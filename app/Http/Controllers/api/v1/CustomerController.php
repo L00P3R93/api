@@ -34,7 +34,7 @@ class CustomerController extends Controller
                 ->get()
         );
     }
-    
+
     /**
      * Search for customers by name, account number, phone number, or email.
      * @param Request $request
@@ -60,7 +60,7 @@ class CustomerController extends Controller
 
         return CustomerResource::collection($customers);
     }
-    
+
     public function customersReferrals(Request $request) {
         $referralCodes = Str::contains($request->referral_code, ',')
             ? explode(',', $request->referral_code)
@@ -74,7 +74,7 @@ class CustomerController extends Controller
     public function store(StoreCustomerRequest $request) {
         try {
             $customer = Customer::create($request->validated());
-            Wallet::create(['customer_id' => $customer->id, 'balance' => 100000]);
+            Wallet::create(['customer_id' => $customer->id, 'balance' => 250]);
             return response()->json(["status" => "Success", "customer_id" => $customer->id ], 201);
         } catch (\Exception $e) {
             Log::error('Create Customer Error: ', ['error' => $e->getMessage()]);
@@ -90,7 +90,7 @@ class CustomerController extends Controller
         if(!$customer) return response()->json([ "message" => "Customer not found" ], 404);
         return CustomerResource::make($customer);
     }
-    
+
     public function customer_transactions(Request $request, $encryptedIdentifier): JsonResponse{
         try {
             $request->validate([
@@ -117,7 +117,7 @@ class CustomerController extends Controller
             return response()->json([ "message" => $e->getMessage() ], 500);
         }
     }
-    
+
     public function customer_played($encryptedIdentifier) : JsonResponse {
         try {
             $customer = Customer::query()
@@ -234,7 +234,7 @@ class CustomerController extends Controller
             return response()->json(["message" => $e->getMessage()], 500);
         }
     }
-    
+
     public function customer_leaderboard(Request $request): JsonResponse
     {
         try {
@@ -300,7 +300,7 @@ class CustomerController extends Controller
             return response()->json(["message" => $e->getMessage()], 500);
         }
     }
-    
+
     public function combined_leaderboard(Request $request): JsonResponse
     {
         try {
@@ -370,7 +370,7 @@ class CustomerController extends Controller
             return response()->json(["message" => $e->getMessage()], 500);
         }
     }
-    
+
     public function customer_purchases($encryptedIdentifier) {
         try {
             $customer = Customer::query()->where('id', $encryptedIdentifier)->orWhere('account_no', $encryptedIdentifier)->first();
@@ -401,7 +401,7 @@ class CustomerController extends Controller
         $customer->update($request->validated());
         return CustomerResource::make($customer);
     }
-    
+
     public function update_wallet(Request $request, $encryptedIdentifier): JsonResponse
     {
         $request->validate([

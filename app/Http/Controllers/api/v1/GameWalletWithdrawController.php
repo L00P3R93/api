@@ -47,7 +47,7 @@ class GameWalletWithdrawController extends Controller
                 $totalBalance = $gameWallet->balance;
 
                 // Define shares: 10% to house, The rest to player. Adjusted to 20%
-                $houseShare = ceil($totalBalance * 0.05);
+                $houseShare = ceil($totalBalance * 0.20);
                 $playerShare = $totalBalance - $houseShare;
 
                 // Create transaction record for the player's payout

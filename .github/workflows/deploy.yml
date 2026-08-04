@@ -1,0 +1,72 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install SSH Key
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_KEY }}
+
+      - name: Deploy Code
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} "
+            set -e
+
+            cd ${{ secrets.DEPLOY_PATH }} || exit 1
+
+            # Pull latest code
+            git pull origin main
+
+            # Maintenance mode
+            /usr/bin/php8.4 artisan down || true
+
+            # Install dependencies with PHP 8.4
+            /usr/bin/php8.4 /usr/local/bin/composer install \
+              --no-interaction \
+              --no-dev \
+              --optimize-autoloader \
+              --no-progress
+
+            # Create storage directories if missing
+            mkdir -p storage/framework/cache
+            mkdir -p storage/framework/sessions
+            mkdir -p storage/framework/views
+            mkdir -p storage/framework/testing
+            mkdir -p storage/logs
+            mkdir -p storage/app/public
+            mkdir -p bootstrap/cache
+
+            # Optimize application
+            /usr/bin/php8.4 artisan optimize:clear
+            /usr/bin/php8.4 artisan config:cache
+            /usr/bin/php8.4 artisan route:cache
+            /usr/bin/php8.4 artisan view:cache
+
+            # Run migrations
+            /usr/bin/php8.4 artisan migrate --force || true
+
+            # Fix permissions
+            sudo chown -R deployer:www-data .
+            sudo chmod -R 775 storage bootstrap/cache
+            sudo chmod 640 .env
+
+            # Restart PHP 8.4 FPM
+            sudo systemctl restart php8.4-fpm
+
+            # Bring application back up
+            /usr/bin/php8.4 artisan up
+          "
