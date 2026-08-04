@@ -12,8 +12,8 @@ if (!function_exists('encryptOpenSSL')) {
      * @return string The encrypted value, with the IV prepended and URL-safe encoded
      */
     function encryptOpenSSL(string $plainValue): string {
-        $method = env('OPENSSL_METHOD');  // You can use AES-128, AES-192, etc.
-        $key = env('OPENSSL_KEY');
+        $method = config('openssl.method');  // You can use AES-128, AES-192, etc.
+        $key = config('openssl.key');
         // Generate an initialization vector (IV) for AES
         $iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length($method));
         // Encrypt the data
@@ -34,8 +34,8 @@ if (!function_exists('decryptOpenSSL')) {
      * @return string|false The decrypted value, or `false` on failure
      */
     function decryptOpenSSL(string $encryptedWithIvValue): false|string {
-        $method = env('OPENSSL_METHOD');  // You can use AES-128, AES-192, etc.
-        $key = env('OPENSSL_KEY');
+        $method = config('openssl.method');  // You can use AES-128, AES-192, etc.
+        $key = config('openssl.key');
         // Decode the URL-safe base64 encoded string
         $decodedData = base64url_decode($encryptedWithIvValue);
         $iv = substr($decodedData, 0, openssl_cipher_iv_length($method));
@@ -130,6 +130,7 @@ function crazyString(int $length): string
  * @param bool $full Whether to include all time units or not.
  * @return string The human-readable time elapsed string.
  * @throws DateMalformedStringException
+ * @throws Exception
  */
 function time_elapsed_string(string $datetime, bool $full = false): string
 {
@@ -268,9 +269,9 @@ function in_array_r(mixed $needle, array $haystack, bool $strict = false): bool
  * Recursively converts an object or array to an array
  *
  * @param object|array $object The object or array to convert
- * @return array The converted array
+ * @return array|object
  */
-function objectToArray(object|array $object): array
+function objectToArray(object|array $object): array|object
 {
     if (!is_object($object) && !is_array($object)) return $object;
     return array_map('objectToArray', (array)$object);
@@ -438,25 +439,7 @@ function isValidDob($dob): bool
     return false;
 }
 
-/**
- * Given a section ID, returns the corresponding section name.
- *
- * @param int $sectionId Section ID.
- *
- * @return string Section name.
- */
-function getSection($sectionId): string
-{
-    switch ($sectionId) {
-        default:
-        case 1:
-            return 'HQ';
-            break;
-        case 2:
-            return 'MSA';
-            break;
-    }
-}
+
 
 /**
  * Pads a number with leading zeroes to a length of 4.
