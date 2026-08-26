@@ -3,44 +3,135 @@
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
-if (!function_exists('encryptOpenSSL')) {
+if (! function_exists('openssl_shared_key')) {
     /**
-     * Encrypts a given value using OpenSSL, with an initialization vector (IV).
-     * The encrypted value is URL-safe.
+     * Resolve the shared KadiApi ID-encryption key from config.
      *
-     * @param string $plainValue The value to encrypt
-     * @return string The encrypted value, with the IV prepended and URL-safe encoded
+     * Accepts either raw bytes or Laravel-style "base64:<encoded>" values and
+     * enforces a 32-byte key length (AES-256). Fails hard rather than falling
+     * back to any built-in value — a missing/misconfigured key must never
+     * silently degrade customer-ID encryption on money endpoints.
+     *
+     * @throws RuntimeException when the key is absent or unusable
      */
-    function encryptOpenSSL(string $plainValue): string {
-        $method = config('openssl.method');  // You can use AES-128, AES-192, etc.
-        $key = config('openssl.key');
-        // Generate an initialization vector (IV) for AES
-        $iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length($method));
-        // Encrypt the data
-        $encrypted = openssl_encrypt($plainValue, $method, $key, 0, $iv);
-        // Combine the IV and encrypted string (needed for decryption)
-        $combined = $iv . $encrypted;
-        // Use URL-safe base64 encoding
-        return base64url_encode($combined);
+    function openssl_shared_key(): string
+    {
+        static $cachedKey = null;
+        static $cachedSource = null;
+
+        $source = config('openssl.key');
+
+        if ($cachedKey !== null && $cachedSource === $source) {
+            return $cachedKey;
+        }
+
+        if (! is_string($source) || $source === '') {
+            throw new RuntimeException('OPENSSL_KEY is not set. Generate one with: php -r "echo \'base64:\'.base64_encode(random_bytes(32));"');
+        }
+
+        $key = str_starts_with($source, 'base64:')
+            ? base64_decode(substr($source, 7), true)
+            : $source;
+
+        if ($key === false || strlen($key) !== 32) {
+            throw new RuntimeException('OPENSSL_KEY must decode to exactly 32 bytes for AES-256.');
+        }
+
+        $cachedSource = $source;
+
+        return $cachedKey = $key;
     }
 }
 
-if (!function_exists('decryptOpenSSL')) {
+if (! function_exists('encryptOpenSSL')) {
     /**
-     * Decrypts a given value using OpenSSL, with an initialization vector (IV).
-     * The input value is expected to be URL-safe encoded.
+     * Encrypts a given value for transport to KadiApi using authenticated
+     * encryption (AES-256-GCM).
      *
-     * @param string $encryptedWithIvValue The value to decrypt, with the IV prepended and URL-safe encoded
-     * @return string|false The decrypted value, or `false` on failure
+     * Wire format: "v2." . urlsafe_base64( nonce[12] || ciphertext || tag[16] )
+     *
+     * The version prefix lets the receiving side distinguish this format from
+     * the legacy unauthenticated CBC scheme during the migration window.
+     * Tampered ciphertext fails loudly instead of yielding attacker-malleable
+     * plaintext.
+     *
+     * @param  string  $plainValue  The value to encrypt
+     * @return string URL-safe, versioned ciphertext
+     *
+     * @throws RuntimeException on key or encryption failure
      */
-    function decryptOpenSSL(string $encryptedWithIvValue): false|string {
-        $method = config('openssl.method');  // You can use AES-128, AES-192, etc.
-        $key = config('openssl.key');
-        // Decode the URL-safe base64 encoded string
-        $decodedData = base64url_decode($encryptedWithIvValue);
-        $iv = substr($decodedData, 0, openssl_cipher_iv_length($method));
-        $encryptedData = substr($decodedData, openssl_cipher_iv_length($method));
-        return openssl_decrypt($encryptedData, $method, $key, 0, $iv);
+    function encryptOpenSSL(string $plainValue): string
+    {
+        $key = openssl_shared_key();
+        $nonce = random_bytes(12);
+        $tag = '';
+
+        $cipherText = openssl_encrypt(
+            $plainValue,
+            config('openssl.cipher', 'aes-256-gcm'),
+            $key,
+            OPENSSL_RAW_DATA,
+            $nonce,
+            $tag,
+            '',
+            16,
+        );
+
+        if ($cipherText === false) {
+            throw new RuntimeException('Failed to encrypt value for KadiApi transport.');
+        }
+
+        return 'v2.'.base64url_encode($nonce.$cipherText.$tag);
+    }
+}
+
+if (! function_exists('decryptOpenSSL')) {
+    /**
+     * Decrypts values produced by encryptOpenSSL().
+     *
+     * Supports both the current "v2." AES-256-GCM format and the legacy
+     * IV-prefixed CBC format (migration window only — remove once both sides
+     * emit v2 exclusively).
+     *
+     * @param  string  $payload  Versioned ciphertext (URL-safe encoded)
+     * @return string|false The decrypted value, or false on failure/tamper
+     *
+     * @throws RuntimeException when the shared key is misconfigured
+     */
+    function decryptOpenSSL(string $payload): false|string
+    {
+        $key = openssl_shared_key();
+        $cipher = config('openssl.cipher', 'aes-256-gcm');
+
+        if (str_starts_with($payload, 'v2.')) {
+            $raw = base64url_decode(substr($payload, 3));
+
+            // Minimum length: nonce (12) + tag (16), even for empty plaintext.
+            if (strlen($raw) < 28) {
+                return false;
+            }
+
+            $nonce = substr($raw, 0, 12);
+            $tag = substr($raw, -16);
+            $cipherText = substr($raw, 12, -16);
+
+            return openssl_decrypt($cipherText, $cipher, $key, OPENSSL_RAW_DATA, $nonce, $tag);
+        }
+
+        // Legacy format (deprecated): raw IV bytes prefixed to the base64
+        // ciphertext string. Unauthenticated — kept only so values emitted
+        // before the v2 rollout remain readable during cutover.
+        $decodedData = base64url_decode($payload);
+        $ivLength = openssl_cipher_iv_length('aes-256-cbc');
+
+        if (strlen($decodedData) <= $ivLength) {
+            return false;
+        }
+
+        $iv = substr($decodedData, 0, $ivLength);
+        $encryptedData = substr($decodedData, $ivLength);
+
+        return openssl_decrypt($encryptedData, 'aes-256-cbc', $key, 0, $iv);
     }
 }
 
