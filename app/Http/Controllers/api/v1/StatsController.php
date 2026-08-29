@@ -358,37 +358,76 @@ class StatsController extends Controller
             'end_date' => 'required|date'
         ]);
 
-        // Count single games played today
-        $gamesPlayedToday = GameTransaction::where('payment_type', '!=', 'payout')
-            ->where('customer_id', $validated['customer_id'])
-            ->whereDate('created_at', Carbon::today())
-            ->count();
+        $startDate = $validated['start_date'];
+        $endDate = $validated['end_date'];
+        $customerId = $validated['customer_id'];
 
-        // Count tournaments played today (game_type = 1)
-        $tournamentsPlayedToday = CompetitionWallet::where('game_type', 1)
-            ->whereHas('transactions', function($query) use ($validated) {
-                $query->where('payment_type', '!=', 'payout')
-                    ->where('customer_id', $validated['customer_id'])
-                    ->whereDate('created_at', Carbon::today());
-            })
-            ->count();
+        // Helper to get single games played by player count for a customer
+        $getSingleGamesPlayedByPlayerCount = function ($playerCount) use ($customerId, $startDate, $endDate) {
+            return DB::table('game_transactions')
+                ->select('game_wallet_id')
+                ->where('payment_type', 'deposit')
+                ->where('customer_id', $customerId)
+                ->whereDate('created_at', '>=', $startDate)
+                ->whereDate('created_at', '<=', $endDate)
+                ->groupBy('game_wallet_id')
+                ->havingRaw('COUNT(DISTINCT customer_id) = ?', [$playerCount])
+                ->count();
+        };
 
-        // Count jackpots played today (game_type = 2)
-        $jackpotsPlayedToday = CompetitionWallet::where('game_type', 2)
-            ->whereHas('transactions', function($query) use ($validated) {
-                $query->where('payment_type', '!=', 'payout')
-                    ->where('customer_id', $validated['customer_id'])
-                    ->whereDate('created_at', Carbon::today());
-            })
-            ->count();
+        // Single games played breakdown by player count
+        $games2Players = $getSingleGamesPlayedByPlayerCount(2);
+        $games3Players = $getSingleGamesPlayedByPlayerCount(3);
+        $games4Players = $getSingleGamesPlayedByPlayerCount(4);
+        $totalGamesPlayed = $games2Players + $games3Players + $games4Players;
 
-        $totalPlayedToday = $gamesPlayedToday + $tournamentsPlayedToday + $jackpotsPlayedToday;
+        // Helper to get tournaments/jackpots played by rounds for a customer
+        $getCompetitionPlayedByRounds = function ($gameType, $rounds) use ($customerId, $startDate, $endDate) {
+            return CompetitionWallet::where('game_type', $gameType)
+                ->whereIn('jp_rounds', $rounds)
+                ->whereHas('transactions', function($query) use ($customerId, $startDate, $endDate) {
+                    $query->where('payment_type', '!=', 'payout')
+                        ->where('customer_id', $customerId)
+                        ->whereDate('created_at', '>=', $startDate)
+                        ->whereDate('created_at', '<=', $endDate);
+                })
+                ->count();
+        };
+
+        // Tournaments played breakdown (game_type = 1, jp_rounds: 3, 4, 5)
+        $tournaments3Rounds = $getCompetitionPlayedByRounds(1, [3]);
+        $tournaments4Rounds = $getCompetitionPlayedByRounds(1, [4]);
+        $tournaments5Rounds = $getCompetitionPlayedByRounds(1, [5]);
+        $totalTournamentsPlayed = $tournaments3Rounds + $tournaments4Rounds + $tournaments5Rounds;
+
+        // Jackpots played breakdown (game_type = 2, jp_rounds: 13, 17, 21)
+        $jackpots13Rounds = $getCompetitionPlayedByRounds(2, [13]);
+        $jackpots17Rounds = $getCompetitionPlayedByRounds(2, [17]);
+        $jackpots21Rounds = $getCompetitionPlayedByRounds(2, [21]);
+        $totalJackpotsPlayed = $jackpots13Rounds + $jackpots17Rounds + $jackpots21Rounds;
+
+        $totalPlayedToday = $totalGamesPlayed + $totalTournamentsPlayed + $totalJackpotsPlayed;
 
         $played = [
             'total' => $totalPlayedToday,
-            'games' => $gamesPlayedToday,
-            'tournament' => $tournamentsPlayedToday,
-            'jackpots' => $jackpotsPlayedToday
+            'games' => [
+                'total' => $totalGamesPlayed,
+                '2_players' => $games2Players,
+                '3_players' => $games3Players,
+                '4_players' => $games4Players,
+            ],
+            'tournament' => [
+                'total' => $totalTournamentsPlayed,
+                '3_rounds' => $tournaments3Rounds,
+                '4_rounds' => $tournaments4Rounds,
+                '5_rounds' => $tournaments5Rounds,
+            ],
+            'jackpots' => [
+                'total' => $totalJackpotsPlayed,
+                '13_rounds' => $jackpots13Rounds,
+                '17_rounds' => $jackpots17Rounds,
+                '21_rounds' => $jackpots21Rounds,
+            ],
         ];
 
         return response()->json([
