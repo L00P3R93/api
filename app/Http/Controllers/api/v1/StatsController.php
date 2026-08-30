@@ -40,7 +40,7 @@ class StatsController extends Controller
             'data' => $stats
         ]);
     }
-    
+
     public function customerReferralStats(Request $request): JsonResponse
     {
         $referralCodes = Str::contains($request->referral_code, ',')
@@ -118,7 +118,7 @@ class StatsController extends Controller
         $jackpots17RoundsIncome = $getCompetitionIncomeByRounds(2, [17]);
         $jackpots21RoundsIncome = $getCompetitionIncomeByRounds(2, [21]);
         $totalJackpotsIncome = $jackpots13RoundsIncome + $jackpots17RoundsIncome + $jackpots21RoundsIncome;
-        
+
         $totalIncome = $totalSingleGamesIncome + $totalTournamentsIncome + $totalJackpotsIncome;
 
         $stats = [
@@ -148,8 +148,8 @@ class StatsController extends Controller
             'data' => $stats,
         ]);
     }
-    
-    
+
+
     public function dailyIncomeStats30Days(): JsonResponse
     {
         $endDate = Carbon::today();
@@ -224,7 +224,7 @@ class StatsController extends Controller
             ],
         ]);
     }
-    
+
     public function purchaseStats(): JsonResponse {
         $today = Carbon::today();
 
@@ -245,7 +245,7 @@ class StatsController extends Controller
             'data' => $purchases
         ]);
     }
-    
+
     public function purchaseReferralsStats(Request $request): JsonResponse {
         $referralCodes = Str::contains($request->referral_code, ',')
             ? explode(',', $request->referral_code)
@@ -269,7 +269,7 @@ class StatsController extends Controller
             'data' => $purchases
         ]);
     }
-    
+
     public function playedStats(): JsonResponse {
         $today = Carbon::today();
 
@@ -343,7 +343,7 @@ class StatsController extends Controller
             'data' => $played
         ]);
     }
-    
+
     /**
      * Accepts customer_id, start_date and end_date and returns summary of games played by the player
      * returns {total, games, tournament, jackpots}
@@ -364,10 +364,21 @@ class StatsController extends Controller
 
         // Helper to get single games played by player count for a customer
         $getSingleGamesPlayedByPlayerCount = function ($playerCount) use ($customerId, $startDate, $endDate) {
-            return DB::table('game_transactions')
+            // First, get game_wallet_ids where the customer made a deposit in the date range
+            $customerGameWalletIds = DB::table('game_transactions')
                 ->select('game_wallet_id')
                 ->where('payment_type', 'deposit')
                 ->where('customer_id', $customerId)
+                ->whereDate('created_at', '>=', $startDate)
+                ->whereDate('created_at', '<=', $endDate)
+                ->pluck('game_wallet_id')
+                ->unique();
+
+            // Then, count how many of those game_wallet_ids have exactly $playerCount distinct customers
+            return DB::table('game_transactions')
+                ->select('game_wallet_id')
+                ->where('payment_type', 'deposit')
+                ->whereIn('game_wallet_id', $customerGameWalletIds)
                 ->whereDate('created_at', '>=', $startDate)
                 ->whereDate('created_at', '<=', $endDate)
                 ->groupBy('game_wallet_id')
@@ -435,7 +446,7 @@ class StatsController extends Controller
             'data' => $played
         ]);
     }
-    
+
     public function retentionRates(): JsonResponse
     {
         $now = Carbon::now();
@@ -444,7 +455,7 @@ class StatsController extends Controller
         $startOfWeek = $now->copy()->startOfWeek();
         $startOfMonth = $now->copy()->startOfMonth();
         $startOfYear = $now->copy()->startOfYear();
-    
+
         // Get all players who have played before today (for calculating returning players)
         $allPlayers = Customer::whereHas('gameWalletTransactions', function($q) use ($today) {
                 $q->where('game_transactions.created_at', '<', $today);
@@ -453,7 +464,7 @@ class StatsController extends Controller
                 $q->where('competition_transactions.created_at', '<', $today);
             })
             ->count();
-    
+
         if ($allPlayers === 0) {
             return response()->json([
                 'success' => true,
@@ -466,7 +477,7 @@ class StatsController extends Controller
                 ]
             ]);
         }
-    
+
         // Helper function to count returning players
         $countReturningPlayers = function ($startDate, $endDate = null) use ($today) {
             return Customer::where(function($q) use ($startDate, $endDate, $today) {
@@ -496,13 +507,13 @@ class StatsController extends Controller
                 });
             })->count();
         };
-    
+
         // Calculate returning players for each period
         $todayReturning = $countReturningPlayers($today, $now);
         $weekReturning = $countReturningPlayers($startOfWeek, $now);
         $monthReturning = $countReturningPlayers($startOfMonth, $now);
         $yearReturning = $countReturningPlayers($startOfYear, $now);
-    
+
         return response()->json([
             'success' => true,
             'data' => [
