@@ -19,6 +19,7 @@ use App\Http\Controllers\api\v1\DepositController;
 use App\Http\Controllers\api\v1\DropConnectionController;
 use App\Http\Controllers\api\v1\EmailVerifiedController;
 use App\Http\Controllers\api\v1\EncryptIdentifierController;
+use App\Http\Controllers\api\v1\GameCreditController;
 use App\Http\Controllers\api\v1\GameTransactionController;
 use App\Http\Controllers\api\v1\GameWalletController;
 use App\Http\Controllers\api\v1\GameWalletWithdrawController;
@@ -72,6 +73,8 @@ Route::prefix('/v1')->group(function () {
 
         Route::get('/game/bets', [GameTransactionController::class, 'index']);
         Route::post('/game/bets', [GameTransactionController::class, 'store'])->middleware(['idempotency', 'throttle:write']);
+
+        Route::post('/game/credit', GameCreditController::class)->middleware(['idempotency', 'throttle:write']);
 
         Route::get('/competition/wallets', [CompetitionWalletController::class, 'index']);
         Route::post('/competition/wallets', [CompetitionWalletController::class, 'store'])->middleware(['idempotency', 'throttle:write']);

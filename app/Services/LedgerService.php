@@ -87,6 +87,45 @@ class LedgerService
         return [$customerEntry, $gameEntry];
     }
 
+    public function recordGameBetWithHouseCut($gameTransaction, Wallet $customerWallet, $gameWallet, float $amount, float $houseCut): array
+    {
+        $customerBalanceBefore = $customerWallet->balance;
+        $gameBalanceBefore = $gameWallet->balance;
+        $netCredit = $amount - $houseCut;
+
+        $customerWallet->balance -= $amount;
+        $customerWallet->save();
+
+        $gameWallet->balance += $netCredit;
+        $gameWallet->save();
+
+        $customerEntry = $this->createEntry(
+            entryType: 'game_bet',
+            referenceable: $gameTransaction,
+            wallet: $customerWallet,
+            customerId: $customerWallet->customer_id,
+            debit: $amount,
+            credit: 0,
+            balanceBefore: $customerBalanceBefore,
+            balanceAfter: $customerWallet->balance,
+            metadata: ['game_wallet_id' => $gameWallet->id, 'house_cut' => $houseCut]
+        );
+
+        $gameEntry = $this->createEntry(
+            entryType: 'game_bet',
+            referenceable: $gameTransaction,
+            wallet: $gameWallet,
+            customerId: null,
+            debit: 0,
+            credit: $netCredit,
+            balanceBefore: $gameBalanceBefore,
+            balanceAfter: $gameWallet->balance,
+            metadata: ['customer_wallet_id' => $customerWallet->id, 'house_cut' => $houseCut]
+        );
+
+        return [$customerEntry, $gameEntry];
+    }
+
     public function recordGamePayout($gameTransaction, Wallet $winnerWallet, float $amount): LedgerEntry
     {
         $balanceBefore = $winnerWallet->balance;

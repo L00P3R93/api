@@ -251,6 +251,7 @@
         </ul>
         <div class="nav-section">Utilities</div>
         <ul>
+            <li><a href="#" data-section="playground"><span class="nav-icon">&#128736;</span> <span>Playground</span></a></li>
             <li><a href="#" data-section="utilities"><span class="nav-icon">&#128295;</span> <span>Utilities</span></a></li>
             <li><a href="#" data-section="errors"><span class="nav-icon">&#9888;</span> <span>Error Responses</span></a></li>
         </ul>
@@ -812,6 +813,17 @@ Content-Type: application/json
 }</pre></div>
 </div></div>
 <div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-put">PUT</span><span class="endpoint-path">/api/v1/deposits/{encryptedIdentifier}</span><span class="endpoint-desc">Update a deposit record</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-rate">30/min</span></div>
+<div class="endpoint-section"><h4>Request Body</h4>
+<table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>status</td><td>integer</td><td><span class="optional">Optional</span></td><td>Deposit status code</td></tr>
+<tr><td>name</td><td>string</td><td><span class="optional">Optional</span></td><td>Depositor name</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{"id": 1, "trans_id": "QHK123ABC", "status": 2, "name": "John Doe"}</pre></div>
+</div></div>
+<div class="endpoint">
 <div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/deposits/{encryptedIdentifier}</span><span class="endpoint-desc">Initiate STK Push deposit</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">5/min</span></div>
@@ -949,6 +961,38 @@ Content-Type: application/json
 <tr><td>amount</td><td>numeric</td><td><span class="required">Required</span></td><td>Bet amount</td></tr>
 <tr><td>status</td><td>integer</td><td><span class="optional">Optional</span></td><td>Transaction status</td></tr></table></div>
 <div class="endpoint-section"><h4>Response (201)</h4><pre>{"status": "success"}</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/game/credit</span><span class="endpoint-desc">Credit game wallet (10% house share deducted)</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">30/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Transfers funds from a customer's wallet to a game wallet. A 10% house share is deducted — the game wallet receives 90% of the amount, and the house wallet is credited with the remaining 20%.</p></div>
+<div class="endpoint-section"><h4>Request Body</h4>
+<table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>customer_id</td><td>integer</td><td><span class="required">Required</span></td><td>Customer ID (must exist, wallet fetched automatically)</td></tr>
+<tr><td>game_wallet_id</td><td>integer</td><td><span class="required">Required</span></td><td>Target game wallet ID</td></tr>
+<tr><td>amount</td><td>numeric</td><td><span class="required">Required</span></td><td>Amount to transfer (min: 0.01)</td></tr></table></div>
+<div class="endpoint-section"><h4>Request</h4>
+<pre>POST /api/v1/game/credit HTTP/1.1
+Host: api.kadi-kings.co.ke
+X-API-KEY: your-api-key-here
+Content-Type: application/json
+Idempotency-Key: idem-game-credit-123
+
+{
+  "customer_id": 1,
+  "game_wallet_id": 5,
+  "amount": 100.00
+}</pre></div>
+<div class="endpoint-section"><h4>Response (201)</h4>
+<pre>{"status": "success"}</pre></div>
+<div class="endpoint-section"><h4>Error Responses</h4>
+<pre>// Customer has no wallet
+{"error": "Customer has no wallet."}
+
+// Insufficient balance
+{"error": "Insufficient wallet balance."}</pre></div>
 </div></div>
 <div class="endpoint">
 <div class="endpoint-header" onclick="toggle(this)"><span class="method method-put">PUT</span><span class="endpoint-path">/api/v1/game/bets/{encryptedIdentifier}</span><span class="endpoint-desc">Update a game transaction</span><span class="chevron">&#9654;</span></div>
@@ -1299,6 +1343,52 @@ Content-Type: application/json
 </div></div>
 </div>
 
+<!-- PLAYGROUND SECTION -->
+<div class="doc-section" data-section="playground">
+<div class="callback-note">These are test/demo endpoints for verifying encryption and decryption functionality. They do not persist any data.</div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/playground</span><span class="endpoint-desc">Encryption proof-of-concept</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{"encrypted": "eyJpdiI6IkxOazB...", "decrypted": "11"}</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/playground</span><span class="endpoint-desc">Echo request data with decryption</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span></div>
+<div class="endpoint-section"><h4>Request Body</h4>
+<table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>*</td><td>mixed</td><td><span class="optional">Optional</span></td><td>Any arbitrary data is echoed back</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4><pre>{"decrypted_id": null, "data": {...}}</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/playground/{encryptedIdentifier}</span><span class="endpoint-desc">Encrypt a raw identifier</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span></div>
+<div class="endpoint-section"><h4>Path Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td>encryptedIdentifier</td><td>string</td><td>Raw integer ID (not encrypted, middleware bypassed)</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{"original": "123", "encrypted": "eyJpdiI6IkxOazB..."}</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-put">PUT</span><span class="endpoint-path">/api/v1/playground/{encryptedIdentifier}</span><span class="endpoint-desc">Encrypt request data with decrypted ID</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
+<div class="endpoint-section"><h4>Request Body</h4>
+<table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>identifier</td><td>string</td><td><span class="required">Required</span></td><td>Value to encrypt</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{"decrypted_id": "123", "encrypted": "eyJpdiI6IkxOazB...", "data": {...}}</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-delete">DELETE</span><span class="endpoint-path">/api/v1/playground/{encryptedIdentifier}</span><span class="endpoint-desc">Return decrypted identifier</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
+<div class="endpoint-section"><h4>Response (200)</h4><pre>{"decrypted_id": "123"}</pre></div>
+</div></div>
+</div>
 <!-- UTILITIES SECTION -->
 <div class="doc-section" data-section="utilities">
 <div class="endpoint" id="encrypt">
@@ -1327,6 +1417,14 @@ Content-Type: application/json
 <tr><td>identifier</td><td>string</td><td><span class="required">Required</span></td><td>Encrypted string to decrypt</td></tr></table></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
 <pre>{"decrypted_id": "1", "encrypted_id": "eyJpdiI6IkxOazB..."}</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/test</span><span class="endpoint-desc">M-Pesa B2C test endpoint</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span></div>
+<div class="callback-note">Sends a test B2C payment request (KES 0) to Safaricom. Currently disabled in routes.</div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{"OriginatorConversationID": "...", "ConversationID": "...", "ResponseCode": "0", "ResponseDescription": "Accept the service request successfully."}</pre></div>
 </div></div>
 <div class="endpoint">
 <div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/c2b/register</span><span class="endpoint-desc">Register MPesa C2B URLs</span><span class="chevron">&#9654;</span></div>
@@ -1409,13 +1507,14 @@ var sectionTitles = {
     'withdraws': { title: 'Withdraws', desc: 'Withdrawal records and status' },
     'transactions': { title: 'Transactions', desc: 'Polymorphic transaction records' },
     'game-wallets': { title: 'Game Wallets', desc: 'Game wallet CRUD, results, and income' },
-    'game-bets': { title: 'Game Bets', desc: 'Game bet transactions, drop payouts, and withdrawals' },
+    'game-bets': { title: 'Game Bets', desc: 'Game bet transactions, credits, drop payouts, and withdrawals' },
     'comp-wallets': { title: 'Competition Wallets', desc: 'Competition wallet management, income, results, and awards' },
     'comp-txns': { title: 'Competition Transactions', desc: 'Competition transaction records' },
     'financial': { title: 'Financial Operations', desc: 'STK Push loads and B2C balance' },
     'callbacks': { title: 'MPesa Callbacks', desc: 'Safaricom webhook endpoints (no auth required)' },
     'stats': { title: 'Statistics & Analytics', desc: 'Customer, income, purchase, and gameplay statistics' },
     'utilities': { title: 'Utilities', desc: 'Encrypt/decrypt identifiers and system endpoints' },
+    'playground': { title: 'Playground', desc: 'Test and demo endpoints for encryption/decryption functionality' },
     'errors': { title: 'Error Responses', desc: 'Common HTTP error response formats' }
 };
 
