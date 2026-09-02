@@ -117,6 +117,62 @@
             color: var(--text-muted);
         }
 
+        /* SEARCH */
+        .search-wrap {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        .search-box {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .search-box input {
+            width: 100%;
+            padding: 8px 30px 8px 10px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 12px;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+        .search-box input::placeholder { color: var(--text-muted); }
+        .search-box input:focus { border-color: var(--accent-blue); }
+        .search-clear {
+            position: absolute;
+            right: 8px;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+            display: none;
+            padding: 2px;
+        }
+        .search-clear.visible { display: block; }
+        .search-clear:hover { color: var(--text-primary); }
+        .search-info {
+            font-size: 10px;
+            color: var(--text-muted);
+            padding: 0 2px;
+            margin-top: 4px;
+            display: none;
+        }
+        .search-info.visible { display: block; }
+        .sidebar-nav .nav-section.hidden,
+        .sidebar-nav ul.hidden { display: none; }
+        .endpoint.search-hidden { display: none !important; }
+        .endpoint mark {
+            background: rgba(88, 166, 255, 0.25);
+            color: var(--text-primary);
+            border-radius: 2px;
+            padding: 0 1px;
+        }
+
         /* MAIN CONTENT */
         .main-content {
             margin-left: var(--sidebar-width);
@@ -202,7 +258,7 @@
 
         @media (max-width: 900px) {
             .sidebar { width: 60px; }
-            .sidebar-header h1, .sidebar-header p, .sidebar-header .base-url, .sidebar-nav .nav-section, .sidebar-nav a span { display: none; }
+            .sidebar-header h1, .sidebar-header p, .sidebar-header .base-url, .sidebar-nav .nav-section, .sidebar-nav a span, .search-wrap { display: none; }
             .sidebar-nav a { justify-content: center; padding: 10px; }
             .sidebar-nav .nav-icon { width: auto; }
             .main-content { margin-left: 60px; }
@@ -216,6 +272,13 @@
         <h1>Kadi Kings API</h1>
         <p>RESTful API Documentation</p>
         <div class="base-url">https://api.kadi-kings.co.ke/api/v1</div>
+    </div>
+    <div class="search-wrap">
+        <div class="search-box">
+            <input type="text" id="doc-search" placeholder="Search endpoints..." autocomplete="off">
+            <button class="search-clear" id="search-clear">&times;</button>
+        </div>
+        <div class="search-info" id="search-info"></div>
     </div>
     <nav class="sidebar-nav">
         <div class="nav-section">Getting Started</div>
@@ -1479,14 +1542,16 @@ Content-Type: application/json</pre></div>
 </div>
 
 <script>
+var STORAGE_KEY = 'kadi-docs-section';
+
 function toggle(el) {
     el.closest('.endpoint').classList.toggle('open');
 }
 function toggleAll(sectionId) {
-    const section = document.querySelector('.doc-section[data-section="' + sectionId + '"]');
+    var section = document.querySelector('.doc-section[data-section="' + sectionId + '"]');
     if (!section) return;
-    const endpoints = section.querySelectorAll('.endpoint');
-    const allOpen = Array.from(endpoints).every(function(e) { return e.classList.contains('open'); });
+    var endpoints = section.querySelectorAll('.endpoint');
+    var allOpen = Array.from(endpoints).every(function(e) { return e.classList.contains('open'); });
     endpoints.forEach(function(e) {
         if (allOpen) e.classList.remove('open');
         else e.classList.add('open');
@@ -1496,6 +1561,8 @@ function toggleAll(sectionId) {
 // Sidebar navigation
 var navLinks = document.querySelectorAll('.sidebar-nav a[data-section]');
 var docSections = document.querySelectorAll('.doc-section');
+var navSections = document.querySelectorAll('.sidebar-nav .nav-section');
+var navUls = document.querySelectorAll('.sidebar-nav ul');
 var sectionTitles = {
     'auth': { title: 'Authentication', desc: 'API key setup, encrypted identifiers, rate limits, and idempotency' },
     'customers': { title: 'Customers', desc: 'CRUD operations, search, referrals, leaderboard, and customer data' },
@@ -1533,26 +1600,196 @@ function showSection(sectionId) {
         document.getElementById('section-desc').textContent = info.desc;
     }
     window.scrollTo(0, 0);
+
+    try { localStorage.setItem(STORAGE_KEY, sectionId); } catch(e) {}
 }
 
 navLinks.forEach(function(link) {
     link.addEventListener('click', function(e) {
         e.preventDefault();
+        clearSearch();
         showSection(this.getAttribute('data-section'));
     });
 });
 
-// Handle internal section links (e.g. "POST /api/v1/encrypt" link in auth section)
+// Handle internal section links
 document.addEventListener('click', function(e) {
     var target = e.target.closest('[data-section]');
     if (target && target.tagName === 'A') {
         e.preventDefault();
+        clearSearch();
         showSection(target.getAttribute('data-section'));
     }
 });
 
-// Set first item active on load
-showSection('auth');
+// --- SEARCH ---
+var searchInput = document.getElementById('doc-search');
+var searchClear = document.getElementById('search-clear');
+var searchInfo = document.getElementById('search-info');
+var searchTimer = null;
+
+function stripHtml(html) {
+    var tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || '';
+}
+
+function highlightText(text, query) {
+    if (!query) return text;
+    var re = new RegExp('(' + query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+    return text.replace(re, '<mark>$1</mark>');
+}
+
+function clearSearch() {
+    searchInput.value = '';
+    searchClear.classList.remove('visible');
+    searchInfo.classList.remove('visible');
+    searchInfo.textContent = '';
+    docSections.forEach(function(s) { s.classList.remove('active'); });
+    docSections.forEach(function(s) {
+        s.querySelectorAll('.endpoint').forEach(function(ep) {
+            ep.classList.remove('search-hidden');
+        });
+    });
+    navSections.forEach(function(ns) { ns.classList.remove('hidden'); });
+    navUls.forEach(function(ul) { ul.classList.remove('hidden'); });
+    // Restore active section from storage or default
+    var saved = 'auth';
+    try { saved = localStorage.getItem(STORAGE_KEY) || 'auth'; } catch(e) {}
+    showSection(saved);
+}
+
+function runSearch() {
+    var query = searchInput.value.trim().toLowerCase();
+    if (!query) {
+        clearSearch();
+        return;
+    }
+
+    searchClear.classList.add('visible');
+
+    // Count matches across all sections
+    var totalMatches = 0;
+    var sectionsWithMatches = {};
+
+    docSections.forEach(function(section) {
+        var sectionId = section.getAttribute('data-section');
+        var endpoints = section.querySelectorAll('.endpoint');
+        var sectionMatches = 0;
+
+        endpoints.forEach(function(ep) {
+            var pathEl = ep.querySelector('.endpoint-path');
+            var descEl = ep.querySelector('.endpoint-desc');
+            var bodyText = ep.querySelector('.endpoint-body') ? stripHtml(ep.querySelector('.endpoint-body').innerHTML).toLowerCase() : '';
+
+            var path = pathEl ? pathEl.textContent.toLowerCase() : '';
+            var desc = descEl ? descEl.textContent.toLowerCase() : '';
+
+            if (path.indexOf(query) !== -1 || desc.indexOf(query) !== -1 || bodyText.indexOf(query) !== -1) {
+                ep.classList.remove('search-hidden');
+                sectionMatches++;
+                totalMatches++;
+
+                // Highlight path and description
+                if (pathEl) pathEl.innerHTML = highlightText(pathEl.getAttribute('data-original') || pathEl.textContent, query);
+                if (descEl) descEl.innerHTML = highlightText(descEl.getAttribute('data-original') || descEl.textContent, query);
+            } else {
+                ep.classList.add('search-hidden');
+            }
+        });
+
+        if (sectionMatches > 0) {
+            sectionsWithMatches[sectionId] = sectionMatches;
+        }
+    });
+
+    // Store original text for re-highlighting
+    docSections.querySelectorAll ? null : null;
+
+    // Hide nav sections with no matches
+    navLinks.forEach(function(link) {
+        var sectionId = link.getAttribute('data-section');
+        var li = link.closest('li');
+        var ul = li ? li.parentElement : null;
+        var navSection = ul ? ul.previousElementSibling : null;
+
+        if (sectionsWithMatches[sectionId]) {
+            if (li) li.style.display = '';
+        } else {
+            if (li) li.style.display = 'none';
+        }
+    });
+
+    // Hide empty nav groups
+    navUls.forEach(function(ul) {
+        var visibleItems = ul.querySelectorAll('li:not([style*="display: none"])');
+        var navSection = ul.previousElementSibling;
+        if (visibleItems.length === 0) {
+            ul.classList.add('hidden');
+            if (navSection && navSection.classList.contains('nav-section')) navSection.classList.add('hidden');
+        } else {
+            ul.classList.remove('hidden');
+            if (navSection && navSection.classList.contains('nav-section')) navSection.classList.remove('hidden');
+        }
+    });
+
+    // Show first section with matches
+    var firstSection = Object.keys(sectionsWithMatches)[0];
+    if (firstSection) {
+        docSections.forEach(function(s) { s.classList.remove('active'); });
+        var target = document.querySelector('.doc-section[data-section="' + firstSection + '"]');
+        if (target) target.classList.add('active');
+
+        navLinks.forEach(function(a) { a.classList.remove('active'); });
+        var link = document.querySelector('.sidebar-nav a[data-section="' + firstSection + '"]');
+        if (link) link.classList.add('active');
+
+        var info = sectionTitles[firstSection];
+        if (info) {
+            document.getElementById('section-title').textContent = info.title;
+            document.getElementById('section-desc').textContent = info.desc;
+        }
+    }
+
+    searchInfo.textContent = totalMatches + ' endpoint' + (totalMatches !== 1 ? 's' : '') + ' found';
+    searchInfo.classList.add('visible');
+}
+
+// Save original text on load
+document.querySelectorAll('.endpoint-path, .endpoint-desc').forEach(function(el) {
+    el.setAttribute('data-original', el.textContent);
+});
+
+searchInput.addEventListener('input', function() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(runSearch, 200);
+});
+
+searchClear.addEventListener('click', function() {
+    clearSearch();
+    searchInput.focus();
+});
+
+// Keyboard shortcut: / to focus search, Escape to clear
+document.addEventListener('keydown', function(e) {
+    if (e.key === '/' && document.activeElement !== searchInput) {
+        e.preventDefault();
+        searchInput.focus();
+    }
+    if (e.key === 'Escape' && document.activeElement === searchInput) {
+        clearSearch();
+        searchInput.blur();
+    }
+});
+
+// --- INIT: restore saved section or default to auth ---
+var initialSection = 'auth';
+try { initialSection = localStorage.getItem(STORAGE_KEY) || 'auth'; } catch(e) {}
+// Validate the saved section exists
+if (!document.querySelector('.doc-section[data-section="' + initialSection + '"]')) {
+    initialSection = 'auth';
+}
+showSection(initialSection);
 </script>
 </body>
 </html>
