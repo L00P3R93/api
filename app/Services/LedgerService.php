@@ -491,7 +491,7 @@ class LedgerService
     private function createEntry(
         string $entryType,
         $referenceable,
-        Wallet $wallet,
+        $wallet,
         $customerId,
         float $debit,
         float $credit,
