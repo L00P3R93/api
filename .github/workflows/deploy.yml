@@ -32,10 +32,10 @@ jobs:
             git pull origin main
 
             # Maintenance mode
-            /usr/bin/php artisan down || true
+            /usr/bin/php8.4 artisan down || true
 
             # Install dependencies with PHP 8.4
-            /usr/bin/php /usr/local/bin/composer install \
+            /usr/bin/php8.4 /usr/local/bin/composer install \
               --no-interaction \
               --no-dev \
               --optimize-autoloader \
@@ -51,13 +51,13 @@ jobs:
             mkdir -p bootstrap/cache
 
             # Optimize application
-            /usr/bin/php artisan optimize:clear
-            /usr/bin/php artisan config:cache
-            /usr/bin/php artisan route:cache
-            /usr/bin/php artisan view:cache
+            /usr/bin/php8.4 artisan optimize:clear
+            /usr/bin/php8.4 artisan config:cache
+            /usr/bin/php8.4 artisan route:cache
+            /usr/bin/php8.4 artisan view:cache
 
             # Run migrations
-            /usr/bin/php artisan migrate --force || true
+            /usr/bin/php8.4 artisan migrate --force || true
 
             # Fix permissions
             sudo chown -R deployer:www-data .
@@ -65,5 +65,5 @@ jobs:
             sudo chmod 640 .env
 
             # Bring application back up
-            php artisan up
+            php8.4 artisan up
           "
