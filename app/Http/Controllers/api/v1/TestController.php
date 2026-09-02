@@ -10,8 +10,8 @@ use App\Mpesa\Core;
 
 class TestController extends Controller {
     public function index() {
-        $key = 'h5UA56LlyGYsCp75m77Z9Z3CTOHA0y4gkX7W043AVlCHBNsJ';
-        $secret = 'Wb9XepJ9CUka9JlLyUvhFZeOnGeCe7By5zTPB61ZEbm8f5ybGnnalSWacFSFdlnl';
+        $key = config('mpesa.apps.b2c.consumer_key');
+        $secret = config('mpesa.apps.b2c.consumer_secret');
 
         // Generate access token
         $credentials = base64_encode("$key:$secret");
@@ -32,10 +32,10 @@ class TestController extends Controller {
             'InitiatorName' => config('mpesa.b2c.initiator_name'),
             'SecurityCredential' => Core::computeSecurityCredentials(config('mpesa.b2c.security_credential'), true),
             'CommandID' => config('mpesa.b2c.default_command_id'),
-            'Amount' => 10,
+            'Amount' => 0,
             'PartyA' => config('mpesa.b2c.short_code'),
-            'PartyB' => 254724574375,
-            'Remarks' => 'Test Payment',
+            'PartyB' => 254795702455,
+            'Remarks' => 'Business Payment',
             'QueueTimeOutURL' => config('mpesa.b2c.timeout_url'),
             'ResultURL' => config('mpesa.b2c.result_url'),
             "Occasion" => "",

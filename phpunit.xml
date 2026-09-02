@@ -29,5 +29,7 @@
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="OPENSSL_KEY" value="a9378f354771d2bdf46c1fd1b5bcaf38"/>
+        <env name="OPENSSL_METHOD" value="AES-128-CBC"/>
     </php>
 </phpunit>

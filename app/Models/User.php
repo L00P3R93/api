@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Util\Badge;
+use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -11,7 +12,7 @@ use Illuminate\Support\Facades\Hash;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
+    /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
     /**
@@ -28,7 +29,7 @@ class User extends Authenticatable
         'role_id',
         'password',
         'remember_token',
-        'status'
+        'status',
     ];
 
     /**
@@ -54,11 +55,13 @@ class User extends Authenticatable
         ];
     }
 
-    public function role(){
+    public function role()
+    {
         return $this->belongsTo(Role::class);
     }
 
-    public function stock(){
+    public function stock()
+    {
         return $this->belongsTo(Stock::class);
     }
 
@@ -81,18 +84,18 @@ class User extends Authenticatable
      * Generate a unique identifier for the user.
      *
      * @return string A string containing the year and month of the user's creation date,
-     * followed by the user's id.
+     *                followed by the user's id.
      */
-    public function getUserId(): string {
-        return date('Ym', strtotime($this->created_at)).set_number($this->id);
+    public function getUserId(): string
+    {
+        return date('Ym', strtotime($this->created_at)).str_pad($this->id, 4, '0', STR_PAD_LEFT);
     }
 
     /**
      * Get the status badge HTML for this role.
-     *
-     * @return string
      */
-    public function getStatusBadge(): string {
+    public function getStatusBadge(): string
+    {
         return match ($this->status) {
             1 => Badge::set('primary', 'Active'),
             2 => Badge::set('danger', 'Blocked'),
@@ -101,7 +104,8 @@ class User extends Authenticatable
         };
     }
 
-    static public function getSingle($id){
+    public static function getSingle($id)
+    {
         return self::find($id);
     }
 }

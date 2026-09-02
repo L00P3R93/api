@@ -2,16 +2,16 @@
 
 namespace App\Models;
 
+use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Facades\Log;
 
-class SMSCode extends Model {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+class SMSCode extends Model
+{
+    /** @use HasFactory<UserFactory> */
+    use HasFactory;
 
-    protected $table = 'sms_codes';
+    protected $table = 'sms_codes_disabled';
 
     /**
      * The attributes that are mass assignable.
@@ -22,20 +22,16 @@ class SMSCode extends Model {
         'phone_no',
         'code',
         'status',
-        'body'
+        'body',
     ];
 
-    public static function generateCode(): string {
-        do {
-            try {
-                //Generate 6-digit random code
-                $code = (string) random_int(100000, 999999);
-            } catch (\Exception $e) {
-                //Handle failure gracefully
-                Log::error("Failed to generate verification code: {$e->getMessage()}");
-                abort(500, 'Unable to generate verification code.');
-            }
-        } while (self::where('code', $code)->exists());
-        return $code;
+    /**
+     * @deprecated This feature is disabled. The SMSCode feature has not been
+     * implemented yet. This model is retained only to preserve the table
+     * structure for future use.
+     */
+    public static function generateCode(): string
+    {
+        abort(503, 'SMS verification is not available.');
     }
 }

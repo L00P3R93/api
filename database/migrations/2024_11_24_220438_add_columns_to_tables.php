@@ -18,7 +18,7 @@ return new class extends Migration
             $table->foreign('customer_id')->references('id')->on('customers')->onDelete('set null');
         });
         Schema::table('users', function (Blueprint $table) {
-            $table->foreign('role_id')->references('id')->on('users')->onDelete('set null');
+            $table->foreign('role_id')->references('id')->on('roles')->onDelete('set null');
         });
     }
 
