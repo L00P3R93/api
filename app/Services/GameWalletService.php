@@ -187,6 +187,60 @@ class GameWalletService
         return ['status' => 'success'];
     }
 
+    public function processFullRefund(int $gameWalletId): array
+    {
+        $gameWallet = GameWallet::find($gameWalletId);
+        if (! $gameWallet) {
+            return ['error' => 'Game Wallet not found', 'status' => 404];
+        }
+
+        $depositsByCustomer = GameTransaction::where('game_wallet_id', $gameWalletId)
+            ->where('payment_type', 'deposit')
+            ->where('status', 2)
+            ->select('customer_id', DB::raw('SUM(amount) as total_amount'))
+            ->groupBy('customer_id')
+            ->get();
+
+        if ($depositsByCustomer->isEmpty()) {
+            return ['error' => 'No deposit transactions found for this game wallet', 'status' => 404];
+        }
+
+        DB::transaction(function () use ($gameWallet, $depositsByCustomer) {
+            foreach ($depositsByCustomer as $deposit) {
+                $playerWallet = Wallet::where('customer_id', $deposit->customer_id)->first();
+                if (! $playerWallet) {
+                    continue;
+                }
+
+                $refundTransaction = GameTransaction::create([
+                    'game_wallet_id' => $gameWallet->id,
+                    'customer_id' => $deposit->customer_id,
+                    'amount' => $deposit->total_amount,
+                    'payment_type' => 'refund|full',
+                    'status' => 2,
+                ]);
+
+                $ledgerEntry = $this->ledgerService->recordRefund(
+                    $refundTransaction,
+                    $playerWallet,
+                    (float) $deposit->total_amount,
+                    'game_full_refund'
+                );
+
+                $refundTransaction->update([
+                    'wallet_balance_before' => $ledgerEntry->balance_before,
+                    'wallet_balance_after' => $ledgerEntry->balance_after,
+                ]);
+            }
+
+            $gameWallet->balance = 0;
+            $gameWallet->status = 3;
+            $gameWallet->save();
+        });
+
+        return ['status' => 'success'];
+    }
+
     public function listGameTransactions(): Collection
     {
         return GameTransaction::with(['gameWallet'])->get();

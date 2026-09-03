@@ -1026,11 +1026,11 @@ Content-Type: application/json
 <div class="endpoint-section"><h4>Response (201)</h4><pre>{"status": "success"}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/game/credit</span><span class="endpoint-desc">Credit game wallet (10% house share deducted)</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/game/credit</span><span class="endpoint-desc">Credit game wallet (5% house share deducted)</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">30/min</span></div>
 <div class="endpoint-section"><h4>Description</h4>
-<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Transfers funds from a customer's wallet to a game wallet. A 10% house share is deducted — the game wallet receives 90% of the amount, and the house wallet is credited with the remaining 20%.</p></div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Transfers funds from a customer's wallet to a game wallet. A 5% house share is deducted — the game wallet receives 95% of the amount, and the house wallet is credited with the remaining 5%.</p></div>
 <div class="endpoint-section"><h4>Request Body</h4>
 <table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
 <tr><td>customer_id</td><td>integer</td><td><span class="required">Required</span></td><td>Customer ID (must exist, wallet fetched automatically)</td></tr>
@@ -1090,6 +1090,33 @@ Idempotency-Key: idem-game-credit-123
 <table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
 <tr><td>customer_id</td><td>string</td><td><span class="required">Required</span></td><td>Customer identifier</td></tr></table></div>
 <div class="endpoint-section"><h4>Response (201)</h4><pre>{"status": "success"}</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/game/refund</span><span class="endpoint-desc">Full refund all bets on a game wallet (no house cut)</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">30/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Refunds the full bet amount to every customer who placed a deposit on the specified game wallet. No house cut is deducted. The game wallet is closed (status set to 3) after the refund. Useful when a game needs to be cancelled and all players must be made whole.</p></div>
+<div class="endpoint-section"><h4>Request Body</h4>
+<table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>game_wallet_id</td><td>integer</td><td><span class="required">Required</span></td><td>Game wallet ID to refund all bets for</td></tr></table></div>
+<div class="endpoint-section"><h4>Request</h4>
+<pre>POST /api/v1/game/refund HTTP/1.1
+Host: api.kadi-kings.co.ke
+X-API-KEY: your-api-key-here
+Content-Type: application/json
+Idempotency-Key: idem-game-refund-42
+
+{
+  "game_wallet_id": 42
+}</pre></div>
+<div class="endpoint-section"><h4>Response (200)</h4><pre>{"status": "success"}</pre></div>
+<div class="endpoint-section"><h4>Error Responses</h4>
+<pre>// Game wallet not found
+{"status": "error", "error": "Game Wallet not found"}
+
+// No deposits found
+{"status": "error", "error": "No deposit transactions found for this game wallet"}</pre></div>
 </div></div>
 </div>
 <!-- COMPETITION WALLETS SECTION -->
@@ -1574,7 +1601,7 @@ var sectionTitles = {
     'withdraws': { title: 'Withdraws', desc: 'Withdrawal records and status' },
     'transactions': { title: 'Transactions', desc: 'Polymorphic transaction records' },
     'game-wallets': { title: 'Game Wallets', desc: 'Game wallet CRUD, results, and income' },
-    'game-bets': { title: 'Game Bets', desc: 'Game bet transactions, credits, drop payouts, and withdrawals' },
+    'game-bets': { title: 'Game Bets', desc: 'Game bet transactions, credits, drop payouts, withdrawals, and full refunds' },
     'comp-wallets': { title: 'Competition Wallets', desc: 'Competition wallet management, income, results, and awards' },
     'comp-txns': { title: 'Competition Transactions', desc: 'Competition transaction records' },
     'financial': { title: 'Financial Operations', desc: 'STK Push loads and B2C balance' },

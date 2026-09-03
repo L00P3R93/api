@@ -36,7 +36,7 @@ class GameCreditController extends Controller
         }
 
         $amount = (float) $validated['amount'];
-        $houseShare = round($amount * 0.10, 2);
+        $houseShare = round($amount * 0.05, 2);
 
         try {
             DB::transaction(function () use ($validated, $wallet, $gameWallet, $amount, $houseShare) {
