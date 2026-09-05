@@ -23,7 +23,7 @@ class FetchMpesaBalances extends Command
         $b2cResult = $this->balanceService->fetchAndStoreB2CBalance();
 
         if ($b2cResult['success']) {
-            $this->info('B2C balance stored successfully.');
+            $this->info('B2C balance request accepted (ConversationID: '.($b2cResult['conversation_id'] ?? 'N/A').').');
         } else {
             $this->error('B2C balance failed: '.$b2cResult['message']);
         }
@@ -33,7 +33,7 @@ class FetchMpesaBalances extends Command
         $c2bResult = $this->balanceService->fetchAndStoreC2BBalance();
 
         if ($c2bResult['success']) {
-            $this->info('C2B balance stored successfully.');
+            $this->info('C2B balance request accepted (ConversationID: '.($c2bResult['conversation_id'] ?? 'N/A').').');
         } else {
             $this->error('C2B balance failed: '.$c2bResult['message']);
         }

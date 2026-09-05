@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\MpesaApiException;
 use App\Models\MpesaBalance;
 use Illuminate\Support\Facades\Log;
 
@@ -11,30 +12,46 @@ class BalanceService
 
     public function fetchAndStoreB2CBalance(): array
     {
-        $response = $this->mpesaService->b2cAccountBalance();
-        $data = json_decode($response, true);
+        try {
+            $data = $this->mpesaService->b2cAccountBalance();
 
-        if (! $data || isset($data['error'])) {
-            Log::channel('mpesa')->error('B2C Balance Request Failed', ['response' => $data]);
+            Log::channel('mpesa')->info('MPESA B2C Balance Request Accepted', $data);
 
-            return ['success' => false, 'message' => 'Failed to fetch B2C balance'];
+            return [
+                'success' => true,
+                'conversation_id' => $data['ConversationID'] ?? null,
+                'message' => 'Balance request accepted. Awaiting callback.',
+            ];
+        } catch (MpesaApiException $e) {
+            Log::channel('mpesa')->error('B2C Balance Request Failed', [
+                'message' => $e->getMessage(),
+                'status' => $e->statusCode,
+            ]);
+
+            return ['success' => false, 'message' => $e->getMessage()];
         }
-
-        return $this->parseAndStore('b2c', $data);
     }
 
     public function fetchAndStoreC2BBalance(): array
     {
-        $response = $this->mpesaService->c2bAccountBalance();
-        $data = json_decode($response, true);
+        try {
+            $data = $this->mpesaService->c2bAccountBalance();
 
-        if (! $data || isset($data['error'])) {
-            Log::channel('mpesa')->error('C2B Balance Request Failed', ['response' => $data]);
+            Log::channel('mpesa')->info('MPESA C2B Balance Request Accepted', $data);
 
-            return ['success' => false, 'message' => 'Failed to fetch C2B balance'];
+            return [
+                'success' => true,
+                'conversation_id' => $data['ConversationID'] ?? null,
+                'message' => 'Balance request accepted. Awaiting callback.',
+            ];
+        } catch (MpesaApiException $e) {
+            Log::channel('mpesa')->error('C2B Balance Request Failed', [
+                'message' => $e->getMessage(),
+                'status' => $e->statusCode,
+            ]);
+
+            return ['success' => false, 'message' => $e->getMessage()];
         }
-
-        return $this->parseAndStore('c2b', $data);
     }
 
     public function processBalanceResult(string $type, array $data): array
@@ -58,6 +75,7 @@ class BalanceService
 
         if (! $accountBalanceString) {
             Log::channel('mpesa')->error('No balance data found', $data);
+
             return ['success' => false, 'message' => 'No balance data found'];
         }
 

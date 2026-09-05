@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\MpesaApiException;
 use App\Models\Customer;
 use App\Models\Transaction;
 use App\Models\Wallet;
@@ -73,12 +74,27 @@ class WithdrawalService
             'Remarks' => 'Business Payment',
         ];
 
-        $response_json = $this->mpesaService->b2c($userParams);
-        Log::channel('mpesa')->info('MPESA B2C Response: '.$response_json);
+        try {
+            $response = $this->mpesaService->b2c($userParams);
+        } catch (MpesaApiException $e) {
+            Log::channel('mpesa')->error('MPESA B2C Error: '.$e->getMessage());
 
-        $response = json_decode($response_json, true);
+            $transaction->update([
+                'payment_id' => $withdraw->id,
+                'status' => 3,
+            ]);
 
-        if ($response && isset($response['ResponseCode']) && $response['ResponseCode'] == 0) {
+            $withdraw->update([
+                'disburse' => 3,
+                'error_message' => $e->getMessage(),
+            ]);
+
+            return ['success' => false, 'message' => $e->getMessage(), 'status_code' => 500];
+        }
+
+        Log::channel('mpesa')->info('MPESA B2C Response', $response);
+
+        if (isset($response['ResponseCode']) && $response['ResponseCode'] == 0) {
             $ledgerEntry = $this->ledgerService->recordWithdrawal($withdraw, $wallet, (float) $amount);
 
             $transaction->update([
@@ -155,20 +171,31 @@ class WithdrawalService
         if ($withdraw->status == 1 && $withdraw->disburse == 1 && $withdraw->receipt == null && $withdraw->transactions()->first()->payment_type == Withdraw::class) {
             $userParams = [
                 'Amount' => $withdraw->amount,
-                $withdraw->transactions()->first()->wallet->customer->phone_no,
+                'PartyB' => $withdraw->transactions()->first()->wallet->customer->phone_no,
                 'Remarks' => 'Business Payment',
             ];
 
-            $response = $this->mpesaService->b2c($userParams);
-            $response = json_decode($response);
+            try {
+                $response = $this->mpesaService->b2c($userParams);
+            } catch (MpesaApiException $e) {
+                $withdraw->disburse = 3;
+                $withdraw->error_message = $e->getMessage();
+                $withdraw->save();
 
-            if ($response->ResponseCode == 0) {
+                return [
+                    'success' => false,
+                    'message' => 'Disbursement failed: '.$e->getMessage(),
+                    'status_code' => 500,
+                ];
+            }
+
+            if ($response['ResponseCode'] == 0) {
                 $withdraw->disburse = 2;
-                $withdraw->receipt = $response->ConversationID;
+                $withdraw->receipt = $response['ConversationID'];
             } else {
                 $withdraw->disburse = 3;
-                $withdraw->receipt = $response->errorCode;
-                $withdraw->error_message = $response->errorMessage;
+                $withdraw->receipt = $response['errorCode'] ?? null;
+                $withdraw->error_message = $response['errorMessage'] ?? $response['ResponseDescription'] ?? 'Unknown Error';
             }
             $withdraw->save();
 
