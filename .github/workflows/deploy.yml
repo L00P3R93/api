@@ -64,6 +64,9 @@ jobs:
             sudo chmod -R 775 storage bootstrap/cache
             sudo chmod 640 .env
 
+            # Restart PHP-FPM
+            sudo systemctl restart php8.4-fpm
+
             # Bring application back up
             php8.4 artisan up
           "
