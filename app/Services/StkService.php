@@ -25,7 +25,7 @@ class StkService
         ];
 
         $response = $this->mpesaService->stkPush($params);
-        Log::channel('mpesa')->info('MPESA StkPush Request Response: '.$response);
+        Log::channel('mpesa')->info('MPESA StkPush Request Response', $response);
 
         return ['status' => 'success'];
     }
@@ -65,7 +65,7 @@ class StkService
         ];
 
         $response = $this->mpesaService->stkPush($params);
-        Log::channel('mpesa')->info('MPESA StkPush Load Request Response: '.$response);
+        Log::channel('mpesa')->info('MPESA StkPush Load Request Response', $response);
 
         return ['status' => 'success'];
     }
