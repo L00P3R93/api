@@ -88,7 +88,7 @@ class MpesaService
             'BusinessShortCode' => $config['short_code'],
             'Password' => $this->lnmoPassword(),
             'Timestamp' => now()->format('YmdHis'),
-            'TransactionType' => $config['default_transaction_type'],
+            'TransactionType' => 'CustomerPayBillOnline',
             'PartyB' => $config['short_code'],
             'CallBackURL' => $config['callback'],
             'TransactionDesc' => 'WalletDeposit',
