@@ -36,5 +36,6 @@ return Application::configure(basePath: dirname(__DIR__))
         // $schedule->command('sms:expire-codes')->everyMinute();
         $schedule->command('idempotency:clean')->daily();
         $schedule->command('logs:clean')->daily();
+        $schedule->command('mpesa:fetch-balances')->hourly();
     })
     ->create();

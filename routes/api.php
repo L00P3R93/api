@@ -1,9 +1,12 @@
 <?php
 
 use App\Http\Controllers\api\v1\B2CBalanceController;
+use App\Http\Controllers\api\v1\B2CBalanceTimeoutController;
 use App\Http\Controllers\api\v1\B2Controller;
 use App\Http\Controllers\api\v1\B2CResultController;
 use App\Http\Controllers\api\v1\B2CTimeOutController;
+use App\Http\Controllers\api\v1\C2BBalanceResultController;
+use App\Http\Controllers\api\v1\C2BBalanceTimeoutController;
 use App\Http\Controllers\api\v1\CoinBuyController;
 use App\Http\Controllers\api\v1\CoinController;
 use App\Http\Controllers\api\v1\CoinExchangeController;
@@ -242,6 +245,9 @@ Route::prefix('/v1')->group(function () {
         Route::post('/c2b/validate', ValidationController::class);
         Route::post('/b2c/result', B2CResultController::class);
         Route::post('/b2c/timeout', B2CTimeOutController::class);
-        Route::post('/b2c/balance/result', B2CBalanceController::class);
+        Route::post('/balance/b2c/result', B2CBalanceController::class);
+        Route::post('/balance/b2c/timeout', B2CBalanceTimeoutController::class);
+        Route::post('/balance/c2b/result', C2BBalanceResultController::class);
+        Route::post('/balance/c2b/timeout', C2BBalanceTimeoutController::class);
     });
 });

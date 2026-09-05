@@ -3,11 +3,12 @@
 namespace App\Services;
 
 use App\Models\Customer;
-use App\Mpesa\Init as Mpesa;
 use Illuminate\Support\Facades\Log;
 
 class StkService
 {
+    public function __construct(private MpesaService $mpesaService) {}
+
     public function initiateStkDeposit(string $identifier, float $amount): array
     {
         $customer = Customer::where('id', $identifier)->orWhere('account_no', $identifier)->first();
@@ -23,7 +24,7 @@ class StkService
             'PhoneNumber' => $customer->phone_no,
         ];
 
-        $response = Mpesa::stkPush($params);
+        $response = $this->mpesaService->stkPush($params);
         Log::channel('mpesa')->info('MPESA StkPush Request Response: '.$response);
 
         return ['status' => 'success'];
@@ -63,7 +64,7 @@ class StkService
             'PhoneNumber' => $phoneNo ?? $customer->phone_no,
         ];
 
-        $response = Mpesa::stkPush($params);
+        $response = $this->mpesaService->stkPush($params);
         Log::channel('mpesa')->info('MPESA StkPush Load Request Response: '.$response);
 
         return ['status' => 'success'];

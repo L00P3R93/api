@@ -1,4 +1,5 @@
 <?php
+
 return [
     /* Credentials
      * *************************************************************************************************************
@@ -59,7 +60,7 @@ return [
          * *********************************************************************************************************
          * This is the Default Transaction Type set on every STK Push request
          */
-        'default_transaction_type' => 'CustomerPaybillOnline'
+        'default_transaction_type' => 'CustomerPaybillOnline',
     ],
 
     /*
@@ -76,7 +77,7 @@ return [
         'on_timeout' => 'Completed',
         'short_code' => env('MPESA_C2B_SHORTCODE'),
         'test_phone_number' => env('MPESA_C2B_TEST_PHONE_NUMBER'),
-        'default_command_id' => 'CustomerPayBillOnline'
+        'default_command_id' => 'CustomerPayBillOnline',
     ],
 
     /*
@@ -92,7 +93,7 @@ return [
         'default_command_id' => 'BusinessPayment',
         'test_phone_number' => env('MPESA_B2C_TEST_PHONE_NUMBER'),
         'result_url' => env('MPESA_B2C_RESULT_URL'),
-        'timeout_url' => env('MPESA_B2C_TIMEOUT_URL')
+        'timeout_url' => env('MPESA_B2C_TIMEOUT_URL'),
     ],
 
     /*
@@ -101,7 +102,7 @@ return [
      */
     'transaction_status_b2c' => [
         'result_url' => '',
-        'timeout_url' => ''
+        'timeout_url' => '',
     ],
 
     /*
@@ -109,8 +110,8 @@ return [
      * *************************************************************************************************************
      */
     'account_balance_b2c' => [
-        'timeout_url'=> '',
-        'result_url'=> ''
+        'timeout_url' => env('MPESA_B2C_BALANCE_TIMEOUT_URL'),
+        'result_url' => env('MPESA_B2C_BALANCE_RESULT_URL'),
     ],
 
     /*
@@ -118,7 +119,7 @@ return [
      * *************************************************************************************************************
      */
     'account_balance_c2b' => [
-        'timeout_url'=> '',
-        'result_url'=> ''
-    ]
+        'timeout_url' => env('MPESA_C2B_BALANCE_TIMEOUT_URL'),
+        'result_url' => env('MPESA_C2B_BALANCE_RESULT_URL'),
+    ],
 ];

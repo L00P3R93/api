@@ -6,13 +6,15 @@ use App\Models\Customer;
 use App\Models\Transaction;
 use App\Models\Wallet;
 use App\Models\Withdraw;
-use App\Mpesa\Init as Mpesa;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class WithdrawalService
 {
-    public function __construct(private LedgerService $ledgerService) {}
+    public function __construct(
+        private LedgerService $ledgerService,
+        private MpesaService $mpesaService
+    ) {}
 
     public function initiateWithdrawal(string $identifier, float $amount): array
     {
@@ -71,7 +73,7 @@ class WithdrawalService
             'Remarks' => 'Business Payment',
         ];
 
-        $response_json = Mpesa::b2c($userParams);
+        $response_json = $this->mpesaService->b2c($userParams);
         Log::channel('mpesa')->info('MPESA B2C Response: '.$response_json);
 
         $response = json_decode($response_json, true);
@@ -157,7 +159,7 @@ class WithdrawalService
                 'Remarks' => 'Business Payment',
             ];
 
-            $response = Mpesa::b2c($userParams);
+            $response = $this->mpesaService->b2c($userParams);
             $response = json_decode($response);
 
             if ($response->ResponseCode == 0) {

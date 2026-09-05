@@ -5,8 +5,9 @@ namespace App\Http\Controllers\api\v1;
 use App\Http\Controllers\Controller;
 use App\Services\BalanceService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
-class B2CBalanceController extends Controller
+class C2BBalanceTimeoutController extends Controller
 {
     public function __construct(
         private BalanceService $balanceService
@@ -17,6 +18,10 @@ class B2CBalanceController extends Controller
      */
     public function __invoke(Request $request)
     {
-        $this->balanceService->processBalanceResult('b2c', $request->all());
+        try {
+            $this->balanceService->processBalanceTimeout('c2b', $request->all());
+        } catch (\Exception $e) {
+            Log::error('MPESA C2B Balance Timeout Error: ', ['error' => $e->getMessage()]);
+        }
     }
 }
