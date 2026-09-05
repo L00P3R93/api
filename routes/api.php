@@ -225,7 +225,7 @@ Route::prefix('/v1')->group(function () {
         Route::get('/c2b/register', RegisterC2BUrlsController::class);
 
         // Testing MPESA API
-        //Route::get('/test', [TestController::class, 'index']);
+        Route::get('/test', TestController::class);
         /*Route::middleware('decryptIdentifier')->get('/test/{encryptedIdentifier}', function ($decryptedIdentifier) {
             return response()->json(['decrypted' => $decryptedIdentifier]);
         });*/
