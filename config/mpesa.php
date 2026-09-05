@@ -60,7 +60,7 @@ return [
          * *********************************************************************************************************
          * This is the Default Transaction Type set on every STK Push request
          */
-        'default_transaction_type' => 'CustomerPaybillOnline',
+        'default_transaction_type' => 'CustomerPayBillOnline',
     ],
 
     /*
