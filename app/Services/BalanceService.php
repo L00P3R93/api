@@ -57,6 +57,7 @@ class BalanceService
             ->firstWhere('Key', 'AccountBalance')['Value'] ?? null;
 
         if (! $accountBalanceString) {
+            Log::channel('mpesa')->error('No balance data found', $data);
             return ['success' => false, 'message' => 'No balance data found'];
         }
 
