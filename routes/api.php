@@ -225,7 +225,7 @@ Route::prefix('/v1')->group(function () {
         Route::get('/c2b/register', RegisterC2BUrlsController::class);
 
         // Testing MPESA API
-        Route::get('/test', [TestController::class, 'index']);
+        //Route::get('/test', [TestController::class, 'index']);
         /*Route::middleware('decryptIdentifier')->get('/test/{encryptedIdentifier}', function ($decryptedIdentifier) {
             return response()->json(['decrypted' => $decryptedIdentifier]);
         });*/
@@ -241,13 +241,19 @@ Route::prefix('/v1')->group(function () {
     // Callback URLS
     Route::middleware('throttle:callback')->group(function () {
         Route::post('/stk/callback', StkCallbackController::class);
-        Route::post('/c2b/confirm', ConfirmationController::class);
-        Route::post('/c2b/validate', ValidationController::class);
         Route::post('/b2c/result', B2CResultController::class);
         Route::post('/b2c/timeout', B2CTimeOutController::class);
         Route::post('/balance/b2c/result', B2CBalanceController::class);
         Route::post('/balance/b2c/timeout', B2CBalanceTimeoutController::class);
         Route::post('/balance/c2b/result', C2BBalanceResultController::class);
         Route::post('/balance/c2b/timeout', C2BBalanceTimeoutController::class);
+
+        // Kadi Kings
+        Route::post('/c2b/confirm', ConfirmationController::class);
+        Route::post('/c2b/validate', ValidationController::class);
+
+        // Kizuka C2B Endpoints
+        Route::post('/km/c2b/confirm', ConfirmationController::class);
+        Route::post('/km/c2b/validate', ValidationController::class);
     });
 });

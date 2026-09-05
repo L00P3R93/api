@@ -168,8 +168,8 @@ class MpesaService
             'PartyA' => $b2cConfig['short_code'],
             'IdentifierType' => '4',
             'Remarks' => 'Account Balance Query',
-            'QueueTimeOutURL' => $balanceConfig['timeout_url'] ?: $b2cConfig['timeout_url'],
-            'ResultURL' => $balanceConfig['result_url'] ?: $b2cConfig['result_url'],
+            'QueueTimeOutURL' => $balanceConfig['timeout_url'],
+            'ResultURL' => $balanceConfig['result_url'],
         ];
 
         return $this->request('/mpesa/accountbalance/v1/query', $payload, 'b2c');
@@ -237,8 +237,8 @@ class MpesaService
             'PartyA' => $c2bConfig['short_code'],
             'IdentifierType' => '4',
             'Remarks' => 'Account Balance Query',
-            'QueueTimeOutURL' => $balanceConfig['timeout_url'] ?: $c2bConfig['confirmation_url'],
-            'ResultURL' => $balanceConfig['result_url'] ?: $c2bConfig['validation_url'],
+            'QueueTimeOutURL' => $balanceConfig['timeout_url'],
+            'ResultURL' => $balanceConfig['result_url'],
         ];
 
         return $this->request('/mpesa/accountbalance/v1/query', $payload, 'c2b');
