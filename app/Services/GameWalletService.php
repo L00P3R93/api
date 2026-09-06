@@ -112,7 +112,7 @@ class GameWalletService
             return ['error' => 'Game Wallet not found', 'status' => 404];
         }
 
-        if ($gameWallet->status !== '1') {
+        if ($gameWallet->status !== 1) {
             return ['error' => 'Game Wallet is not open for withdrawal', 'status' => 400];
         }
 
