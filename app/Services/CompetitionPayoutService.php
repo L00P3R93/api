@@ -42,8 +42,12 @@ class CompetitionPayoutService
         DB::transaction(function () use ($sender, $receiver) {
             $totalBalance = $sender->balance;
 
+            $senderCustomer = $sender->customer;
+            $receiverCustomer =  $receiver->customer;
+
             $senderTransaction = CompetitionTransaction::create([
                 'competition_wallet_id' => $sender->id,
+                'customer_id' => $senderCustomer->id,
                 'amount' => $totalBalance,
                 'payment_type' => 'loss',
                 'level' => $sender->level,
@@ -61,6 +65,7 @@ class CompetitionPayoutService
 
             $receiverTransaction = CompetitionTransaction::create([
                 'competition_wallet_id' => $receiver->id,
+                'customer_id' => $receiverCustomer->id,
                 'amount' => $totalBalance,
                 'payment_type' => 'win',
                 'level' => $receiver->level,
@@ -128,8 +133,10 @@ class CompetitionPayoutService
 
         DB::transaction(function () use ($sender, $receiver, $receiverGets, $senderGets, $nextLevel) {
             if ($receiverGets > 0) {
+                $receiverCustomer = $receiver->customer;
                 $receiverTransaction = CompetitionTransaction::create([
                     'competition_wallet_id' => $receiver->id,
+                    'customer_id' => $receiverCustomer->id,
                     'amount' => $receiverGets,
                     'payment_type' => 'win',
                     'level' => $nextLevel,
@@ -147,8 +154,10 @@ class CompetitionPayoutService
             }
 
             if ($senderGets > 0) {
+                $senderCustomer = $sender->customer;
                 $senderTransaction = CompetitionTransaction::create([
                     'competition_wallet_id' => $sender->id,
+                    'customer_id' => $senderCustomer->id,
                     'amount' => $senderGets,
                     'payment_type' => 'loss',
                     'level' => $sender->level,
