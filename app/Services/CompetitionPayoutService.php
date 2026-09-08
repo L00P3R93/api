@@ -43,8 +43,6 @@ class CompetitionPayoutService
             $totalBalance = $sender->balance;
 
             $senderCustomer = $sender->customer;
-            $receiverCustomer =  $receiver->customer;
-
             $senderTransaction = CompetitionTransaction::create([
                 'competition_wallet_id' => $sender->id,
                 'customer_id' => $senderCustomer->id,
@@ -63,6 +61,7 @@ class CompetitionPayoutService
                 'competition_wallet_balance_after' => $sender->balance,
             ]);
 
+            $receiverCustomer =  $receiver->customer;
             $receiverTransaction = CompetitionTransaction::create([
                 'competition_wallet_id' => $receiver->id,
                 'customer_id' => $receiverCustomer->id,

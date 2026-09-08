@@ -129,7 +129,7 @@ class GameWalletService
         }
 
         $totalBalance = $gameWallet->balance;
-        $houseShare = ceil($totalBalance * 0.20);
+        $houseShare = ceil($totalBalance * 0.05); // 5%
         $playerShare = $totalBalance - $houseShare;
 
         DB::transaction(function () use ($gameWallet, $customer, $wallet, $playerShare, $houseShare, $totalBalance) {

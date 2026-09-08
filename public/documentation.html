@@ -218,6 +218,7 @@
         .method-post { background: rgba(88,166,255,0.15); color: var(--accent-blue); }
         .method-put { background: rgba(210,153,34,0.15); color: var(--accent-orange); }
         .method-delete { background: rgba(248,81,73,0.15); color: var(--accent-red); }
+        .method-patch { background: rgba(188,140,255,0.15); color: var(--accent-purple); }
         .endpoint-path { font-family: monospace; font-size: 13px; color: var(--text-primary); flex: 1; }
         .endpoint-desc { color: var(--text-secondary); font-size: 12px; margin-left: auto; white-space: nowrap; }
         .endpoint-body { display: none; padding: 0 18px 18px; border-top: 1px solid var(--border-color); }
@@ -252,6 +253,15 @@
         .callback-note { background: rgba(210,153,34,0.1); border: 1px solid rgba(210,153,34,0.3); border-radius: 6px; padding: 10px 14px; font-size: 12px; color: var(--accent-orange); margin-bottom: 14px; }
         .expand-all { background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; margin-bottom: 16px; transition: all 0.15s; }
         .expand-all:hover { color: var(--text-primary); border-color: var(--accent-blue); }
+
+        /* COPY BUTTON */
+        .copy-btn {
+            background: none; border: none; color: var(--text-muted); cursor: pointer;
+            font-size: 12px; padding: 2px 6px; border-radius: 4px; transition: all 0.15s;
+            margin-left: 8px; white-space: nowrap; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+        }
+        .copy-btn:hover { color: var(--accent-blue); background: rgba(88,166,255,0.1); }
+        .copy-btn.copied { color: var(--accent-green); }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: var(--bg-primary); }
         ::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 4px; }
@@ -293,7 +303,7 @@
             <li><a href="#" data-section="coins"><span class="nav-icon">&#129689;</span> <span>Coins</span></a></li>
             <li><a href="#" data-section="purchases"><span class="nav-icon">&#128722;</span> <span>Purchases</span></a></li>
             <li><a href="#" data-section="deposits"><span class="nav-icon">&#128178;</span> <span>Deposits</span></a></li>
-            <li><a href="#" data-section="withdraws"><span class="nav-icon">&#128184;</span> <span>Withdraws</span></a></li>
+            <li><a href="#" data-section="withdraws"><span class="nav-icon">&#128184;</span> <span>Withdrawals</span></a></li>
             <li><a href="#" data-section="transactions"><span class="nav-icon">&#128203;</span> <span>Transactions</span></a></li>
         </ul>
         <div class="nav-section">Gaming</div>
@@ -364,7 +374,7 @@
 <div class="endpoint-header" onclick="toggle(this)">
 <span class="method method-get">GET</span>
 <span class="endpoint-path">/api/v1/customers</span>
-<span class="endpoint-desc">List all active customers</span>
+<span class="endpoint-desc">Lists all customers in the system</span>
 <span class="chevron">&#9654;</span>
 </div>
 <div class="endpoint-body">
@@ -465,7 +475,7 @@ Idempotency-Key: idem-12345
 <div class="endpoint-header" onclick="toggle(this)">
 <span class="method method-get">GET</span>
 <span class="endpoint-path">/api/v1/customers/{encryptedIdentifier}</span>
-<span class="endpoint-desc">Get a single customer</span>
+<span class="endpoint-desc">Retrieves details for a specific customer</span>
 <span class="chevron">&#9654;</span>
 </div>
 <div class="endpoint-body">
@@ -483,7 +493,7 @@ Idempotency-Key: idem-12345
 <div class="endpoint-header" onclick="toggle(this)">
 <span class="method method-put">PUT</span>
 <span class="endpoint-path">/api/v1/customers/{encryptedIdentifier}</span>
-<span class="endpoint-desc">Update a customer</span>
+<span class="endpoint-desc">Updates details for a specific customer</span>
 <span class="chevron">&#9654;</span>
 </div>
 <div class="endpoint-body">
@@ -505,7 +515,7 @@ Idempotency-Key: idem-12345
 <div class="endpoint-header" onclick="toggle(this)">
 <span class="method method-put">PUT</span>
 <span class="endpoint-path">/api/v1/customers/{encryptedIdentifier}/wallet</span>
-<span class="endpoint-desc">Set customer wallet balance</span>
+<span class="endpoint-desc">Updates customer wallet balance</span>
 <span class="chevron">&#9654;</span>
 </div>
 <div class="endpoint-body">
@@ -551,7 +561,7 @@ Idempotency-Key: idem-12345
 <div class="endpoint-header" onclick="toggle(this)">
 <span class="method method-post">POST</span>
 <span class="endpoint-path">/api/v1/customers/leaderboard</span>
-<span class="endpoint-desc">Customer leaderboard</span>
+<span class="endpoint-desc">Customer leaderboard for single games and competitions</span>
 <span class="chevron">&#9654;</span>
 </div>
 <div class="endpoint-body">
@@ -569,7 +579,7 @@ Idempotency-Key: idem-12345
 <div class="endpoint-header" onclick="toggle(this)">
 <span class="method method-post">POST</span>
 <span class="endpoint-path">/api/v1/customers/combined-leaderboard</span>
-<span class="endpoint-desc">Combined leaderboard</span>
+<span class="endpoint-desc">Combined leaderboard for single games and competitions</span>
 <span class="chevron">&#9654;</span>
 </div>
 <div class="endpoint-body">
@@ -581,11 +591,28 @@ Idempotency-Key: idem-12345
 <div class="endpoint-header" onclick="toggle(this)">
 <span class="method method-get">GET</span>
 <span class="endpoint-path">/api/v1/customers/{encryptedIdentifier}/verify-email</span>
-<span class="endpoint-desc">Verify customer email</span>
+<span class="endpoint-desc">Marks a customer as email-verified</span>
 <span class="chevron">&#9654;</span>
 </div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
+<div class="endpoint-section"><h4>Response (200)</h4><pre>{"status": "Success"}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)">
+<span class="method method-patch">PATCH</span>
+<span class="endpoint-path">/api/v1/customers/{encryptedIdentifier}/verify-phone</span>
+<span class="endpoint-desc">Marks a customer as phone-verified</span>
+<span class="chevron">&#9654;</span>
+</div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
+<div class="endpoint-section"><h4>Request Body</h4>
+<table class="params-table">
+<tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>code</td><td>string</td><td><span class="required">Required</span></td><td>OTP verification code</td></tr>
+</table></div>
 <div class="endpoint-section"><h4>Response (200)</h4><pre>{"status": "Success"}</pre></div>
 </div></div>
 
@@ -643,7 +670,7 @@ Idempotency-Key: idem-12345
 </div></div>
 
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/wallets/{encryptedIdentifier}</span><span class="endpoint-desc">Get a single wallet</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/wallets/{encryptedIdentifier}</span><span class="endpoint-desc">Retrieves details of a specific wallet</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
@@ -651,7 +678,7 @@ Idempotency-Key: idem-12345
 </div></div>
 
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-put">PUT</span><span class="endpoint-path">/api/v1/wallets/{encryptedIdentifier}</span><span class="endpoint-desc">Update wallet balance</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-put">PUT</span><span class="endpoint-path">/api/v1/wallets/{encryptedIdentifier}</span><span class="endpoint-desc">Updates wallet details</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -661,7 +688,7 @@ Idempotency-Key: idem-12345
 </div></div>
 
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-put">PUT</span><span class="endpoint-path">/api/v1/wallets/{encryptedIdentifier}/balance</span><span class="endpoint-desc">Set wallet balance to exact amount</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-put">PUT</span><span class="endpoint-path">/api/v1/wallets/{encryptedIdentifier}/balance</span><span class="endpoint-desc">Updates wallet balance to exact amount</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -671,7 +698,7 @@ Idempotency-Key: idem-12345
 </div></div>
 
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-put">PUT</span><span class="endpoint-path">/api/v1/wallets/{encryptedIdentifier}/deposit</span><span class="endpoint-desc">Add funds to wallet</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-put">PUT</span><span class="endpoint-path">/api/v1/wallets/{encryptedIdentifier}/deposit</span><span class="endpoint-desc">Add to wallet balance</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -681,7 +708,7 @@ Idempotency-Key: idem-12345
 </div></div>
 
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-put">PUT</span><span class="endpoint-path">/api/v1/wallets/{encryptedIdentifier}/withdraw</span><span class="endpoint-desc">Deduct funds from wallet</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-put">PUT</span><span class="endpoint-path">/api/v1/wallets/{encryptedIdentifier}/withdraw</span><span class="endpoint-desc">Deduct from wallet balance</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -691,7 +718,7 @@ Idempotency-Key: idem-12345
 </div></div>
 
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/wallets/transfer/{encryptedIdentifier}</span><span class="endpoint-desc">Transfer funds between wallets</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/wallets/transfer/{encryptedIdentifier}</span><span class="endpoint-desc">Transfer specified amount from one customer wallet to another</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-idempotent">Idempotent</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -712,14 +739,14 @@ Idempotency-Key: idem-12345
 </div></div>
 
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/wallets/today</span><span class="endpoint-desc">Get today's total transaction amount</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/wallets/today</span><span class="endpoint-desc">Get today's total wallet transactions</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4><pre>{"data": {"amount": 15000.00}}</pre></div>
 </div></div>
 
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/wallets/transactions/{encryptedIdentifier}</span><span class="endpoint-desc">Get a single wallet transaction</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/wallets/transactions/{encryptedIdentifier}</span><span class="endpoint-desc">Retrieves details of a specific wallet transaction</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
@@ -740,14 +767,14 @@ Idempotency-Key: idem-12345
 </div></div>
 
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/coins/{encryptedIdentifier}</span><span class="endpoint-desc">Get a single coin wallet</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/coins/{encryptedIdentifier}</span><span class="endpoint-desc">Fetches details of a customer's coin wallet</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4><pre>{"id": 1, "customer_id": 1, "coins": 1000}</pre></div>
 </div></div>
 
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-put">PUT</span><span class="endpoint-path">/api/v1/coins/{encryptedIdentifier}</span><span class="endpoint-desc">Update coin wallet balance</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-put">PUT</span><span class="endpoint-path">/api/v1/coins/{encryptedIdentifier}</span><span class="endpoint-desc">Updates coin wallet balance</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -757,7 +784,7 @@ Idempotency-Key: idem-12345
 </div></div>
 
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/coins/buy/{encryptedIdentifier}</span><span class="endpoint-desc">Buy coins (deducts from wallet)</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/coins/buy/{encryptedIdentifier}</span><span class="endpoint-desc">Allows a customer to purchase coins using their wallet balance</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-idempotent">Idempotent</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -768,7 +795,7 @@ Idempotency-Key: idem-12345
 </div></div>
 
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/coins/transfer/{encryptedIdentifier}</span><span class="endpoint-desc">Transfer coins to another wallet</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/coins/transfer/{encryptedIdentifier}</span><span class="endpoint-desc">Allows a customer to transfer coins to another customer</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-idempotent">Idempotent</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -779,7 +806,7 @@ Idempotency-Key: idem-12345
 </div></div>
 
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-put">PUT</span><span class="endpoint-path">/api/v1/coins/exchange/{encryptedIdentifier}</span><span class="endpoint-desc">Exchange coins for wallet balance</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-put">PUT</span><span class="endpoint-path">/api/v1/coins/exchange/{encryptedIdentifier}</span><span class="endpoint-desc">Allows a customer to exchange coins for wallet balance</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-idempotent">Idempotent</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -838,7 +865,7 @@ Idempotency-Key: idem-12345
 <pre>{"id": 1, "trans_id": "QHK123ABC", "trans_amount": 100.00, "name": "John Doe", "status": 2, "customer": "John Doe"}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/deposits</span><span class="endpoint-desc">Record a deposit (MPesa C2B webhook)</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/deposits</span><span class="endpoint-desc">Records a new deposit (MPesa C2B webhook)</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">30/min</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -887,7 +914,7 @@ Content-Type: application/json
 <pre>{"id": 1, "trans_id": "QHK123ABC", "status": 2, "name": "John Doe"}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/deposits/{encryptedIdentifier}</span><span class="endpoint-desc">Initiate STK Push deposit</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/deposits/{encryptedIdentifier}</span><span class="endpoint-desc">Initiates an STK push to a registered phone number</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">5/min</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -900,14 +927,14 @@ Content-Type: application/json
 <!-- WITHDRAWS SECTION -->
 <div class="doc-section" data-section="withdraws">
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/withdraws</span><span class="endpoint-desc">List all withdrawals</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/withdraws</span><span class="endpoint-desc">Lists all withdrawal requests</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
 <pre>[{"id": 1, "status": 1, "disburse": 0, "receipt": null, "error_message": null, "customer": "John Doe", "amount": 500.00}]</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/withdraws/{encryptedIdentifier}</span><span class="endpoint-desc">Get a single withdrawal</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/withdraws/{encryptedIdentifier}</span><span class="endpoint-desc">Retrieves details of a specific withdrawal</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
@@ -918,14 +945,14 @@ Content-Type: application/json
 <!-- TRANSACTIONS SECTION -->
 <div class="doc-section" data-section="transactions">
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/transactions</span><span class="endpoint-desc">List all transactions (polymorphic)</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/transactions</span><span class="endpoint-desc">Lists all transactions in the system</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
 <pre>[{"id": 1, "payment_type": "App\\Models\\Deposit", "status": 2, "created_at": "2025-01-15T10:30:00.000000Z", "payment": {...}, "wallet": {...}}]</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/transactions/{encryptedIdentifier}</span><span class="endpoint-desc">Get a single transaction</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/transactions/{encryptedIdentifier}</span><span class="endpoint-desc">Retrieves details of a specific transaction</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
@@ -936,21 +963,21 @@ Content-Type: application/json
 <div class="doc-section" data-section="game-wallets">
 <button class="expand-all" onclick="toggleAll('game-wallets')">Expand / Collapse All</button>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/game/wallets</span><span class="endpoint-desc">List all game wallets</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/game/wallets</span><span class="endpoint-desc">Retrieve a list of all game wallets</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
 <pre>[{"id": 1, "game_id": "GAME-001", "game_type": 1, "balance": 500.00, "status": 1}]</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/game/wallets/{encryptedIdentifier}</span><span class="endpoint-desc">Get a single game wallet</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/game/wallets/{encryptedIdentifier}</span><span class="endpoint-desc">Retrieve details of a specific game wallet</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
 <pre>{"id": 1, "game_id": "GAME-001", "game_type": 1, "balance": 500.00, "status": 1}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/game/wallets</span><span class="endpoint-desc">Create a game wallet</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/game/wallets</span><span class="endpoint-desc">Create a new game wallet</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">30/min</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -960,7 +987,7 @@ Content-Type: application/json
 <div class="endpoint-section"><h4>Response (201)</h4><pre>{"status": "success", "game_wallet_id": 2, "game_type": 1}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-put">PUT</span><span class="endpoint-path">/api/v1/game/wallets/{encryptedIdentifier}</span><span class="endpoint-desc">Update a game wallet</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-put">PUT</span><span class="endpoint-path">/api/v1/game/wallets/{encryptedIdentifier}</span><span class="endpoint-desc">Update an existing game wallet</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -978,13 +1005,13 @@ Content-Type: application/json
 <div class="endpoint-section"><h4>Response (200)</h4><pre>{"status": "Success"}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/game/results</span><span class="endpoint-desc">Get game results</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/game/results</span><span class="endpoint-desc">Retrieve game results</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4><pre>{"status": "Success", "data": [...]}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/game/income</span><span class="endpoint-desc">Get game income by date range</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/game/income</span><span class="endpoint-desc">Retrieve game income by date range</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -999,21 +1026,21 @@ Content-Type: application/json
 <div class="doc-section" data-section="game-bets">
 <button class="expand-all" onclick="toggleAll('game-bets')">Expand / Collapse All</button>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/game/bets</span><span class="endpoint-desc">List all game transactions</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/game/bets</span><span class="endpoint-desc">Retrieve a list of all game bets</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
 <pre>[{"id": 1, "payment_type": "deposit", "amount": 50.00, "status": 1, "game_wallet_id": 1, "balance": 450.00, "customer_id": 1, "account_no": "ACC-001", "customer_name": "John Doe"}]</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/game/bets/{encryptedIdentifier}</span><span class="endpoint-desc">Get a single game transaction</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/game/bets/{encryptedIdentifier}</span><span class="endpoint-desc">Retrieve details of a specific bet</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
 <pre>{"id": 1, "payment_type": "deposit", "amount": 50.00, "game_wallet_id": 1, "customer_name": "John Doe"}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/game/bets</span><span class="endpoint-desc">Create a game bet</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/game/bets</span><span class="endpoint-desc">Create a new game bet</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">30/min</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -1058,19 +1085,19 @@ Idempotency-Key: idem-game-credit-123
 {"error": "Insufficient wallet balance."}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-put">PUT</span><span class="endpoint-path">/api/v1/game/bets/{encryptedIdentifier}</span><span class="endpoint-desc">Update a game transaction</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-put">PUT</span><span class="endpoint-path">/api/v1/game/bets/{encryptedIdentifier}</span><span class="endpoint-desc">Update an existing game bet</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Request Body (same fields as create)</h4><h4>Response (201)</h4><pre>{"status": "success"}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-delete">DELETE</span><span class="endpoint-path">/api/v1/game/bets/{encryptedIdentifier}</span><span class="endpoint-desc">Delete a game transaction</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-delete">DELETE</span><span class="endpoint-path">/api/v1/game/bets/{encryptedIdentifier}</span><span class="endpoint-desc">Delete a game bet</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4><pre>{"message": "Game Transaction deleted successfully"}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/game/drop/{encryptedIdentifier}</span><span class="endpoint-desc">Process game drop/connection payout</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/game/drop/{encryptedIdentifier}</span><span class="endpoint-desc">Handles payout/refund when players disconnect from a game</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-idempotent">Idempotent</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -1083,7 +1110,7 @@ Idempotency-Key: idem-game-credit-123
 <pre>{"status": "success", "payouts": [{"customer_id": 1, "amount": 25.00}]}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/game/withdraw/{encryptedIdentifier}</span><span class="endpoint-desc">Withdraw from game wallet to customer</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/game/withdraw/{encryptedIdentifier}</span><span class="endpoint-desc">Withdraw entire balance from game wallet to customer wallet</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-idempotent">Idempotent</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -1123,14 +1150,14 @@ Idempotency-Key: idem-game-refund-42
 <div class="doc-section" data-section="comp-wallets">
 <button class="expand-all" onclick="toggleAll('comp-wallets')">Expand / Collapse All</button>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/competition/wallets</span><span class="endpoint-desc">List all competition wallets</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/competition/wallets</span><span class="endpoint-desc">Retrieve a list of all competition wallets</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
 <pre>[{"id": 1, "competition_id": "CMP-001", "game_type": 1, "customer_id": 1, "level": 1, "balance": 200.00, "status": 1}]</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/competition/wallets/{encryptedIdentifier}</span><span class="endpoint-desc">Get a single competition wallet</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/competition/wallets/{encryptedIdentifier}</span><span class="endpoint-desc">Retrieve details of a specific competition wallet</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
@@ -1144,7 +1171,7 @@ Idempotency-Key: idem-game-refund-42
 <pre>[{"id": 1, "competition_id": "CMP-001", "customer_id": 1, "level": 1, "balance": 200.00}]</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/competition/wallets</span><span class="endpoint-desc">Create a competition wallet</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/competition/wallets</span><span class="endpoint-desc">Create a new competition wallet</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">30/min</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -1157,7 +1184,7 @@ Idempotency-Key: idem-game-refund-42
 <div class="endpoint-section"><h4>Response (201)</h4><pre>{"status": "Success", "competition_wallet_id": 1}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-put">PUT</span><span class="endpoint-path">/api/v1/competition/wallets/{encryptedIdentifier}</span><span class="endpoint-desc">Update a competition wallet</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-put">PUT</span><span class="endpoint-path">/api/v1/competition/wallets/{encryptedIdentifier}</span><span class="endpoint-desc">Update an existing competition wallet</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -1175,7 +1202,7 @@ Idempotency-Key: idem-game-refund-42
 <div class="endpoint-section"><h4>Response (200)</h4><pre>{"status": "Success"}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/competition/income/{encryptedIdentifier}</span><span class="endpoint-desc">Get competition income</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/competition/income/{encryptedIdentifier}</span><span class="endpoint-desc">Retrieve competition income by date range</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -1185,19 +1212,19 @@ Idempotency-Key: idem-game-refund-42
 <div class="endpoint-section"><h4>Response (200)</h4><pre>{"status": "Success", "data": [...]}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/competition/results/{encryptedIdentifier}</span><span class="endpoint-desc">Get competition results</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/competition/results/{encryptedIdentifier}</span><span class="endpoint-desc">Retrieve competition results</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4><pre>{"status": "Success", "data": [...]}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/competition/awards/{encryptedIdentifier}</span><span class="endpoint-desc">Get competition awards</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/competition/awards/{encryptedIdentifier}</span><span class="endpoint-desc">Retrieve competition awards</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4><pre>{"status": "Success", "data": [...]}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/competition/payout</span><span class="endpoint-desc">Transfer payout between competition wallets</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/competition/payout</span><span class="endpoint-desc">Move competition winnings for a single game/level win (minus house share)</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-idempotent">Idempotent</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -1207,7 +1234,7 @@ Idempotency-Key: idem-game-refund-42
 <div class="endpoint-section"><h4>Response (200)</h4><pre>{"status": "success"}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/competition/withdraw/{encryptedIdentifier}</span><span class="endpoint-desc">Withdraw from competition wallet</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/competition/withdraw/{encryptedIdentifier}</span><span class="endpoint-desc">Withdraw entire balance from competition wallet (minus house share)</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-idempotent">Idempotent</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -1220,21 +1247,21 @@ Idempotency-Key: idem-game-refund-42
 <!-- COMPETITION TRANSACTIONS SECTION -->
 <div class="doc-section" data-section="comp-txns">
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/competition/transactions</span><span class="endpoint-desc">List all competition transactions</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/competition/transactions</span><span class="endpoint-desc">Retrieve a list of all competition transactions</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
 <pre>[{"id": 1, "competition_wallet_id": 1, "customer_id": 1, "payment_type": "deposit", "amount": 50.00, "status": 1}]</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/competition/transactions/{encryptedIdentifier}</span><span class="endpoint-desc">Get a single competition transaction</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/competition/transactions/{encryptedIdentifier}</span><span class="endpoint-desc">Retrieve details of a specific competition transaction</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
 <pre>{"id": 1, "competition_wallet_id": 1, "customer_id": 1, "payment_type": "deposit", "amount": 50.00, "status": 1}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/competition/transactions</span><span class="endpoint-desc">Create a competition transaction</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/competition/transactions</span><span class="endpoint-desc">Create a new competition bet</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">30/min</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -1246,7 +1273,7 @@ Idempotency-Key: idem-game-refund-42
 <div class="endpoint-section"><h4>Response (201)</h4><pre>{"status": "Success"}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-put">PUT</span><span class="endpoint-path">/api/v1/competition/transactions/{encryptedIdentifier}</span><span class="endpoint-desc">Update a competition transaction</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-put">PUT</span><span class="endpoint-path">/api/v1/competition/transactions/{encryptedIdentifier}</span><span class="endpoint-desc">Update an existing competition bet</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -1258,7 +1285,7 @@ Idempotency-Key: idem-game-refund-42
 <pre>{"id": 1, "competition_wallet_id": 1, "payment_type": "deposit", "amount": 75.00, "status": 2}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-delete">DELETE</span><span class="endpoint-path">/api/v1/competition/transactions/{encryptedIdentifier}</span><span class="endpoint-desc">Delete a competition transaction</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-delete">DELETE</span><span class="endpoint-path">/api/v1/competition/transactions/{encryptedIdentifier}</span><span class="endpoint-desc">Delete a competition bet</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4><pre>{"status": "Success"}</pre></div>
@@ -1267,7 +1294,7 @@ Idempotency-Key: idem-game-refund-42
 <!-- FINANCIAL SECTION -->
 <div class="doc-section" data-section="financial">
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/load/{encryptedIdentifier}</span><span class="endpoint-desc">Initiate STK Push load</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/load/{encryptedIdentifier}</span><span class="endpoint-desc">Initiates an STK push to a registered or non-registered phone number</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">5/min</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -1304,7 +1331,7 @@ Content-Type: application/json
 <div class="doc-section" data-section="callbacks">
 <div class="callback-note">These endpoints are called by Safaricom's MPesa API. They require no API key authentication but are rate-limited to 100 requests/minute per IP.</div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/stk/callback</span><span class="endpoint-desc">MPesa STK Push callback</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/stk/callback</span><span class="endpoint-desc">Provides a test endpoint for API callback functionality</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-rate">100/min</span></div>
 <div class="callback-note">Internal webhook called by Safaricom after STK Push completion.</div>
@@ -1323,7 +1350,7 @@ Content-Type: application/json
 <div class="endpoint-section"><h4>Response</h4><pre>// Logs only, no response body</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/c2b/confirm</span><span class="endpoint-desc">MPesa C2B confirmation webhook</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/c2b/confirm</span><span class="endpoint-desc">Provides a test endpoint for C2B confirmation callback</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-rate">100/min</span></div>
 <div class="callback-note">Called by Safaricom when a C2B payment is confirmed. Processes deposit and credits wallet.</div>
@@ -1336,19 +1363,19 @@ Content-Type: application/json
 <div class="endpoint-section"><h4>Response (200)</h4><pre>{"ResultCode": "0", "ResultDesc": "Accepted"}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/b2c/result</span><span class="endpoint-desc">MPesa B2C result callback</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/b2c/result</span><span class="endpoint-desc">Provides a test endpoint for B2C result callback</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-rate">100/min</span></div>
 <div class="endpoint-section"><h4>Response</h4><pre>// Processes silently</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/b2c/timeout</span><span class="endpoint-desc">MPesa B2C timeout callback</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/b2c/timeout</span><span class="endpoint-desc">Provides a test endpoint for B2C timeout callback</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-rate">100/min</span></div>
 <div class="endpoint-section"><h4>Response</h4><pre>// Processes silently</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/b2c/balance/result</span><span class="endpoint-desc">MPesa B2C balance result callback</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/b2c/balance/result</span><span class="endpoint-desc">Provides a test endpoint for B2C balance result callback</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-rate">100/min</span></div>
 <div class="endpoint-section"><h4>Response</h4><pre>// Updates B2C balance record</pre></div>
@@ -1358,14 +1385,14 @@ Content-Type: application/json
 <div class="doc-section" data-section="stats">
 <div class="callback-note">All stats endpoints are rate-limited to 20 requests/minute.</div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/stats/customers</span><span class="endpoint-desc">Get customer statistics</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/stats/customers</span><span class="endpoint-desc">Lists all customers in the system</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
 <pre>{"success": true, "data": {"total_customers": 1250, "active_customers": 980, "new_this_month": 45}}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/stats/income</span><span class="endpoint-desc">Get income statistics</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/stats/income</span><span class="endpoint-desc">Lists all wallets and their details</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
@@ -1379,21 +1406,21 @@ Content-Type: application/json
 <pre>{"success": true, "data": [{"date": "2025-08-01", "deposits": 15000.00, "withdrawals": 5000.00}]}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/stats/purchases</span><span class="endpoint-desc">Get purchase statistics</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/stats/purchases</span><span class="endpoint-desc">Lists all coins and their details</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
 <pre>{"success": true, "data": {"total_purchases": 850, "total_amount": 42500.00, "by_type": {"load": 600, "gift": 150, "emoji": 100}}}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/stats/played</span><span class="endpoint-desc">Get game play statistics</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/stats/played</span><span class="endpoint-desc">Retrieves details for a specific customer</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
 <pre>{"success": true, "data": {"total_games_played": 3200, "single_games": 2100, "competition_games": 1100}}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/stats/retention</span><span class="endpoint-desc">Get customer retention rates</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/stats/retention</span><span class="endpoint-desc">Retrieves customer retention rates</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
@@ -1482,7 +1509,7 @@ Content-Type: application/json
 <!-- UTILITIES SECTION -->
 <div class="doc-section" data-section="utilities">
 <div class="endpoint" id="encrypt">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/encrypt</span><span class="endpoint-desc">Encrypt an identifier for API URLs</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/encrypt</span><span class="endpoint-desc">Encrypts a given plain value</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -1499,7 +1526,7 @@ Content-Type: application/json
 <pre>{"decrypted_id": "1", "encrypted_id": "eyJpdiI6IkxOazB..."}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/decrypt</span><span class="endpoint-desc">Decrypt an encrypted identifier</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/decrypt</span><span class="endpoint-desc">Decrypts a given encrypted value</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
@@ -1509,7 +1536,7 @@ Content-Type: application/json
 <pre>{"decrypted_id": "1", "encrypted_id": "eyJpdiI6IkxOazB..."}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/test</span><span class="endpoint-desc">M-Pesa B2C test endpoint</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/test</span><span class="endpoint-desc">Provides a test endpoint for API functionality</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span></div>
 <div class="callback-note">Sends a test B2C payment request (KES 0) to Safaricom. Currently disabled in routes.</div>
@@ -1517,7 +1544,7 @@ Content-Type: application/json
 <pre>{"OriginatorConversationID": "...", "ConversationID": "...", "ResponseCode": "0", "ResponseDescription": "Accept the service request successfully."}</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/c2b/register</span><span class="endpoint-desc">Register MPesa C2B URLs</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/c2b/register</span><span class="endpoint-desc">Production endpoint to register C2B URLs</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span></div>
 <div class="endpoint-section"><h4>Response</h4><pre>// Safaricom API response</pre></div>
@@ -1570,10 +1597,51 @@ Content-Type: application/json</pre></div>
 
 <script>
 var STORAGE_KEY = 'kadi-docs-section';
+var BASE_URL = 'https://api.kadi-kings.co.ke';
 
 function toggle(el) {
     el.closest('.endpoint').classList.toggle('open');
 }
+
+function copyEndpoint(path, btn) {
+    var url = BASE_URL + path;
+    navigator.clipboard.writeText(url).then(function() {
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(function() {
+            btn.textContent = 'Copy URL';
+            btn.classList.remove('copied');
+        }, 1500);
+    }).catch(function() {
+        var input = document.createElement('input');
+        input.value = url;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(function() {
+            btn.textContent = 'Copy URL';
+            btn.classList.remove('copied');
+        }, 1500);
+    });
+}
+
+function addCopyButtons() {
+    document.querySelectorAll('.endpoint-path').forEach(function(pathEl) {
+        if (pathEl.closest('.endpoint-header').querySelector('.copy-btn')) return;
+        var btn = document.createElement('button');
+        btn.className = 'copy-btn';
+        btn.textContent = 'Copy URL';
+        btn.onclick = function(e) {
+            e.stopPropagation();
+            copyEndpoint(pathEl.textContent, btn);
+        };
+        pathEl.parentNode.insertBefore(btn, pathEl.nextSibling);
+    });
+}
+addCopyButtons();
 function toggleAll(sectionId) {
     var section = document.querySelector('.doc-section[data-section="' + sectionId + '"]');
     if (!section) return;
@@ -1592,23 +1660,23 @@ var navSections = document.querySelectorAll('.sidebar-nav .nav-section');
 var navUls = document.querySelectorAll('.sidebar-nav ul');
 var sectionTitles = {
     'auth': { title: 'Authentication', desc: 'API key setup, encrypted identifiers, rate limits, and idempotency' },
-    'customers': { title: 'Customers', desc: 'CRUD operations, search, referrals, leaderboard, and customer data' },
+    'customers': { title: 'Customers', desc: 'CRUD, search, referrals, leaderboard, verification, and customer data' },
     'wallets': { title: 'Wallets', desc: 'Wallet management, balance operations, and transfers' },
-    'wallet-txns': { title: 'Wallet Transactions', desc: 'List and query wallet transaction history' },
+    'wallet-txns': { title: 'Wallet Transactions', desc: 'Wallet transaction history and daily totals' },
     'coins': { title: 'Coins', desc: 'Coin wallet management, buy, transfer, and exchange' },
     'purchases': { title: 'Purchases', desc: 'Purchase records and referral lookups' },
     'deposits': { title: 'Deposits', desc: 'Deposit records, C2B webhooks, and STK Push' },
-    'withdraws': { title: 'Withdraws', desc: 'Withdrawal records and status' },
+    'withdraws': { title: 'Withdrawals', desc: 'Withdrawal requests and disbursement' },
     'transactions': { title: 'Transactions', desc: 'Polymorphic transaction records' },
     'game-wallets': { title: 'Game Wallets', desc: 'Game wallet CRUD, results, and income' },
-    'game-bets': { title: 'Game Bets', desc: 'Game bet transactions, credits, drop payouts, withdrawals, and full refunds' },
-    'comp-wallets': { title: 'Competition Wallets', desc: 'Competition wallet management, income, results, and awards' },
-    'comp-txns': { title: 'Competition Transactions', desc: 'Competition transaction records' },
+    'game-bets': { title: 'Game Bets', desc: 'Game bets, credits, drop payouts, withdrawals, and refunds' },
+    'comp-wallets': { title: 'Competition Wallets', desc: 'Competition wallets, income, results, and awards' },
+    'comp-txns': { title: 'Competition Transactions', desc: 'Competition bet transactions' },
     'financial': { title: 'Financial Operations', desc: 'STK Push loads and B2C balance' },
-    'callbacks': { title: 'MPesa Callbacks', desc: 'Safaricom webhook endpoints (no auth required)' },
-    'stats': { title: 'Statistics & Analytics', desc: 'Customer, income, purchase, and gameplay statistics' },
-    'utilities': { title: 'Utilities', desc: 'Encrypt/decrypt identifiers and system endpoints' },
-    'playground': { title: 'Playground', desc: 'Test and demo endpoints for encryption/decryption functionality' },
+    'callbacks': { title: 'MPesa Callbacks', desc: 'Safaricom webhook endpoints' },
+    'stats': { title: 'Statistics', desc: 'Customer, income, purchase, and gameplay statistics' },
+    'utilities': { title: 'Utilities', desc: 'Encrypt/decrypt identifiers and test endpoints' },
+    'playground': { title: 'Playground', desc: 'Test and demo endpoints for encryption/decryption' },
     'errors': { title: 'Error Responses', desc: 'Common HTTP error response formats' }
 };
 

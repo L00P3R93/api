@@ -21,7 +21,7 @@ class DecryptIdentifier
             try {
                 $decryptedId = decryptOpenSSL($request->route('encryptedIdentifier'));
                 if(empty($decryptedId)) {
-                    Log::error("Invalid identifier [Unable to Decrypt]: $decryptedId");
+                    Log::error("Invalid identifier [Unable to Decrypt]: $decryptedId", ['route' => $request->route('encryptedIdentifier'), 'request' => $request->all()]);
                     return response()->json(['message' => 'Invalid identifier.'], 400);
                 }
                 $request->route()->setParameter('encryptedIdentifier', $decryptedId);
