@@ -18,6 +18,7 @@ class DecryptIdentifier
     {
         if ($request->route('encryptedIdentifier')) {
             $encryptedIdentifier = $request->route('encryptedIdentifier');
+            Log::info('Encrypted Request: ', $this->requestContext($request, $encryptedIdentifier));
 
             try {
                 $decryptedId = decryptOpenSSL($encryptedIdentifier);
