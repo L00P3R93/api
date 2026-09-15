@@ -1,6 +1,9 @@
 <?php
 
 use App\Models\ApiKey;
+use App\Models\CompetitionWallet;
+use App\Models\Customer;
+use App\Models\Wallet;
 use Tests\TestCase;
 
 /*
@@ -65,4 +68,43 @@ function apiHeaders(?string $apiKey = null): array
         'Content-Type' => 'application/json',
         'Accept' => 'application/json',
     ];
+}
+
+/**
+ * Create an open, same-competition pair of tournament (game_type 1) competition wallets,
+ * each backed by a customer with a real wallet, for payout/withdrawal tests.
+ *
+ * @return array{0: CompetitionWallet, 1: CompetitionWallet, 2: Wallet} [$sender, $receiver, $receiverWallet]
+ */
+function createTournamentWalletPair(float $senderBalance = 50): array
+{
+    $cmpUid = (string) fake()->unique()->numberBetween(1000, 999999);
+
+    $senderCustomer = Customer::factory()->create();
+    Wallet::factory()->create(['customer_id' => $senderCustomer->id, 'balance' => 0]);
+    $sender = CompetitionWallet::create([
+        'competition_id' => 'TOURN-1',
+        'cmp_uid' => $cmpUid,
+        'game_type' => 1,
+        'customer_id' => $senderCustomer->id,
+        'level' => 2,
+        'jp_rounds' => 5,
+        'balance' => $senderBalance,
+        'status' => 1,
+    ]);
+
+    $receiverCustomer = Customer::factory()->create();
+    $receiverWallet = Wallet::factory()->create(['customer_id' => $receiverCustomer->id, 'balance' => 0]);
+    $receiver = CompetitionWallet::create([
+        'competition_id' => 'TOURN-1',
+        'cmp_uid' => $cmpUid,
+        'game_type' => 1,
+        'customer_id' => $receiverCustomer->id,
+        'level' => 2,
+        'jp_rounds' => 5,
+        'balance' => 0,
+        'status' => 1,
+    ]);
+
+    return [$sender, $receiver, $receiverWallet];
 }

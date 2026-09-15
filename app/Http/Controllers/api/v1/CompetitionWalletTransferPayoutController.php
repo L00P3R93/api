@@ -18,15 +18,17 @@ class CompetitionWalletTransferPayoutController extends Controller
      */
     public function __invoke(Request $request)
     {
-        try {
-            $validated = $request->validate([
-                'sender_competition_wallet_id' => 'required|integer',
-                'receiver_competition_wallet_id' => 'required|integer',
-            ]);
+        $validated = $request->validate([
+            'sender_competition_wallet_id' => 'required|integer',
+            'receiver_competition_wallet_id' => 'required|integer',
+            'receiver_withdraw' => 'sometimes|boolean',
+        ]);
 
+        try {
             $result = $this->payoutService->processPayout(
                 $validated['sender_competition_wallet_id'],
-                $validated['receiver_competition_wallet_id']
+                $validated['receiver_competition_wallet_id'],
+                $validated['receiver_withdraw'] ?? false
             );
 
             return response()->json($result);

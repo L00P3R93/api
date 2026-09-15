@@ -5,12 +5,16 @@ namespace App\Services;
 use App\Models\CompetitionTransaction;
 use App\Models\CompetitionWallet;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class CompetitionPayoutService
 {
-    public function __construct(private LedgerService $ledgerService) {}
+    public function __construct(
+        private LedgerService $ledgerService,
+        private CompetitionWalletService $walletService
+    ) {}
 
-    public function processPayout(int $senderId, int $receiverId): array
+    public function processPayout(int $senderId, int $receiverId, bool $receiverWithdraw = false): array
     {
         $sender = CompetitionWallet::find($senderId);
         $receiver = CompetitionWallet::find($receiverId);
@@ -29,12 +33,32 @@ class CompetitionPayoutService
         }
 
         if ($sender->game_type == 1) {
-            return $this->handleTournamentPayout($sender, $receiver);
+            $result = $this->handleTournamentPayout($sender, $receiver);
         } elseif ($sender->game_type == 2) {
-            return $this->handleJackpotPayout($sender, $receiver);
+            $result = $this->handleJackpotPayout($sender, $receiver);
+        } else {
+            throw new \InvalidArgumentException('Unsupported game type');
         }
 
-        throw new \InvalidArgumentException('Unsupported game type');
+        if ($receiverWithdraw) {
+            $result['withdrawal'] = $this->attemptReceiverWithdrawal($receiver);
+        }
+
+        return $result;
+    }
+
+    private function attemptReceiverWithdrawal(CompetitionWallet $receiver): array
+    {
+        try {
+            return $this->walletService->processWithdrawal($receiver->id, $receiver->customer_id);
+        } catch (\Throwable $e) {
+            Log::error('Competition Wallet Receiver Withdrawal Error', [
+                'message' => $e->getMessage(),
+                'competition_wallet_id' => $receiver->id,
+            ]);
+
+            return ['status' => 'failed', 'error' => $e->getMessage()];
+        }
     }
 
     public function handleTournamentPayout(CompetitionWallet $sender, CompetitionWallet $receiver): array
@@ -61,7 +85,7 @@ class CompetitionPayoutService
                 'competition_wallet_balance_after' => $sender->balance,
             ]);
 
-            $receiverCustomer =  $receiver->customer;
+            $receiverCustomer = $receiver->customer;
             $receiverTransaction = CompetitionTransaction::create([
                 'competition_wallet_id' => $receiver->id,
                 'customer_id' => $receiverCustomer->id,
