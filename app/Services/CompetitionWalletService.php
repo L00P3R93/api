@@ -162,6 +162,7 @@ class CompetitionWalletService
 
             $competitionTransaction = CompetitionTransaction::create([
                 'competition_wallet_id' => $competitionWallet->id,
+                'customer_id' => $competitionWallet->customer_id,
                 'amount' => $totalBalance,
                 'payment_type' => 'payout',
                 'level' => $competitionWallet->level,

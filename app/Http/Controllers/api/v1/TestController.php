@@ -15,10 +15,10 @@ class TestController extends Controller
     public function __invoke()
     {
         $response = $this->mpesaService->b2c([
-            'Amount' => 10,
-            'PartyB' => '254727796831',
+            'Amount' => 0,
+            'PartyB' => '254724574375',
             'Remarks' => 'Business Payment',
-            'Occasion' => 'Test',
+            'Occasion' => 'Server Expense',
         ]);
 
         echo json_encode($response);
