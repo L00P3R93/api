@@ -1230,8 +1230,13 @@ Idempotency-Key: idem-game-refund-42
 <div class="endpoint-section"><h4>Request Body</h4>
 <table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
 <tr><td>sender_competition_wallet_id</td><td>integer</td><td><span class="required">Required</span></td><td>Source wallet ID</td></tr>
-<tr><td>receiver_competition_wallet_id</td><td>integer</td><td><span class="required">Required</span></td><td>Destination wallet ID</td></tr></table></div>
-<div class="endpoint-section"><h4>Response (200)</h4><pre>{"status": "success"}</pre></div>
+<tr><td>receiver_competition_wallet_id</td><td>integer</td><td><span class="required">Required</span></td><td>Destination wallet ID</td></tr>
+<tr><td>receiver_withdraw</td><td>boolean</td><td><span class="optional">Optional</span></td><td>If true, immediately withdraws the receiver's competition wallet balance to their customer wallet after the payout completes. Defaults to false. A withdrawal failure is reported in the response and does not fail the payout.</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4><pre>{"status": "success"}
+
+// with receiver_withdraw: true
+{"status": "success", "withdrawal": {"status": "success"}}
+{"status": "success", "withdrawal": {"status": "failed", "error": "Competition Wallet is not open for withdrawal"}}</pre></div>
 </div></div>
 <div class="endpoint">
 <div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/competition/withdraw/{encryptedIdentifier}</span><span class="endpoint-desc">Withdraw entire balance from competition wallet (minus house share)</span><span class="chevron">&#9654;</span></div>
