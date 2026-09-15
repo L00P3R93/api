@@ -26,8 +26,7 @@ class CompetitionWalletService
 
     public function getCompetitionWallet($identifier): ?CompetitionWallet
     {
-        return CompetitionWallet::where('id', $identifier)
-            ->orWhere('competition_id', $identifier)
+        return CompetitionWallet::where('competition_id', $identifier)
             ->first();
     }
 
