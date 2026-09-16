@@ -4,4 +4,5 @@ Before planning or editing, find the row whose globs match the file's path and r
 
 | Applies to | Rule file |
 | --- | --- |
+| config/log-viewer.php | .ai/rules/config.md |
 | app/Http/Middleware/** | .ai/rules/middleware.md |
