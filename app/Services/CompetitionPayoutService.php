@@ -204,6 +204,6 @@ class CompetitionPayoutService
             $sender->save();
         });
 
-        return ['status' => 'Success'];
+        return ['status' => 'success'];
     }
 }
