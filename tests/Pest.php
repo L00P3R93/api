@@ -108,3 +108,42 @@ function createTournamentWalletPair(float $senderBalance = 50): array
 
     return [$sender, $receiver, $receiverWallet];
 }
+
+/**
+ * Create an open, same-competition pair of jackpot (game_type 2) competition wallets,
+ * each backed by a customer with a real wallet, for payout/withdrawal tests.
+ *
+ * @return array{0: CompetitionWallet, 1: CompetitionWallet, 2: Wallet} [$sender, $receiver, $receiverWallet]
+ */
+function createJackpotWalletPair(float $senderBalance = 50): array
+{
+    $cmpUid = (string) fake()->unique()->numberBetween(1000, 999999);
+
+    $senderCustomer = Customer::factory()->create();
+    Wallet::factory()->create(['customer_id' => $senderCustomer->id, 'balance' => 0]);
+    $sender = CompetitionWallet::create([
+        'competition_id' => 'JACKPOT-1',
+        'cmp_uid' => $cmpUid,
+        'game_type' => 2,
+        'customer_id' => $senderCustomer->id,
+        'level' => 2,
+        'jp_rounds' => 13,
+        'balance' => $senderBalance,
+        'status' => 1,
+    ]);
+
+    $receiverCustomer = Customer::factory()->create();
+    $receiverWallet = Wallet::factory()->create(['customer_id' => $receiverCustomer->id, 'balance' => 0]);
+    $receiver = CompetitionWallet::create([
+        'competition_id' => 'JACKPOT-1',
+        'cmp_uid' => $cmpUid,
+        'game_type' => 2,
+        'customer_id' => $receiverCustomer->id,
+        'level' => 2,
+        'jp_rounds' => 13,
+        'balance' => 0,
+        'status' => 1,
+    ]);
+
+    return [$sender, $receiver, $receiverWallet];
+}

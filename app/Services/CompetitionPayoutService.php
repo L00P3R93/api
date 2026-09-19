@@ -22,6 +22,15 @@ class CompetitionPayoutService
         if (! $sender || ! $receiver) {
             throw new \InvalidArgumentException('Invalid Competition Wallet(s)');
         }
+        if ($senderId === $receiverId) {
+            throw new \InvalidArgumentException('Sender and Receiver Competition Wallets must be different');
+        }
+        if ($sender->status !== 1) {
+            throw new \InvalidArgumentException('Sender Competition Wallet is not open');
+        }
+        if ($receiver->status !== 1) {
+            throw new \InvalidArgumentException('Receiver Competition Wallet is not open');
+        }
         if ($sender->balance <= 0) {
             throw new \InvalidArgumentException('Insufficient balance in Sender Competition Wallet');
         }
@@ -63,6 +72,25 @@ class CompetitionPayoutService
 
     public function handleTournamentPayout(CompetitionWallet $sender, CompetitionWallet $receiver): array
     {
+        return $this->transferRoundResult($sender, $receiver);
+    }
+
+    /**
+     * Jackpot rounds transfer exactly like tournament rounds. `jp_rounds` is intentionally not
+     * consulted here: it has no bearing on round-by-round transfer mechanics.
+     */
+    public function handleJackpotPayout(CompetitionWallet $sender, CompetitionWallet $receiver): array
+    {
+        return $this->transferRoundResult($sender, $receiver);
+    }
+
+    /**
+     * Move the sender's full balance to the receiver and record the paired loss/win transactions.
+     *
+     * @return array{status: string}
+     */
+    private function transferRoundResult(CompetitionWallet $sender, CompetitionWallet $receiver): array
+    {
         DB::transaction(function () use ($sender, $receiver) {
             $totalBalance = $sender->balance;
 
@@ -103,105 +131,6 @@ class CompetitionPayoutService
                 'competition_wallet_balance_before' => $receiverTransaction->competition_wallet_balance_before ?? $receiver->balance - $totalBalance,
                 'competition_wallet_balance_after' => $receiver->balance,
             ]);
-        });
-
-        return ['status' => 'success'];
-    }
-
-    public function handleJackpotPayout(CompetitionWallet $sender, CompetitionWallet $receiver): array
-    {
-        $totalCollected = CompetitionWallet::where('cmp_uid', $sender->cmp_uid)
-            ->with(['transactions' => function ($query) {
-                $query->where('payment_type', 'deposit');
-            }])
-            ->get()
-            ->pluck('transactions')
-            ->flatten()
-            ->sum('amount');
-
-        $currentLevel = $receiver->level;
-        $nextLevel = $currentLevel + 1;
-        $totalRounds = $receiver->jp_rounds;
-
-        $quarterLevel = match ($totalRounds) {
-            13 => 11,
-            17 => 15,
-            21 => 19,
-        };
-
-        $semiFinalLevel = match ($totalRounds) {
-            13 => 12,
-            17 => 16,
-            21 => 20,
-        };
-
-        $finalLevel = $totalRounds;
-
-        $receiverPayoutPercentage = match ($nextLevel) {
-            $quarterLevel => 0,
-            $semiFinalLevel => 0,
-            $finalLevel => 0.50,
-            default => 0
-        };
-
-        $senderPayoutPercentage = match ($nextLevel) {
-            $quarterLevel => 0.025,
-            $semiFinalLevel => 0.05,
-            $finalLevel => 0.10,
-            default => 0
-        };
-
-        $receiverGets = round($totalCollected * $receiverPayoutPercentage, 2);
-        $senderGets = round($totalCollected * $senderPayoutPercentage, 2);
-
-        DB::transaction(function () use ($sender, $receiver, $receiverGets, $senderGets, $nextLevel) {
-            if ($receiverGets > 0) {
-                $receiverCustomer = $receiver->customer;
-                $receiverTransaction = CompetitionTransaction::create([
-                    'competition_wallet_id' => $receiver->id,
-                    'customer_id' => $receiverCustomer->id,
-                    'amount' => $receiverGets,
-                    'payment_type' => 'win',
-                    'level' => $nextLevel,
-                    'status' => 2,
-                ]);
-
-                $receiverBalanceBefore = $receiver->balance;
-                $receiver->balance += $receiverGets;
-                $receiver->save();
-
-                $receiverTransaction->update([
-                    'competition_wallet_balance_before' => $receiverBalanceBefore,
-                    'competition_wallet_balance_after' => $receiver->balance,
-                ]);
-            }
-
-            if ($senderGets > 0) {
-                $senderCustomer = $sender->customer;
-                $senderTransaction = CompetitionTransaction::create([
-                    'competition_wallet_id' => $sender->id,
-                    'customer_id' => $senderCustomer->id,
-                    'amount' => $senderGets,
-                    'payment_type' => 'loss',
-                    'level' => $sender->level,
-                    'status' => 2,
-                ]);
-
-                $senderBalanceBefore = $sender->balance;
-                $sender->balance += $senderGets;
-                $sender->save();
-
-                $senderTransaction->update([
-                    'competition_wallet_balance_before' => $senderBalanceBefore,
-                    'competition_wallet_balance_after' => $sender->balance,
-                ]);
-            }
-
-            $receiver->level = $nextLevel;
-            $receiver->save();
-
-            $sender->status = 3;
-            $sender->save();
         });
 
         return ['status' => 'success'];
