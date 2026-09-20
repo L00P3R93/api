@@ -221,9 +221,9 @@ class CompetitionWalletService
 
             $houseCompetitionShare = 0;
             if ($competitionType == 1) {
-                $houseCompetitionShare = round($totalBalance * 0.10, 2); // 10%
+                $houseCompetitionShare = round($totalBalance * config('finance.fees.tournament'), 2);
             } elseif ($competitionType == 2) {
-                $houseCompetitionShare = round($totalBalance * 0.20, 2); // 20%
+                $houseCompetitionShare = round($totalBalance * config('finance.fees.jackpot'), 2);
             }
 
             $competitionTransaction = CompetitionTransaction::create($data);
