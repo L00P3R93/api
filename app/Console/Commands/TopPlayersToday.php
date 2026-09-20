@@ -13,8 +13,9 @@ class TopPlayersToday extends Command
     protected $description = 'Show the players with the most games played today (single games, tournaments and jackpots)';
 
     /**
-     * A single game counts once per game wallet the customer staked in; a tournament or jackpot
-     * counts once per competition wallet the customer entered.
+     * Mirrors StatsService::playedByPlayerStats() for every customer at once: a single game counts
+     * when 2-4 players staked in it, and a competition counts for the tournament (3-5 rounds) and
+     * jackpot (13, 17, 21 rounds) round sets that endpoint reports.
      */
     public function handle(): int
     {
@@ -23,20 +24,28 @@ class TopPlayersToday extends Command
         $to = $day->copy()->endOfDay();
         $limit = max(1, (int) $this->option('limit'));
 
+        $qualifyingGames = DB::table('game_transactions')
+            ->where('payment_type', 'deposit')
+            ->whereBetween('created_at', [$from, $to])
+            ->groupBy('game_wallet_id')
+            ->havingRaw('COUNT(DISTINCT customer_id) IN (2, 3, 4)')
+            ->select('game_wallet_id');
+
         $single = DB::table('game_transactions')
             ->where('payment_type', 'deposit')
             ->whereBetween('created_at', [$from, $to])
+            ->whereIn('game_wallet_id', $qualifyingGames)
             ->groupBy('customer_id')
             ->selectRaw('customer_id, COUNT(DISTINCT game_wallet_id) as single_games, 0 as tournaments, 0 as jackpots');
 
         $competitions = DB::table('competition_transactions as ct')
             ->join('competition_wallets as cw', 'cw.id', '=', 'ct.competition_wallet_id')
-            ->whereNotIn('ct.payment_type', ['payout', 'win', 'loss'])
+            ->where('ct.payment_type', '!=', 'payout')
             ->whereBetween('ct.created_at', [$from, $to])
             ->groupBy('ct.customer_id')
             ->selectRaw('ct.customer_id, 0 as single_games,
-                COUNT(DISTINCT CASE WHEN cw.game_type = 1 THEN cw.id END) as tournaments,
-                COUNT(DISTINCT CASE WHEN cw.game_type = 2 THEN cw.id END) as jackpots');
+                COUNT(DISTINCT CASE WHEN cw.game_type = 1 AND cw.jp_rounds IN (3, 4, 5) THEN cw.id END) as tournaments,
+                COUNT(DISTINCT CASE WHEN cw.game_type = 2 AND cw.jp_rounds IN (13, 17, 21) THEN cw.id END) as jackpots');
 
         $rows = DB::query()
             ->fromSub($single->unionAll($competitions), 'p')
