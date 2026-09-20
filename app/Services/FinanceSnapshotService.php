@@ -15,11 +15,24 @@ class FinanceSnapshotService
 {
     /**
      * Record today's position. Running it again on the same day overwrites that day's row.
+     */
+    public function takeSnapshot(): FinancialSnapshot
+    {
+        return FinancialSnapshot::updateOrCreate(
+            ['snapshot_date' => now()->toDateString()],
+            $this->currentPosition() + ['taken_at' => now()]
+        );
+    }
+
+    /**
+     * The position right now.
      *
      * Customer wallets and coins exclude the house wallet and the configured test customers.
      * Stuck escrow is money still sitting in a game or competition wallet that is no longer open.
+     *
+     * @return array{customer_wallets_total: float, house_wallet_balance: float, game_escrow_total: float, competition_escrow_total: float, stuck_escrow_total: float, coin_liability: float, pending_holds_total: float, unmatched_deposits_total: float, mpesa_balances: array<string, array<string, array{amount: float, as_of: string}>>|null}
      */
-    public function takeSnapshot(): FinancialSnapshot
+    public function currentPosition(): array
     {
         $houseWalletId = (int) config('wallets.house_wallet_id', 1);
         $testCustomerIds = config('finance.test_customer_ids');
@@ -29,23 +42,19 @@ class FinanceSnapshotService
 
         $coins = Coin::whereNotIn('customer_id', $testCustomerIds)->sum('coins');
 
-        return FinancialSnapshot::updateOrCreate(
-            ['snapshot_date' => now()->toDateString()],
-            [
-                'customer_wallets_total' => $this->money(
-                    Wallet::where('id', '!=', $houseWalletId)->whereNotIn('customer_id', $testCustomerIds)->sum('balance')
-                ),
-                'house_wallet_balance' => $this->money(Wallet::whereKey($houseWalletId)->sum('balance')),
-                'game_escrow_total' => $this->money(GameWallet::where('status', 1)->sum('balance')),
-                'competition_escrow_total' => $this->money(CompetitionWallet::where('status', 1)->sum('balance')),
-                'stuck_escrow_total' => $this->money($stuckEscrow),
-                'coin_liability' => $this->money($coins * config('finance.coin_rate')),
-                'pending_holds_total' => $this->money(PendingBalance::where('status', 'holding')->sum('amount')),
-                'unmatched_deposits_total' => $this->money(Deposit::where('status', 0)->sum('trans_amount')),
-                'mpesa_balances' => $this->latestMpesaBalances(),
-                'taken_at' => now(),
-            ]
-        );
+        return [
+            'customer_wallets_total' => $this->money(
+                Wallet::where('id', '!=', $houseWalletId)->whereNotIn('customer_id', $testCustomerIds)->sum('balance')
+            ),
+            'house_wallet_balance' => $this->money(Wallet::whereKey($houseWalletId)->sum('balance')),
+            'game_escrow_total' => $this->money(GameWallet::where('status', 1)->sum('balance')),
+            'competition_escrow_total' => $this->money(CompetitionWallet::where('status', 1)->sum('balance')),
+            'stuck_escrow_total' => $this->money($stuckEscrow),
+            'coin_liability' => $this->money($coins * config('finance.coin_rate')),
+            'pending_holds_total' => $this->money(PendingBalance::where('status', 'holding')->sum('amount')),
+            'unmatched_deposits_total' => $this->money(Deposit::where('status', 0)->sum('trans_amount')),
+            'mpesa_balances' => $this->latestMpesaBalances(),
+        ];
     }
 
     /**

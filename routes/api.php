@@ -22,6 +22,7 @@ use App\Http\Controllers\api\v1\DepositController;
 use App\Http\Controllers\api\v1\DropConnectionController;
 use App\Http\Controllers\api\v1\EmailVerifiedController;
 use App\Http\Controllers\api\v1\EncryptIdentifierController;
+use App\Http\Controllers\api\v1\FinanceReportController;
 use App\Http\Controllers\api\v1\GameCreditController;
 use App\Http\Controllers\api\v1\GameRefundController;
 use App\Http\Controllers\api\v1\GameTransactionController;
@@ -105,6 +106,16 @@ Route::prefix('/v1')->group(function () {
             Route::post('/stats/purchases/referrals', [StatsController::class, 'purchaseReferralsStats']);
             Route::post('/stats/customers/referrals', [StatsController::class, 'customerReferralStats']);
             Route::post('/stats/customers/played', [StatsController::class, 'playedByPlayerStats']);
+
+            // Finance reports
+            Route::prefix('/finance')->group(function () {
+                Route::get('/summary', [FinanceReportController::class, 'summary']);
+                Route::get('/income-statement', [FinanceReportController::class, 'incomeStatement']);
+                Route::get('/cash-flow', [FinanceReportController::class, 'cashFlow']);
+                Route::get('/balance-sheet', [FinanceReportController::class, 'balanceSheet']);
+                Route::get('/trial-balance', [FinanceReportController::class, 'trialBalance']);
+                Route::get('/reconciliation', [FinanceReportController::class, 'reconciliation']);
+            });
         });
 
         Route::get('/playground', [PlaygroundController::class, 'index']);
