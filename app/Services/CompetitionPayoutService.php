@@ -70,6 +70,9 @@ class CompetitionPayoutService
         }
     }
 
+    /**
+     * @throws \Throwable
+     */
     public function handleTournamentPayout(CompetitionWallet $sender, CompetitionWallet $receiver): array
     {
         return $this->transferRoundResult($sender, $receiver);
@@ -78,6 +81,7 @@ class CompetitionPayoutService
     /**
      * Jackpot rounds transfer exactly like tournament rounds. `jp_rounds` is intentionally not
      * consulted here: it has no bearing on round-by-round transfer mechanics.
+     * @throws \Throwable
      */
     public function handleJackpotPayout(CompetitionWallet $sender, CompetitionWallet $receiver): array
     {
@@ -88,6 +92,7 @@ class CompetitionPayoutService
      * Move the sender's full balance to the receiver and record the paired loss/win transactions.
      *
      * @return array{status: string}
+     * @throws \Throwable
      */
     private function transferRoundResult(CompetitionWallet $sender, CompetitionWallet $receiver): array
     {

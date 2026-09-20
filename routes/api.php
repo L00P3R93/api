@@ -201,8 +201,8 @@ Route::prefix('/v1')->group(function () {
                 // StkPush / M-PESA Express Deposit
                 Route::post('/deposits/{encryptedIdentifier}', StkDepositController::class);
                 Route::post('/load/{encryptedIdentifier}', StkLoadController::class);
-                // Withdrawal route
-                // Route::post('/withdraw/{encryptedIdentifier}', WithdrawalController::class);
+                // Withdrawal route (initiates B2C Payout)
+                Route::post('/withdraw/{encryptedIdentifier}', WithdrawalController::class);
             });
 
             // Game Wallets Routes

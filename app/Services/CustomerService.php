@@ -55,7 +55,7 @@ class CustomerService
     public function createCustomer(array $data): Customer
     {
         $customer = Customer::create($data);
-        Wallet::create(['customer_id' => $customer->id, 'balance' => 250]);
+        Wallet::create(['customer_id' => $customer->id, 'balance' => 0]);
 
         return $customer;
     }
