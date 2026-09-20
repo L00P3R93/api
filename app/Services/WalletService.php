@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\DB;
 
 class WalletService
 {
+    public const DEFAULT_ADJUSTMENT_REASON = 'unspecified';
+
     public function __construct(private LedgerService $ledgerService) {}
 
     public function listWallets(): Collection
@@ -21,21 +23,37 @@ class WalletService
         return Wallet::find($id);
     }
 
-    public function updateWallet(int $id, array $data): ?Wallet
+    /**
+     * @param  array<string, mixed>  $data  A `balance` value is applied as a ledgered adjustment, not a raw overwrite.
+     */
+    public function updateWallet(int $id, array $data, ?string $reason = null, ?string $actor = null): ?Wallet
     {
-        $wallet = Wallet::find($id);
-        if (! $wallet) {
-            return null;
-        }
+        return DB::transaction(function () use ($id, $data, $reason, $actor) {
+            $wallet = Wallet::lockForUpdate()->find($id);
+            if (! $wallet) {
+                return null;
+            }
 
-        $wallet->update($data);
+            if (array_key_exists('balance', $data)) {
+                $this->ledgerService->recordAdjustment(
+                    $wallet,
+                    (float) $data['balance'] - (float) $wallet->balance,
+                    $reason ?? self::DEFAULT_ADJUSTMENT_REASON,
+                    $actor,
+                    ['operation' => 'update_wallet']
+                );
+                unset($data['balance']);
+            }
 
-        return $wallet;
+            $wallet->update($data);
+
+            return $wallet;
+        });
     }
 
-    public function reduceBalance(int $walletId, float $amount): array
+    public function reduceBalance(int $walletId, float $amount, ?string $reason = null, ?string $actor = null): array
     {
-        return DB::transaction(function () use ($walletId, $amount) {
+        return DB::transaction(function () use ($walletId, $amount, $reason, $actor) {
             $wallet = Wallet::lockForUpdate()->find($walletId);
             if (! $wallet) {
                 return ['success' => false, 'message' => 'Wallet not found'];
@@ -45,8 +63,7 @@ class WalletService
             }
 
             $balanceBefore = $wallet->balance;
-            $wallet->balance -= $amount;
-            $wallet->save();
+            $this->ledgerService->recordAdjustment($wallet, -$amount, $reason ?? self::DEFAULT_ADJUSTMENT_REASON, $actor, ['operation' => 'reduce_balance']);
 
             return [
                 'success' => true,
@@ -56,17 +73,16 @@ class WalletService
         });
     }
 
-    public function addBalance(int $walletId, float $amount): array
+    public function addBalance(int $walletId, float $amount, ?string $reason = null, ?string $actor = null): array
     {
-        return DB::transaction(function () use ($walletId, $amount) {
+        return DB::transaction(function () use ($walletId, $amount, $reason, $actor) {
             $wallet = Wallet::lockForUpdate()->find($walletId);
             if (! $wallet) {
                 return ['success' => false, 'message' => 'Wallet not found'];
             }
 
             $balanceBefore = $wallet->balance;
-            $wallet->balance += $amount;
-            $wallet->save();
+            $this->ledgerService->recordAdjustment($wallet, $amount, $reason ?? self::DEFAULT_ADJUSTMENT_REASON, $actor, ['operation' => 'add_balance']);
 
             return [
                 'success' => true,
@@ -76,17 +92,22 @@ class WalletService
         });
     }
 
-    public function setBalance(int $walletId, float $amount): array
+    public function setBalance(int $walletId, float $amount, ?string $reason = null, ?string $actor = null): array
     {
-        return DB::transaction(function () use ($walletId, $amount) {
+        return DB::transaction(function () use ($walletId, $amount, $reason, $actor) {
             $wallet = Wallet::lockForUpdate()->find($walletId);
             if (! $wallet) {
                 return ['success' => false, 'message' => 'Wallet not found'];
             }
 
             $balanceBefore = $wallet->balance;
-            $wallet->balance = $amount;
-            $wallet->save();
+            $this->ledgerService->recordAdjustment(
+                $wallet,
+                $amount - (float) $balanceBefore,
+                $reason ?? self::DEFAULT_ADJUSTMENT_REASON,
+                $actor,
+                ['operation' => 'set_balance']
+            );
 
             return [
                 'success' => true,

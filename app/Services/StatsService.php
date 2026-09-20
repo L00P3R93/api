@@ -19,10 +19,10 @@ class StatsService
         $startOfYear = Carbon::now()->startOfYear();
 
         return [
-            'today' => Customer::where('id', '>=', '120')->whereDate('created_at', $today)->count(),
-            'this_week' => Customer::where('id', '>=', '120')->where('created_at', '>=', $startOfWeek)->count(),
-            'this_month' => Customer::where('id', '>=', '120')->where('created_at', '>=', $startOfMonth)->count(),
-            'this_year' => Customer::where('id', '>=', '120')->where('created_at', '>=', $startOfYear)->count(),
+            'today' => Customer::excludingTest()->whereDate('created_at', $today)->count(),
+            'this_week' => Customer::excludingTest()->where('created_at', '>=', $startOfWeek)->count(),
+            'this_month' => Customer::excludingTest()->where('created_at', '>=', $startOfMonth)->count(),
+            'this_year' => Customer::excludingTest()->where('created_at', '>=', $startOfYear)->count(),
         ];
     }
 
@@ -38,10 +38,10 @@ class StatsService
         $startOfYear = Carbon::now()->startOfYear();
 
         return [
-            'today' => Customer::where('id', '>=', '120')->whereDate('created_at', $today)->whereIn('referral_code', $referralCodes)->count(),
-            'this_week' => Customer::where('id', '>=', '120')->where('created_at', '>=', $startOfWeek)->whereIn('referral_code', $referralCodes)->count(),
-            'this_month' => Customer::where('id', '>=', '120')->where('created_at', '>=', $startOfMonth)->whereIn('referral_code', $referralCodes)->count(),
-            'this_year' => Customer::where('id', '>=', '120')->where('created_at', '>=', $startOfYear)->whereIn('referral_code', $referralCodes)->count(),
+            'today' => Customer::excludingTest()->whereDate('created_at', $today)->whereIn('referral_code', $referralCodes)->count(),
+            'this_week' => Customer::excludingTest()->where('created_at', '>=', $startOfWeek)->whereIn('referral_code', $referralCodes)->count(),
+            'this_month' => Customer::excludingTest()->where('created_at', '>=', $startOfMonth)->whereIn('referral_code', $referralCodes)->count(),
+            'this_year' => Customer::excludingTest()->where('created_at', '>=', $startOfYear)->whereIn('referral_code', $referralCodes)->count(),
         ];
     }
 

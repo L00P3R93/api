@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,11 +12,20 @@ class LedgerEntry extends Model
 {
     use HasFactory;
 
+    public const WALLET_TYPE_WALLET = 'wallet';
+
+    public const WALLET_TYPE_GAME = 'game_wallet';
+
+    public const WALLET_TYPE_COMPETITION = 'competition_wallet';
+
+    public const WALLET_TYPE_COIN = 'coin_wallet';
+
     protected $fillable = [
         'entry_id',
         'entry_type',
         'referenceable_type',
         'referenceable_id',
+        'wallet_type',
         'wallet_id',
         'customer_id',
         'debit',
@@ -35,6 +45,18 @@ class LedgerEntry extends Model
             'balance_after' => 'decimal:2',
             'metadata' => 'array',
         ];
+    }
+
+    /**
+     * Entries that count towards a wallet balance. A reversed entry stays in the sum
+     * because its offsetting `*_reversal` entry is counted too.
+     *
+     * @param  Builder<LedgerEntry>  $query
+     * @return Builder<LedgerEntry>
+     */
+    public function scopeCountable(Builder $query): Builder
+    {
+        return $query->whereIn('status', ['settled', 'reversed']);
     }
 
     public function referenceable(): MorphTo

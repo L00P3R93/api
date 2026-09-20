@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Util\Badge;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
@@ -43,6 +44,17 @@ class Customer extends Model
         // });
     }
 
+    /**
+     * Exclude the test customers listed in config('finance.test_customer_ids').
+     *
+     * @param  Builder<Customer>  $query
+     * @return Builder<Customer>
+     */
+    public function scopeExcludingTest(Builder $query): Builder
+    {
+        return $query->whereNotIn($query->qualifyColumn('id'), config('finance.test_customer_ids'));
+    }
+
     public function wallet(){
         return $this->hasOne(Wallet::class);
     }
@@ -63,10 +75,11 @@ class Customer extends Model
         return $this->hasMany(CompetitionTransaction::class);
     }
 
-    public function competitionWallet(){
+    public function competitionWallet(): Customer|HasMany
+    {
         return $this->hasMany(CompetitionWallet::class);
     }
-    
+
     public function allCompetitionTransactions(): HasManyThrough{
         return $this->hasManyThrough(
             CompetitionTransaction::class,

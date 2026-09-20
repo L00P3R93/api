@@ -68,7 +68,9 @@ class GameCreditController extends Controller
                     $this->ledgerService->recordHouseCut(
                         $houseWallet,
                         $houseShare,
-                        'game_credit'
+                        'game_credit',
+                        $gameTransaction,
+                        ['game_wallet_id' => $gameWallet->id]
                     );
                 }
             });

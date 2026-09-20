@@ -9,10 +9,13 @@ use App\Models\Wallet;
 use App\Models\Withdraw;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class CustomerService
 {
+    public function __construct(private LedgerService $ledgerService) {}
+
     public function listActiveCustomers(): Collection
     {
         return Customer::query()
@@ -359,19 +362,31 @@ class CustomerService
         return $customer;
     }
 
-    public function updateCustomerWallet($identifier, float $amount): bool
+    /**
+     * Apply a signed amount to the customer's wallet as a ledgered adjustment.
+     */
+    public function updateCustomerWallet($identifier, float $amount, ?string $reason = null, ?string $actor = null): bool
     {
         $customer = Customer::query()
             ->where('id', $identifier)
             ->orWhere('account_no', $identifier)
             ->first();
 
-        if (! $customer) {
+        if (! $customer || ! $customer->wallet) {
             return false;
         }
 
-        $customer->wallet->balance += $amount;
-        $customer->wallet->save();
+        DB::transaction(function () use ($customer, $amount, $reason, $actor) {
+            $wallet = Wallet::lockForUpdate()->find($customer->wallet->id);
+
+            $this->ledgerService->recordAdjustment(
+                $wallet,
+                $amount,
+                $reason ?? WalletService::DEFAULT_ADJUSTMENT_REASON,
+                $actor,
+                ['operation' => 'update_customer_wallet']
+            );
+        });
 
         return true;
     }

@@ -32,41 +32,49 @@ class WithdrawalService
             return ['success' => false, 'message' => 'Wallet not found', 'status_code' => 404];
         }
 
-        $canWithdraw = DB::transaction(function () use ($wallet, $amount) {
-            $lockedWallet = Wallet::lockForUpdate()->find($wallet->id);
-
-            if ($lockedWallet->balance < $amount) {
-                return false;
-            }
-
-            $lockedWallet->balance -= $amount;
-            $lockedWallet->save();
-
-            return true;
-        });
-
-        if (! $canWithdraw) {
-            return ['success' => false, 'message' => 'Insufficient wallet balance for withdrawal', 'status_code' => 400];
-        }
-
-        $transaction = $wallet->transactions()->create([
-            'payment_id' => null,
-            'payment_ref' => null,
-            'payment_type' => Withdraw::class,
-            'amount' => $amount,
-            'status' => 1,
-        ]);
-
-        $withdraw = Withdraw::create([
-            'transaction_id' => $transaction->id,
-            'amount' => $amount,
-            'disburse' => 1,
-        ]);
-
         $phone_no = $customer->phone_no ?? null;
         if (! $phone_no) {
             return ['success' => false, 'message' => 'Customer phone number not found', 'status_code' => 400];
         }
+
+        // Debit and ledger the withdrawal up front so a failed payout can be reversed against a real entry.
+        $reserved = DB::transaction(function () use ($wallet, $amount) {
+            $lockedWallet = Wallet::lockForUpdate()->find($wallet->id);
+
+            if ($lockedWallet->balance < $amount) {
+                return null;
+            }
+
+            $transaction = $lockedWallet->transactions()->create([
+                'payment_id' => null,
+                'payment_ref' => null,
+                'payment_type' => Withdraw::class,
+                'amount' => $amount,
+                'status' => 1,
+            ]);
+
+            $withdraw = Withdraw::create([
+                'transaction_id' => $transaction->id,
+                'amount' => $amount,
+                'disburse' => 1,
+            ]);
+
+            $ledgerEntry = $this->ledgerService->recordWithdrawal($withdraw, $lockedWallet, (float) $amount);
+
+            $transaction->update([
+                'payment_id' => $withdraw->id,
+                'balance_before' => $ledgerEntry->balance_before,
+                'balance_after' => $ledgerEntry->balance_after,
+            ]);
+
+            return [$transaction, $withdraw, $ledgerEntry];
+        });
+
+        if ($reserved === null) {
+            return ['success' => false, 'message' => 'Insufficient wallet balance for withdrawal', 'status_code' => 400];
+        }
+
+        [$transaction, $withdraw, $ledgerEntry] = $reserved;
 
         $userParams = [
             'Amount' => $withdraw->amount,
@@ -78,6 +86,8 @@ class WithdrawalService
             $response = $this->mpesaService->b2c($userParams);
         } catch (MpesaApiException $e) {
             Log::channel('mpesa')->error('MPESA B2C Error: '.$e->getMessage());
+
+            $this->ledgerService->reverseWithdrawal($withdraw);
 
             $transaction->update([
                 'payment_id' => $withdraw->id,
@@ -95,14 +105,10 @@ class WithdrawalService
         Log::channel('mpesa')->info('MPESA B2C Response', $response);
 
         if (isset($response['ResponseCode']) && $response['ResponseCode'] == 0) {
-            $ledgerEntry = $this->ledgerService->recordWithdrawal($withdraw, $wallet, (float) $amount);
-
             $transaction->update([
                 'payment_id' => $withdraw->id,
                 'payment_ref' => $response['ConversationID'],
                 'status' => 2,
-                'balance_before' => $ledgerEntry->balance_before,
-                'balance_after' => $ledgerEntry->balance_after,
             ]);
 
             $withdraw->update([
@@ -117,6 +123,8 @@ class WithdrawalService
                 'status_code' => 201,
             ];
         } else {
+            $this->ledgerService->reverseWithdrawal($withdraw);
+
             $transaction->update([
                 'payment_id' => $withdraw->id,
                 'status' => 3,
