@@ -22,6 +22,8 @@ use App\Http\Controllers\api\v1\DepositController;
 use App\Http\Controllers\api\v1\DropConnectionController;
 use App\Http\Controllers\api\v1\EmailVerifiedController;
 use App\Http\Controllers\api\v1\EncryptIdentifierController;
+use App\Http\Controllers\api\v1\FinanceDrilldownController;
+use App\Http\Controllers\api\v1\FinanceExportController;
 use App\Http\Controllers\api\v1\FinanceReportController;
 use App\Http\Controllers\api\v1\GameCreditController;
 use App\Http\Controllers\api\v1\GameRefundController;
@@ -115,6 +117,17 @@ Route::prefix('/v1')->group(function () {
                 Route::get('/balance-sheet', [FinanceReportController::class, 'balanceSheet']);
                 Route::get('/trial-balance', [FinanceReportController::class, 'trialBalance']);
                 Route::get('/reconciliation', [FinanceReportController::class, 'reconciliation']);
+
+                // Drill-downs and CSV export
+                Route::get('/deposits', [FinanceDrilldownController::class, 'deposits']);
+                Route::get('/withdrawals', [FinanceDrilldownController::class, 'withdrawals']);
+                Route::get('/purchases', [FinanceDrilldownController::class, 'purchases']);
+                Route::get('/games', [FinanceDrilldownController::class, 'games']);
+                Route::get('/competitions', [FinanceDrilldownController::class, 'competitions']);
+                Route::get('/ledger', [FinanceDrilldownController::class, 'ledger']);
+                Route::get('/adjustments', [FinanceDrilldownController::class, 'adjustments']);
+                Route::get('/customers/top', [FinanceDrilldownController::class, 'topCustomers']);
+                Route::get('/export/{report}', FinanceExportController::class);
             });
         });
 
@@ -135,6 +148,8 @@ Route::prefix('/v1')->group(function () {
             Route::get('/customers/played/{encryptedIdentifier}', [CustomerController::class, 'customer_played']);
             // Customer Purchases Routes
             Route::get('/customers/purchases/{encryptedIdentifier}', [CustomerController::class, 'customer_purchases']);
+            // Finance: one customer's wallet statement
+            Route::get('/finance/customers/{encryptedIdentifier}/statement', [FinanceDrilldownController::class, 'customerStatement'])->middleware('throttle:stats');
 
             // Wallet Routes
             Route::get('/wallets/{encryptedIdentifier}', [WalletController::class, 'show']);
