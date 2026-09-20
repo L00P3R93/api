@@ -2,13 +2,18 @@
 
 namespace App\Services;
 
+use App\Models\Coin;
 use App\Models\CompetitionTransaction;
 use App\Models\CompetitionWallet;
+use App\Models\GameWallet;
 use App\Models\LedgerEntry;
 use App\Models\PendingBalance;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
+use App\Models\Withdraw;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Ramsey\Uuid\Uuid;
 
 class LedgerService
@@ -357,22 +362,30 @@ class LedgerService
         return [$senderEntry, $receiverEntry];
     }
 
-    public function recordHouseCut(Wallet $houseWallet, float $amount, string $source): LedgerEntry
-    {
+    /**
+     * @param  array<string, mixed>  $context  Extra metadata, e.g. game_wallet_id or competition_wallet_id.
+     */
+    public function recordHouseCut(
+        Wallet $houseWallet,
+        float $amount,
+        string $source,
+        ?Model $reference = null,
+        array $context = []
+    ): LedgerEntry {
         $balanceBefore = $houseWallet->balance;
         $houseWallet->balance += $amount;
         $houseWallet->save();
 
         return $this->createEntry(
             entryType: 'house_cut',
-            referenceable: null,
+            referenceable: $reference,
             wallet: $houseWallet,
             customerId: 1,
             debit: 0,
             credit: $amount,
             balanceBefore: $balanceBefore,
             balanceAfter: $houseWallet->balance,
-            metadata: ['source' => $source]
+            metadata: ['source' => $source] + $context
         );
     }
 
@@ -393,6 +406,156 @@ class LedgerService
             balanceAfter: $wallet->balance,
             metadata: ['reason' => $reason]
         );
+    }
+
+    /**
+     * Record a manual balance change. A positive amount credits the wallet, a negative one debits it.
+     * The reason and actor are kept in the entry metadata so manual movements can be audited.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    public function recordAdjustment(Wallet $wallet, float $signedAmount, string $reason, ?string $actor = null, array $context = []): ?LedgerEntry
+    {
+        if (round($signedAmount, 2) == 0.0) {
+            return null;
+        }
+
+        $balanceBefore = $wallet->balance;
+        $wallet->balance += $signedAmount;
+        $wallet->save();
+
+        return $this->createEntry(
+            entryType: 'adjustment',
+            referenceable: null,
+            wallet: $wallet,
+            customerId: $wallet->customer_id,
+            debit: $signedAmount < 0 ? abs($signedAmount) : 0,
+            credit: $signedAmount > 0 ? $signedAmount : 0,
+            balanceBefore: $balanceBefore,
+            balanceAfter: $wallet->balance,
+            metadata: ['reason' => $reason, 'actor' => $actor] + $context
+        );
+    }
+
+    /**
+     * Debit a game or competition wallet when its balance leaves escrow (payout, refund).
+     */
+    public function recordEscrowRelease(Model $reference, GameWallet|CompetitionWallet $escrow, float $amount, string $reason): ?LedgerEntry
+    {
+        if ($amount <= 0) {
+            return null;
+        }
+
+        $balanceBefore = $escrow->balance;
+        $escrow->balance -= $amount;
+        $escrow->save();
+
+        return $this->createEntry(
+            entryType: 'escrow_release',
+            referenceable: $reference,
+            wallet: $escrow,
+            customerId: null,
+            debit: $amount,
+            credit: 0,
+            balanceBefore: $balanceBefore,
+            balanceAfter: $escrow->balance,
+            metadata: ['reason' => $reason]
+        );
+    }
+
+    /**
+     * Move a balance between two competition wallets (round win/loss).
+     *
+     * @return array{0: LedgerEntry, 1: LedgerEntry}
+     */
+    public function recordEscrowTransfer(CompetitionTransaction $reference, CompetitionWallet $sender, CompetitionWallet $receiver, float $amount): array
+    {
+        $senderBalanceBefore = $sender->balance;
+        $receiverBalanceBefore = $receiver->balance;
+
+        $sender->balance -= $amount;
+        $sender->save();
+
+        $receiver->balance += $amount;
+        $receiver->save();
+
+        $senderEntry = $this->createEntry(
+            entryType: 'escrow_transfer',
+            referenceable: $reference,
+            wallet: $sender,
+            customerId: null,
+            debit: $amount,
+            credit: 0,
+            balanceBefore: $senderBalanceBefore,
+            balanceAfter: $sender->balance,
+            metadata: ['direction' => 'outgoing', 'receiver_wallet_id' => $receiver->id]
+        );
+
+        $receiverEntry = $this->createEntry(
+            entryType: 'escrow_transfer',
+            referenceable: $reference,
+            wallet: $receiver,
+            customerId: null,
+            debit: 0,
+            credit: $amount,
+            balanceBefore: $receiverBalanceBefore,
+            balanceAfter: $receiver->balance,
+            metadata: ['direction' => 'incoming', 'sender_wallet_id' => $sender->id]
+        );
+
+        return [$senderEntry, $receiverEntry];
+    }
+
+    /**
+     * Work out which wallet table an entry written before `wallet_type` existed points at.
+     * Returns null when the entry cannot be classified with confidence.
+     */
+    public function inferWalletType(LedgerEntry $entry): ?string
+    {
+        $metadata = $entry->metadata ?? [];
+
+        if (str_ends_with($entry->entry_type, '_reversal')) {
+            $original = LedgerEntry::where('entry_id', $metadata['original_entry_id'] ?? '')->first();
+
+            return $original?->wallet_type ?? ($original ? $this->inferWalletType($original) : null);
+        }
+
+        return match ($entry->entry_type) {
+            'deposit', 'withdrawal', 'wallet_transfer', 'refund', 'house_cut',
+            'game_payout', 'competition_payout', 'adjustment' => LedgerEntry::WALLET_TYPE_WALLET,
+            'game_bet' => match (true) {
+                isset($metadata['customer_wallet_id']) => LedgerEntry::WALLET_TYPE_GAME,
+                isset($metadata['game_wallet_id']) => LedgerEntry::WALLET_TYPE_WALLET,
+                default => null,
+            },
+            'competition_bet' => match (true) {
+                isset($metadata['customer_wallet_id']) => LedgerEntry::WALLET_TYPE_COMPETITION,
+                isset($metadata['competition_wallet_id']) => LedgerEntry::WALLET_TYPE_WALLET,
+                default => null,
+            },
+            'coin_purchase' => match (true) {
+                isset($metadata['amount_paid']) => LedgerEntry::WALLET_TYPE_COIN,
+                isset($metadata['coins_purchased']) => LedgerEntry::WALLET_TYPE_WALLET,
+                default => null,
+            },
+            'coin_exchange' => match (true) {
+                isset($metadata['amount_credited']) => LedgerEntry::WALLET_TYPE_COIN,
+                isset($metadata['coins_exchanged']) => LedgerEntry::WALLET_TYPE_WALLET,
+                default => null,
+            },
+            'coin_transfer' => LedgerEntry::WALLET_TYPE_COIN,
+            default => str_ends_with($entry->entry_type, '_settled') ? LedgerEntry::WALLET_TYPE_WALLET : null,
+        };
+    }
+
+    private function walletTypeFor(Model $wallet): string
+    {
+        return match (true) {
+            $wallet instanceof GameWallet => LedgerEntry::WALLET_TYPE_GAME,
+            $wallet instanceof CompetitionWallet => LedgerEntry::WALLET_TYPE_COMPETITION,
+            $wallet instanceof Coin => LedgerEntry::WALLET_TYPE_COIN,
+            default => LedgerEntry::WALLET_TYPE_WALLET,
+        };
     }
 
     public function holdFunds(Wallet $wallet, float $amount, string $type, $reference = null): PendingBalance
@@ -461,13 +624,37 @@ class LedgerService
         );
     }
 
+    /**
+     * Return the money of a withdrawal that M-Pesa rejected or failed to pay out.
+     * Safe to call more than once: only a still-settled withdrawal entry is reversed.
+     */
+    public function reverseWithdrawal(Withdraw $withdraw): ?LedgerEntry
+    {
+        return DB::transaction(function () use ($withdraw) {
+            $entry = LedgerEntry::where('entry_type', 'withdrawal')
+                ->where('referenceable_type', Withdraw::class)
+                ->where('referenceable_id', $withdraw->id)
+                ->where('status', 'settled')
+                ->lockForUpdate()
+                ->first();
+
+            if (! $entry) {
+                return null;
+            }
+
+            Wallet::lockForUpdate()->find($entry->wallet_id);
+
+            return $this->reverseEntry($entry);
+        });
+    }
+
     public function getBalance(Wallet $wallet): array
     {
-        $settled = LedgerEntry::where('wallet_id', $wallet->id)
-            ->where('status', 'settled')
-            ->sum('credit') - LedgerEntry::where('wallet_id', $wallet->id)
-            ->where('status', 'settled')
-            ->sum('debit');
+        $walletEntries = fn () => LedgerEntry::where('wallet_type', LedgerEntry::WALLET_TYPE_WALLET)
+            ->where('wallet_id', $wallet->id)
+            ->countable();
+
+        $settled = $walletEntries()->sum('credit') - $walletEntries()->sum('debit');
 
         $pending = PendingBalance::where('wallet_id', $wallet->id)
             ->where('status', 'holding')
@@ -482,7 +669,8 @@ class LedgerService
 
     public function getStatement(Wallet $wallet, $from, $to): Collection
     {
-        return LedgerEntry::where('wallet_id', $wallet->id)
+        return LedgerEntry::where('wallet_type', LedgerEntry::WALLET_TYPE_WALLET)
+            ->where('wallet_id', $wallet->id)
             ->whereBetween('created_at', [$from, $to])
             ->orderBy('created_at', 'asc')
             ->get();
@@ -504,6 +692,7 @@ class LedgerService
             'entry_type' => $entryType,
             'referenceable_type' => $referenceable ? get_class($referenceable) : null,
             'referenceable_id' => $referenceable?->id,
+            'wallet_type' => $this->walletTypeFor($wallet),
             'wallet_id' => $wallet->id,
             'customer_id' => $customerId,
             'debit' => $debit,

@@ -8,6 +8,7 @@ use App\Http\Resources\WalletResource;
 use App\Services\WalletService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 
 class WalletController extends Controller
 {
@@ -41,7 +42,7 @@ class WalletController extends Controller
      */
     public function update(UpdateWalletRequest $request, $encryptedIdentifier): JsonResponse
     {
-        $wallet = $this->walletService->updateWallet($encryptedIdentifier, $request->validated());
+        $wallet = $this->walletService->updateWallet($encryptedIdentifier, Arr::except($request->validated(), 'reason'), $request->input('reason'), $this->actorFor($request));
         if (! $wallet) {
             return response()->json(['message' => 'Wallet not found'], 404);
         }
@@ -53,9 +54,10 @@ class WalletController extends Controller
     {
         $request->validate([
             'amount' => 'required|numeric|min:0.01',
+            'reason' => 'nullable|string|max:255',
         ]);
 
-        $result = $this->walletService->reduceBalance($encryptedIdentifier, $request->amount);
+        $result = $this->walletService->reduceBalance($encryptedIdentifier, $request->amount, $request->input('reason'), $this->actorFor($request));
         if (! $result['success']) {
             $statusCode = $result['message'] === 'Wallet not found' ? 404 : 400;
 
@@ -69,9 +71,10 @@ class WalletController extends Controller
     {
         $request->validate([
             'amount' => 'required|numeric|min:0.01',
+            'reason' => 'nullable|string|max:255',
         ]);
 
-        $result = $this->walletService->addBalance($encryptedIdentifier, $request->amount);
+        $result = $this->walletService->addBalance($encryptedIdentifier, $request->amount, $request->input('reason'), $this->actorFor($request));
         if (! $result['success']) {
             return response()->json(['message' => $result['message']], 404);
         }
@@ -83,9 +86,10 @@ class WalletController extends Controller
     {
         $request->validate([
             'amount' => 'required|numeric|min:0.01',
+            'reason' => 'nullable|string|max:255',
         ]);
 
-        $result = $this->walletService->setBalance($encryptedIdentifier, $request->amount);
+        $result = $this->walletService->setBalance($encryptedIdentifier, $request->amount, $request->input('reason'), $this->actorFor($request));
         if (! $result['success']) {
             return response()->json(['message' => $result['message']], 404);
         }

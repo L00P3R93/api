@@ -168,7 +168,9 @@ class GameWalletService
                 $houseEntry = $this->ledgerService->recordHouseCut(
                     $houseWallet,
                     (float) $houseShare,
-                    'game_withdrawal'
+                    'game_withdrawal',
+                    $houseTransaction,
+                    ['game_wallet_id' => $gameWallet->id]
                 );
 
                 $houseTransaction->update([
@@ -178,6 +180,8 @@ class GameWalletService
                     'game_balance_after' => 0,
                 ]);
             }
+
+            $this->ledgerService->recordEscrowRelease($playerTransaction, $gameWallet, (float) $totalBalance, 'game_withdrawal');
 
             $gameWallet->balance = 0;
             $gameWallet->status = 3;
@@ -232,6 +236,8 @@ class GameWalletService
                     'wallet_balance_after' => $ledgerEntry->balance_after,
                 ]);
             }
+
+            $this->ledgerService->recordEscrowRelease($gameWallet, $gameWallet, (float) $gameWallet->balance, 'game_full_refund');
 
             $gameWallet->balance = 0;
             $gameWallet->status = 3;
@@ -479,7 +485,9 @@ class GameWalletService
             $houseEntry = $this->ledgerService->recordHouseCut(
                 $houseWallet,
                 (float) $houseShare,
-                'game_drop_payout'
+                'game_drop_payout',
+                $houseTransaction,
+                ['game_wallet_id' => $gameWallet->id]
             );
 
             $houseTransaction->update([

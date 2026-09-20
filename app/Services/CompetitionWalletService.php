@@ -181,6 +181,8 @@ class CompetitionWalletService
                 'competition_wallet_balance_after' => 0,
             ]);
 
+            $this->ledgerService->recordEscrowRelease($competitionTransaction, $competitionWallet, (float) $totalBalance, 'competition_payout');
+
             $competitionWallet->status = 3;
             $competitionWallet->balance = 0;
             $competitionWallet->save();
@@ -249,7 +251,9 @@ class CompetitionWalletService
                 $this->ledgerService->recordHouseCut(
                     $houseWallet,
                     (float) $houseCompetitionShare,
-                    'competition_bet'
+                    'competition_bet',
+                    $competitionTransaction,
+                    ['competition_wallet_id' => $competitionWallet->id]
                 );
             }
 

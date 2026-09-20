@@ -104,15 +104,6 @@ class CompetitionPayoutService
                 'status' => 2,
             ]);
 
-            $sender->balance -= $totalBalance;
-            $sender->level -= 1;
-            $sender->save();
-
-            $senderTransaction->update([
-                'competition_wallet_balance_before' => $senderTransaction->competition_wallet_balance_before ?? $sender->balance + $totalBalance,
-                'competition_wallet_balance_after' => $sender->balance,
-            ]);
-
             $receiverCustomer = $receiver->customer;
             $receiverTransaction = CompetitionTransaction::create([
                 'competition_wallet_id' => $receiver->id,
@@ -123,13 +114,27 @@ class CompetitionPayoutService
                 'status' => 2,
             ]);
 
-            $receiver->balance += $totalBalance;
+            [$senderEntry, $receiverEntry] = $this->ledgerService->recordEscrowTransfer(
+                $senderTransaction,
+                $sender,
+                $receiver,
+                (float) $totalBalance
+            );
+
+            $sender->level -= 1;
+            $sender->save();
+
             $receiver->level += 1;
             $receiver->save();
 
+            $senderTransaction->update([
+                'competition_wallet_balance_before' => $senderEntry->balance_before,
+                'competition_wallet_balance_after' => $senderEntry->balance_after,
+            ]);
+
             $receiverTransaction->update([
-                'competition_wallet_balance_before' => $receiverTransaction->competition_wallet_balance_before ?? $receiver->balance - $totalBalance,
-                'competition_wallet_balance_after' => $receiver->balance,
+                'competition_wallet_balance_before' => $receiverEntry->balance_before,
+                'competition_wallet_balance_after' => $receiverEntry->balance_after,
             ]);
         });
 

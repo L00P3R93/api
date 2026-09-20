@@ -178,9 +178,9 @@ class CustomerController extends Controller
 
     public function update_wallet(Request $request, $encryptedIdentifier): JsonResponse
     {
-        $request->validate(['amount' => 'required|numeric']);
+        $request->validate(['amount' => 'required|numeric', 'reason' => 'nullable|string|max:255']);
 
-        $updated = $this->customerService->updateCustomerWallet($encryptedIdentifier, (float) $request->amount);
+        $updated = $this->customerService->updateCustomerWallet($encryptedIdentifier, (float) $request->amount, $request->input('reason'), $this->actorFor($request));
 
         if (! $updated) {
             return response()->json(['message' => 'Customer not found'], 404);
