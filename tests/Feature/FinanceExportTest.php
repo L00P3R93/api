@@ -134,8 +134,8 @@ it('exports the statements as flat rows', function () {
     expect($cash['rows'][1])->toMatchArray(['wallet_deposit' => '500', 'gift' => '100', 'cash_in_total' => '600', 'net_cash' => '600']);
 
     $income = downloadCsv($this, 'income-statement');
-    expect($income['header'])->toBe(['period', 'games', 'tournaments', 'jackpots', 'competitions_unattributed', 'gift_emoji_sales', 'other', 'total']);
-    expect($income['rows'][0])->toMatchArray(['period' => '2026-09-20', 'gift_emoji_sales' => '100', 'total' => '100']);
+    expect($income['header'])->toBe(['period', 'games', 'tournaments', 'jackpots', 'competitions_unattributed', 'gift_emoji_sales', 'other', 'total', 'expenses', 'net_income']);
+    expect($income['rows'][0])->toMatchArray(['period' => '2026-09-20', 'gift_emoji_sales' => '100', 'total' => '100', 'expenses' => '0', 'net_income' => '100']);
 
     $trial = downloadCsv($this, 'trial-balance');
     expect($trial['header'])->toBe(['account', 'entry_type', 'category', 'unit', 'debit', 'credit', 'entries']);

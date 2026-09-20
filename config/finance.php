@@ -73,6 +73,67 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Expense Categories
+    |--------------------------------------------------------------------------
+    |
+    | The categories an expense can be recorded under. Reports group by these.
+    | Add a category here to allow it; existing expenses keep theirs.
+    |
+    */
+
+    'expense_categories' => [
+        'mpesa_charges',
+        'hosting',
+        'sms',
+        'salaries',
+        'marketing',
+        'licences_and_fees',
+        'other',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Taxes
+    |--------------------------------------------------------------------------
+    |
+    | Estimated tax lines for the tax report. Every rate is a fraction of the
+    | base (0.15 is 15%) and is off (0) until you set it, because the right
+    | rates and bases depend on how your games are classed. Confirm them with
+    | your accountant or tax adviser. These are estimates for planning, not
+    | tax returns.
+    |
+    | base   stakes      customer stakes in the period
+    |        winnings    winnings paid to customers in the period
+    |        revenue     total revenue
+    |        net_income  revenue minus expenses, never below zero
+    | kind   expense       a cost to the house: reduces net income after tax
+    |        pass_through  collected or withheld and passed on: not a cost
+    |
+    */
+
+    'taxes' => [
+        'excise_duty' => [
+            'label' => 'Excise duty on stakes',
+            'base' => 'stakes',
+            'kind' => 'expense',
+            'rate' => (float) env('FINANCE_TAX_EXCISE_RATE', 0),
+        ],
+        'withholding_tax' => [
+            'label' => 'Withholding tax on winnings',
+            'base' => 'winnings',
+            'kind' => 'pass_through',
+            'rate' => (float) env('FINANCE_TAX_WITHHOLDING_RATE', 0),
+        ],
+        'income_tax' => [
+            'label' => 'Income tax on net income',
+            'base' => 'net_income',
+            'kind' => 'expense',
+            'rate' => (float) env('FINANCE_TAX_INCOME_RATE', 0),
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | List Reports
     |--------------------------------------------------------------------------
     |

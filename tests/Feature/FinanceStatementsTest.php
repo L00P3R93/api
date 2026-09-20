@@ -123,7 +123,7 @@ it('reports revenue by stream and leaves out test customers', function () {
     expect($data['revenue']['jackpots']['by_rounds'])->toEqual(['13' => 20]);
     expect($data['revenue']['gift_emoji_sales'])->toEqual(['total' => 100, 'gift' => 100, 'emoji' => 0]);
     expect($data['revenue']['total'])->toEqual(135);
-    expect($data['expenses']['tracked'])->toBeFalse();
+    expect($data['expenses'])->toEqual(['tracked' => true, 'total' => 0, 'by_category' => []]);
     expect($data['net_income'])->toEqual(135);
     expect($data['memo']['load_margin'])->toEqual(['cash_received' => 300, 'wallet_credited' => 280, 'margin' => 20]);
     expect($data['meta']['period'])->toMatchArray(['from' => '2026-09-20', 'to' => '2026-09-20', 'group_by' => 'day', 'exclude_test' => true]);
