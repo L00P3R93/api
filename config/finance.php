@@ -73,6 +73,45 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Ledger Dates
+    |--------------------------------------------------------------------------
+    |
+    | ledger_started_at    first day the ledger recorded money movements. Reports
+    |                      warn when a range starts before it, because earlier
+    |                      activity is not in the ledger.
+    | ledger_reliable_from first day every movement, including escrow releases,
+    |                      was ledgered (the day the Phase 0 finance fixes went
+    |                      live). Balance and escrow checks ignore older data.
+    |                      Set FINANCE_LEDGER_RELIABLE_FROM after deploying.
+    |
+    */
+
+    'ledger_started_at' => env('FINANCE_LEDGER_STARTED_AT', '2026-09-01'),
+
+    'ledger_reliable_from' => env('FINANCE_LEDGER_RELIABLE_FROM', env('FINANCE_LEDGER_STARTED_AT', '2026-09-01')),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Reconciliation
+    |--------------------------------------------------------------------------
+    |
+    | tolerance                money differences up to this are ignored (KES).
+    | stuck_game_hours         an open game or competition wallet holding a
+    |                          balance and untouched this long is flagged.
+    | stuck_withdrawal_hours   a withdrawal pending this long is flagged.
+    | stale_mpesa_balance_hours  the M-Pesa balance fetch is overdue after this.
+    |
+    */
+
+    'reconciliation' => [
+        'tolerance' => 0.01,
+        'stuck_game_hours' => 24,
+        'stuck_withdrawal_hours' => 24,
+        'stale_mpesa_balance_hours' => 3,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Daily Snapshot
     |--------------------------------------------------------------------------
     |

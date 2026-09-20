@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Services\FinanceDateRange;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
@@ -27,7 +28,8 @@ class FinanceReportRequest extends FormRequest
                 FinanceDateRange::GROUP_BY_WEEK,
                 FinanceDateRange::GROUP_BY_MONTH,
             ])],
-            'exclude_test' => ['nullable', 'boolean'],
+            'exclude_test' => ['nullable', 'in:0,1,true,false'],
+            'as_of' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
         ];
     }
 
@@ -48,11 +50,21 @@ class FinanceReportRequest extends FormRequest
         ];
     }
 
-    public function dateRange(): FinanceDateRange
+    /**
+     * @param  int  $defaultDays  Length of the window when `from` is not sent, ending on `to` (or today).
+     */
+    public function dateRange(int $defaultDays = 1): FinanceDateRange
     {
+        $to = $this->input('to');
+        $from = $this->input('from');
+
+        if (! $from && $defaultDays > 1) {
+            $from = CarbonImmutable::parse($to ?? 'today', config('app.timezone'))->subDays($defaultDays - 1)->toDateString();
+        }
+
         return FinanceDateRange::fromArray([
-            'from' => $this->input('from'),
-            'to' => $this->input('to'),
+            'from' => $from,
+            'to' => $to,
             'group_by' => $this->input('group_by'),
             'exclude_test' => $this->boolean('exclude_test', true),
         ]);
