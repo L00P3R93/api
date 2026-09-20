@@ -37,5 +37,6 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('idempotency:clean')->daily();
         $schedule->command('logs:clean')->daily();
         $schedule->command('mpesa:fetch-balances')->hourly();
+        $schedule->command('finance:snapshot')->dailyAt(config('finance.snapshot_time'))->withoutOverlapping();
     })
     ->create();

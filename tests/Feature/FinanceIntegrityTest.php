@@ -352,6 +352,6 @@ it('excludes the configured test customers from the customer scope', function ()
     expect($ids)->toContain($real->id);
 });
 
-it('defaults the test customer list to the historic id below 120 rule', function () {
-    expect(config('finance.test_customer_ids'))->toBe(range(1, 119));
+it('defaults the test customer list to the historic id below 500 rule', function () {
+    expect(config('finance.test_customer_ids'))->toBe(range(1, 500));
 });

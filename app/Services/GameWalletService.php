@@ -129,7 +129,7 @@ class GameWalletService
         }
 
         $totalBalance = $gameWallet->balance;
-        $houseShare = ceil($totalBalance * 0.05); // 5%
+        $houseShare = ceil($totalBalance * config('finance.fees.game_withdrawal'));
         $playerShare = $totalBalance - $houseShare;
 
         DB::transaction(function () use ($gameWallet, $customer, $wallet, $playerShare, $houseShare, $totalBalance) {
@@ -466,7 +466,7 @@ class GameWalletService
             throw new \Exception('Active player count cannot be zero when game has started.');
         }
 
-        $houseShare = $gameStarted ? ceil($totalBalance * 0.10) : 0;
+        $houseShare = $gameStarted ? ceil($totalBalance * config('finance.fees.game_drop')) : 0;
         $playerShare = $gameStarted ? floor(($totalBalance - $houseShare) / $activeCount) : 0;
 
         $payouts = [];

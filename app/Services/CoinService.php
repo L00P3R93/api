@@ -26,7 +26,7 @@ class CoinService
             return ['success' => false, 'message' => 'Insufficient balance in Wallet', 'status_code' => 400];
         }
 
-        $exchangeRate = 0.04;
+        $exchangeRate = config('finance.coin_rate');
         $coinsToBuy = floor($amount / $exchangeRate);
 
         $coinWallet = null;
@@ -71,7 +71,7 @@ class CoinService
             return ['success' => false, 'message' => 'Wallet not found', 'status_code' => 404];
         }
 
-        $exchangeRate = 0.04;
+        $exchangeRate = config('finance.coin_rate');
         $amountToExchange = $coinsToExchange * $exchangeRate;
 
         $this->ledgerService->recordCoinExchange(
