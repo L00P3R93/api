@@ -32,6 +32,18 @@ class ChartOfAccounts
     }
 
     /**
+     * Every entry type that reports under a category, including the reversal of each.
+     *
+     * @return list<string>
+     */
+    public function entryTypesFor(string $category): array
+    {
+        $types = array_keys(array_filter(config('finance.entry_types'), fn (string $value) => $value === $category));
+
+        return array_merge($types, array_map(fn (string $type) => $type.self::REVERSAL_SUFFIX, $types));
+    }
+
+    /**
      * The account a wallet belongs to. The house wallet is kept apart from customer wallets.
      */
     public function accountFor(string $walletType, int $walletId): string
