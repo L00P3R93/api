@@ -7,6 +7,7 @@ use App\Http\Requests\FinanceReportRequest;
 use App\Services\FinanceDateRange;
 use App\Services\FinanceReconciliationService;
 use App\Services\FinanceReportService;
+use App\Services\FinanceTaxService;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
@@ -22,6 +23,7 @@ class FinanceReportController extends Controller
     public function __construct(
         private FinanceReportService $reports,
         private FinanceReconciliationService $reconciliation,
+        private FinanceTaxService $taxes,
     ) {}
 
     public function summary(FinanceReportRequest $request): JsonResponse
@@ -63,6 +65,13 @@ class FinanceReportController extends Controller
         $range = $request->dateRange();
 
         return $this->respond('trial-balance', $range, fn () => $this->withMeta($range, $this->reports->trialBalance($range)));
+    }
+
+    public function taxes(FinanceReportRequest $request): JsonResponse
+    {
+        $range = $request->dateRange();
+
+        return $this->respond('taxes', $range, fn () => $this->taxes->estimate($range));
     }
 
     public function reconciliation(FinanceReportRequest $request): JsonResponse

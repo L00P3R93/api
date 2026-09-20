@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -322,6 +322,14 @@
         <ul>
             <li><a href="#" data-section="stats"><span class="nav-icon">&#128200;</span> <span>Statistics</span></a></li>
         </ul>
+        <div class="nav-section">Finance Reporting</div>
+        <ul>
+            <li><a href="#" data-section="finance-overview"><span class="nav-icon">&#128214;</span> <span>Finance Overview</span></a></li>
+            <li><a href="#" data-section="finance-statements"><span class="nav-icon">&#129534;</span> <span>Statements</span></a></li>
+            <li><a href="#" data-section="finance-reports"><span class="nav-icon">&#128269;</span> <span>Drill-downs</span></a></li>
+            <li><a href="#" data-section="finance-expenses"><span class="nav-icon">&#129534;</span> <span>Expenses</span></a></li>
+            <li><a href="#" data-section="finance-export"><span class="nav-icon">&#128229;</span> <span>CSV Export</span></a></li>
+        </ul>
         <div class="nav-section">Utilities</div>
         <ul>
             <li><a href="#" data-section="playground"><span class="nav-icon">&#128736;</span> <span>Playground</span></a></li>
@@ -359,8 +367,8 @@
 <h3>Rate Limits</h3>
 <table class="params-table">
 <tr><th>Limiter</th><th>Limit</th><th>Applies To</th></tr>
-<tr><td>write</td><td>30/min</td><td>POST, PUT, DELETE mutations</td></tr>
-<tr><td>stats</td><td>20/min</td><td>All /stats/* endpoints</td></tr>
+<tr><td>write</td><td>30/min</td><td>POST, PUT, DELETE mutations, including recording and voiding finance expenses</td></tr>
+<tr><td>stats</td><td>20/min</td><td>All /stats/* endpoints and all finance GET reports (/finance/*)</td></tr>
 <tr><td>financial</td><td>5/min</td><td>STK Push and load operations</td></tr>
 <tr><td>callback</td><td>100/min</td><td>MPesa callback webhooks (IP-based)</td></tr>
 </table>
@@ -515,7 +523,7 @@ Idempotency-Key: idem-12345
 <div class="endpoint-header" onclick="toggle(this)">
 <span class="method method-put">PUT</span>
 <span class="endpoint-path">/api/v1/customers/{encryptedIdentifier}/wallet</span>
-<span class="endpoint-desc">Updates customer wallet balance</span>
+<span class="endpoint-desc">Adds a signed amount to the customer wallet balance</span>
 <span class="chevron">&#9654;</span>
 </div>
 <div class="endpoint-body">
@@ -523,7 +531,8 @@ Idempotency-Key: idem-12345
 <div class="endpoint-section"><h4>Request Body</h4>
 <table class="params-table">
 <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
-<tr><td>amount</td><td>numeric</td><td><span class="required">Required</span></td><td>New balance</td></tr>
+<tr><td>amount</td><td>numeric</td><td><span class="required">Required</span></td><td>Amount added to the balance. Use a negative number to deduct</td></tr>
+<tr><td>reason</td><td>string</td><td><span class="optional">Optional</span></td><td>Why the balance is being changed (max 255). Recorded in the ledger; defaults to "unspecified"</td></tr>
 </table></div>
 <div class="endpoint-section"><h4>Response (201)</h4><pre>{"status": "success"}</pre></div>
 </div></div>
@@ -660,6 +669,7 @@ Idempotency-Key: idem-12345
 <!-- WALLETS SECTION -->
 <div class="doc-section" data-section="wallets">
 <button class="expand-all" onclick="toggleAll('wallets')">Expand / Collapse All</button>
+<div class="callback-note">Every manual balance change on this page (<code>PUT /wallets/{id}</code> with a balance, <code>/balance</code>, <code>/deposit</code>, <code>/withdraw</code>, and <code>PUT /customers/{id}/wallet</code>) is recorded in the ledger as an adjustment. Send an optional <code>reason</code> (up to 255 characters) with the request; without one it is recorded as <code>unspecified</code>. The API key that made the change is recorded automatically. Review them at <a href="#" data-section="finance-reports" style="color:var(--accent-blue)">GET /finance/adjustments</a>. Request and response formats are unchanged.</div>
 
 <div class="endpoint">
 <div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/wallets</span><span class="endpoint-desc">List all wallets</span><span class="chevron">&#9654;</span></div>
@@ -683,7 +693,8 @@ Idempotency-Key: idem-12345
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
 <table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
-<tr><td>balance</td><td>numeric</td><td><span class="required">Required</span></td><td>New balance value</td></tr></table></div>
+<tr><td>balance</td><td>numeric</td><td><span class="required">Required</span></td><td>New balance value. Recorded as an adjustment for the difference</td></tr>
+<tr><td>reason</td><td>string</td><td><span class="optional">Optional</span></td><td>Why the balance is being changed (max 255). Recorded in the ledger; defaults to "unspecified"</td></tr></table></div>
 <div class="endpoint-section"><h4>Response (201)</h4><pre>{"status": "success"}</pre></div>
 </div></div>
 
@@ -693,7 +704,8 @@ Idempotency-Key: idem-12345
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
 <table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
-<tr><td>amount</td><td>numeric</td><td><span class="required">Required</span></td><td>New balance (min: 0.01)</td></tr></table></div>
+<tr><td>amount</td><td>numeric</td><td><span class="required">Required</span></td><td>New balance (min: 0.01)</td></tr>
+<tr><td>reason</td><td>string</td><td><span class="optional">Optional</span></td><td>Why the balance is being changed (max 255). Recorded in the ledger; defaults to "unspecified"</td></tr></table></div>
 <div class="endpoint-section"><h4>Response (201)</h4><pre>{"status": "success", "balance_before": 1500.00, "balance_after": 2000.00}</pre></div>
 </div></div>
 
@@ -703,7 +715,8 @@ Idempotency-Key: idem-12345
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
 <table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
-<tr><td>amount</td><td>numeric</td><td><span class="required">Required</span></td><td>Amount to add (min: 0.01)</td></tr></table></div>
+<tr><td>amount</td><td>numeric</td><td><span class="required">Required</span></td><td>Amount to add (min: 0.01)</td></tr>
+<tr><td>reason</td><td>string</td><td><span class="optional">Optional</span></td><td>Why the balance is being changed (max 255). Recorded in the ledger; defaults to "unspecified"</td></tr></table></div>
 <div class="endpoint-section"><h4>Response (201)</h4><pre>{"status": "success", "balance_before": 1500.00, "balance_after": 1750.00}</pre></div>
 </div></div>
 
@@ -713,7 +726,8 @@ Idempotency-Key: idem-12345
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Request Body</h4>
 <table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
-<tr><td>amount</td><td>numeric</td><td><span class="required">Required</span></td><td>Amount to deduct (min: 0.01)</td></tr></table></div>
+<tr><td>amount</td><td>numeric</td><td><span class="required">Required</span></td><td>Amount to deduct (min: 0.01)</td></tr>
+<tr><td>reason</td><td>string</td><td><span class="optional">Optional</span></td><td>Why the balance is being changed (max 255). Recorded in the ledger; defaults to "unspecified"</td></tr></table></div>
 <div class="endpoint-section"><h4>Response (201)</h4><pre>{"status": "success", "balance_before": 1500.00, "balance_after": 1250.00}</pre></div>
 </div></div>
 
@@ -1113,6 +1127,8 @@ Idempotency-Key: idem-game-credit-123
 <div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/game/withdraw/{encryptedIdentifier}</span><span class="endpoint-desc">Withdraw entire balance from game wallet to customer wallet</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-idempotent">Idempotent</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Pays the game wallet's balance to the customer, less a further 5% house share (rounded up) on top of the 5% taken at <code>/game/credit</code>. The game wallet is then closed (status 3) and its balance recorded as released in the ledger. See the <a href="#" data-section="finance-overview" style="color:var(--accent-blue)">fee schedule</a>.</p></div>
 <div class="endpoint-section"><h4>Request Body</h4>
 <table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
 <tr><td>customer_id</td><td>string</td><td><span class="required">Required</span></td><td>Customer identifier</td></tr></table></div>
@@ -1388,7 +1404,7 @@ Content-Type: application/json
 </div>
 <!-- STATS SECTION -->
 <div class="doc-section" data-section="stats">
-<div class="callback-note">All stats endpoints are rate-limited to 20 requests/minute.</div>
+<div class="callback-note">All stats endpoints are rate-limited to 20 requests/minute. Customer counts (<code>/stats/customers</code> and the referral variant) leave out test customers: ids 1 to 500 by default, configurable on the server. Days follow Nairobi time. For full financial reporting (income statement, cash flow, balance sheet, reconciliation, expenses and CSV export) see <a href="#" data-section="finance-overview" style="color:var(--accent-blue)">Finance Reporting</a>; the income figures here only cover today and the last 30 days.</div>
 <div class="endpoint">
 <div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/stats/customers</span><span class="endpoint-desc">Lists all customers in the system</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
@@ -1462,6 +1478,755 @@ Content-Type: application/json
 <tr><td>end_date</td><td>date</td><td><span class="required">Required</span></td><td>End date (Y-m-d)</td></tr></table></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
 <pre>{"success": true, "data": {"games_played": 15, "total_spent": 750.00}}</pre></div>
+</div></div>
+</div>
+
+<!-- FINANCE OVERVIEW SECTION -->
+<div class="doc-section" data-section="finance-overview">
+<div class="auth-box">
+<h3>What the finance endpoints are</h3>
+<p>Everything under <code>/api/v1/finance/</code> reports on money: income, cash flow, what is owed to customers, and where the numbers come from. All endpoints are read-only <code>GET</code> requests except recording and voiding <a href="#" data-section="finance-expenses" style="color:var(--accent-blue)">expenses</a>. They all need the <code>X-API-KEY</code> header.</p>
+<table class="params-table">
+<tr><th>Group</th><th>Endpoints</th></tr>
+<tr><td><a href="#" data-section="finance-statements" style="color:var(--accent-blue)">Financial Statements</a></td><td>summary, income-statement, cash-flow, balance-sheet, trial-balance, reconciliation, taxes</td></tr>
+<tr><td><a href="#" data-section="finance-reports" style="color:var(--accent-blue)">Drill-downs</a></td><td>deposits, withdrawals, purchases, games, competitions, ledger, adjustments, customers/top, customer statement</td></tr>
+<tr><td><a href="#" data-section="finance-expenses" style="color:var(--accent-blue)">Expenses</a></td><td>record, void and list expenses</td></tr>
+<tr><td><a href="#" data-section="finance-export" style="color:var(--accent-blue)">CSV Export</a></td><td>any report as a CSV download</td></tr>
+</table>
+</div>
+
+<div class="auth-box">
+<h3>Common query parameters</h3>
+<p>All optional. They apply to every finance <code>GET</code> unless an endpoint says otherwise.</p>
+<table class="params-table">
+<tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
+<tr><td>from</td><td>date (Y-m-d)</td><td>First day, inclusive. Default: today (last 30 days for <code>reconciliation</code>, <code>customers/top</code> and the customer statement)</td></tr>
+<tr><td>to</td><td>date (Y-m-d)</td><td>Last day, inclusive. Must not be before <code>from</code>. The range may not exceed 366 days</td></tr>
+<tr><td>group_by</td><td>string</td><td><code>day</code> (default), <code>week</code> (weeks start Monday) or <code>month</code>. Used by reports that return a series</td></tr>
+<tr><td>exclude_test</td><td>boolean</td><td>Default <code>true</code>. Leaves out test customers. Accepts <code>1</code>, <code>0</code>, <code>true</code>, <code>false</code></td></tr>
+<tr><td>page, per_page</td><td>integer</td><td>Lists only. Page 1, 50 per page by default, at most 200 per page</td></tr>
+</table>
+</div>
+
+<div class="auth-box">
+<h3>Response format</h3>
+<p>Successful responses use the same envelope as the statistics endpoints. Reports over a range include a <code>meta</code> block; every report includes <code>generated_at</code>.</p>
+<pre>{
+  "success": true,
+  "data": {
+    "generated_at": "2026-09-20T12:00:00+03:00",
+    "meta": {
+      "period": {"from": "2026-09-01", "to": "2026-09-20", "group_by": "day", "exclude_test": true},
+      "ledger_started_at": "2026-09-01",
+      "warnings": []
+    }
+    /* report fields */
+  }
+}</pre>
+<p>Lists add <code>summary</code> (totals over everything the filters match, not just the current page), <code>items</code> and <code>pagination</code>:</p>
+<pre>"pagination": {"page": 1, "per_page": 50, "total": 132, "last_page": 3}</pre>
+<p>Money is a number in KES rounded to 2 decimals. Validation errors return <code>422</code>; see <a href="#" data-section="errors" style="color:var(--accent-blue)">Error Responses</a>.</p>
+</div>
+
+<div class="auth-box">
+<h3>Dates and time zone</h3>
+<p>Days are Nairobi days (Africa/Nairobi). A range covers whole days from 00:00 on <code>from</code> to 23:59:59 on <code>to</code>. "Today" ends at Nairobi midnight, not UTC midnight.</p>
+</div>
+
+<div class="auth-box">
+<h3>Ledger start date and warnings</h3>
+<p>Revenue, stakes, payouts and balances come from the ledger, which began recording on <code>2026-09-01</code>. Cash in and cash out come from payment records and cover earlier dates. When a range starts before the ledger began, <code>meta.warnings</code> says which figures are zero before that date.</p>
+<p>Escrow releases (game and competition payouts leaving their wallets) were only ledgered from a later date, so the trial balance and escrow checks may not balance before it. The warning appears in <code>meta.warnings</code> too.</p>
+</div>
+
+<div class="auth-box">
+<h3>Test customers</h3>
+<p>By default reports leave out test customers (customer ids 1 to 500, configurable on the server), including the house customer for customer-level figures. Send <code>exclude_test=0</code> to include them. House cuts cannot always be tied to a player, so the income statement only removes cuts it can link to a test customer or a game a test customer played.</p>
+</div>
+
+<div class="auth-box">
+<h3>Caching and rate limits</h3>
+<p>Reports whose range includes today are cached for about 2 minutes, so a figure can lag by that long. Closed ranges and past balance sheets are cached for an hour. The drill-down lists are not cached. Finance <code>GET</code> endpoints share the <code>stats</code> limit of 20 requests per minute; recording or voiding an expense uses the <code>write</code> limit of 30 per minute.</p>
+</div>
+
+<div class="auth-box">
+<h3>Privacy</h3>
+<p>Phone numbers are masked in JSON and CSV output, for example <code>254712345678</code> becomes <code>2547****5678</code>. This includes phone-like values inside account references. Customer names are shown; use <code>customer_id</code> to look a customer up elsewhere.</p>
+</div>
+
+<div class="auth-box">
+<h3>House fee schedule</h3>
+<table class="params-table">
+<tr><th>Where</th><th>Rate</th></tr>
+<tr><td>Game credit (<code>POST /game/credit</code>)</td><td>5% of the stake, taken when it is credited</td></tr>
+<tr><td>Game payout (<code>POST /game/withdraw</code>)</td><td>a further 5% of the pool, rounded up</td></tr>
+<tr><td>Dropped game (<code>POST /game/drop</code>)</td><td>10% of the dropped players' stakes, rounded up</td></tr>
+<tr><td>Tournament entry</td><td>10%</td></tr>
+<tr><td>Jackpot entry</td><td>20%</td></tr>
+</table>
+<p>Finance reports show what was actually taken; the reconciliation report flags cuts that differ from this schedule.</p>
+</div>
+
+<div class="auth-box">
+<h3>Manual balance changes are audited</h3>
+<p>Changing a wallet balance by hand (<a href="#" data-section="wallets" style="color:var(--accent-blue)">deposit, withdraw, balance, wallet update</a> and the customer wallet update) is recorded in the ledger as an <em>adjustment</em> with an optional <code>reason</code> and the API key that made it. See <a href="#" data-section="finance-reports" style="color:var(--accent-blue)">GET /finance/adjustments</a>.</p>
+</div>
+</div>
+
+<!-- FINANCE STATEMENTS SECTION -->
+<div class="doc-section" data-section="finance-statements">
+<button class="expand-all" onclick="toggleAll('finance-statements')">Expand / Collapse All</button>
+<div class="callback-note">See <a href="#" data-section="finance-overview" style="color:var(--accent-blue)">Finance Overview</a> for the common parameters, response format and how dates work. All endpoints are rate-limited to 20 requests/minute.</div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/summary</span><span class="endpoint-desc">Dashboard figures for today, week, month, year and all time</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">One call for the dashboard tiles. Each window (<code>today</code>, <code>week</code>, <code>month</code>, <code>year</code>, <code>all_time</code>) has cash in and out, revenue by stream, expenses, net income, and customer stakes, payouts, refunds and adjustments. <code>all_time</code> starts at the ledger start date. <code>position</code> is the live balance sheet. <code>from</code>, <code>to</code> and <code>group_by</code> are ignored.</p></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>exclude_test</td><td>boolean</td><td><span class="optional">Optional</span></td><td>Default true</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "generated_at": "2026-09-20T12:00:00+03:00",
+    "exclude_test": true,
+    "all_time_from": "2026-09-01",
+    "windows": {
+      "today": {
+        "from": "2026-09-20",
+        "cash_in": 1100.00, "cash_out": 150.00, "net_cash": 950.00,
+        "revenue": {"games": 10.00, "tournaments": 5.00, "jackpots": 20.00, "gift_emoji_sales": 100.00, "total": 135.00},
+        "expenses": 40.00, "net_income": 95.00,
+        "stakes": 250.00, "payouts": 90.00, "refunds": 0.00, "adjustments": 0.00
+      },
+      "week": {}, "month": {}, "year": {}, "all_time": {}
+    },
+    "position": {"as_of": "2026-09-20", "source": "live", "assets": {}, "liabilities": {}, "house_wallet": 300.00, "difference": 1085.00}
+  }
+}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/income-statement</span><span class="endpoint-desc">Revenue by stream, less expenses, as a series</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Revenue is house cuts as they are booked in the ledger, plus gift and emoji sales at the cash received. Tournament and jackpot cuts are split by rounds where the cut is linked to its competition entry; older cuts appear as <code>competitions_unattributed</code>. <code>expenses</code> are the active entries recorded through <a href="#" data-section="finance-expenses" style="color:var(--accent-blue)">/finance/expenses</a>, dated by their expense date. <code>net_income</code> is revenue minus expenses, before tax (see <a href="#" data-section="finance-statements" style="color:var(--accent-blue)">/finance/taxes</a>). <code>memo.load_margin</code> is cash received for wallet loads minus the wallet credit given; it is shown for information and is not part of revenue.</p></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>from, to, group_by, exclude_test</td><td>&nbsp;</td><td><span class="optional">Optional</span></td><td>See common parameters</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "generated_at": "2026-09-20T12:00:00+03:00",
+    "meta": {"period": {"from": "2026-09-20", "to": "2026-09-20", "group_by": "day", "exclude_test": true}, "ledger_started_at": "2026-09-01", "warnings": []},
+    "revenue": {
+      "games": 10.00,
+      "games_by_source": {"game_credit": 5.00, "game_withdrawal": 5.00},
+      "tournaments": {"total": 5.00, "by_rounds": {"3": 5.00}},
+      "jackpots": {"total": 20.00, "by_rounds": {"13": 20.00}},
+      "competitions_unattributed": 0.00,
+      "gift_emoji_sales": {"total": 100.00, "gift": 100.00, "emoji": 0.00},
+      "other": 0.00,
+      "total": 135.00
+    },
+    "expenses": {"tracked": true, "total": 40.00, "by_category": {"hosting": 40.00}},
+    "net_income": 95.00,
+    "memo": {"load_margin": {"cash_received": 300.00, "wallet_credited": 280.00, "margin": 20.00}},
+    "notes": ["Revenue is house cuts as they are booked in the ledger plus gift and emoji sales at cash received."],
+    "series": [
+      {"period": "2026-09-20", "games": 10.00, "tournaments": 5.00, "jackpots": 20.00, "competitions_unattributed": 0.00, "gift_emoji_sales": 100.00, "other": 0.00, "total": 135.00, "expenses": 40.00, "net_income": 95.00}
+    ]
+  }
+}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/cash-flow</span><span class="endpoint-desc">M-Pesa cash in by what it bought, cash out by status</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Cash in is what customers actually paid (incoming payments), split into <code>wallet_deposit</code>, <code>load</code>, <code>gift</code>, <code>emoji</code> and <code>unmatched</code> (money received from an unknown customer and not credited to anyone; it is included in the total). Cash out is outgoing payments by status: <code>paid</code>, <code>pending</code>, <code>failed</code>. <code>net_cash</code> is cash in minus paid. Works for dates before the ledger began.</p></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>from, to, group_by, exclude_test</td><td>&nbsp;</td><td><span class="optional">Optional</span></td><td>See common parameters</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "generated_at": "2026-09-20T12:00:00+03:00",
+    "meta": {},
+    "totals": {
+      "cash_in": {"wallet_deposit": 500.00, "load": 300.00, "gift": 100.00, "emoji": 0.00, "unmatched": 200.00, "other": 0.00, "total": 1100.00},
+      "cash_out": {"paid": 150.00, "pending": 40.00, "failed": 60.00},
+      "net_cash": 950.00
+    },
+    "series": [
+      {"period": "2026-09-20", "cash_in": {"wallet_deposit": 500.00, "load": 300.00, "gift": 100.00, "emoji": 0.00, "unmatched": 200.00, "other": 0.00, "total": 1100.00}, "cash_out": {"paid": 150.00, "pending": 40.00, "failed": 60.00}, "net_cash": 950.00}
+    ]
+  }
+}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/balance-sheet</span><span class="endpoint-desc">Cash held against what is owed, live or as at a past day</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Assets are the latest balance of every M-Pesa account (from the hourly balance fetch), listed individually. Liabilities are what is owed: customer wallets (test customers and the house wallet excluded), open game and competition wallets, <code>stuck_escrow</code> (money left in finished wallets), coin liability, pending holds and <code>unmatched_deposits</code>. <code>house_wallet</code> is shown separately. <code>difference</code> is cash minus liabilities minus the house wallet. It is not expected to be zero: it also holds gift and emoji sales not yet moved to the house wallet, M-Pesa charges, and timing between the hourly balance fetch and wallet movements. A daily snapshot is taken at 23:59 Nairobi time; <code>as_of</code> reads that day's snapshot.</p></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>as_of</td><td>date (Y-m-d)</td><td><span class="optional">Optional</span></td><td>Not in the future. Returns that day's snapshot. <code>404</code> if there is none. Omit for the live position</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "generated_at": "2026-09-20T12:00:00+03:00",
+    "as_of": "2026-09-20",
+    "source": "live",
+    "assets": {
+      "cash": {
+        "accounts": [
+          {"type": "b2c", "account": "Utility Account", "amount": 1000.00, "as_of": "2026-09-20T11:00:00+03:00"},
+          {"type": "c2b", "account": "Working Account", "amount": 2500.00, "as_of": "2026-09-20T11:00:00+03:00"}
+        ],
+        "total": 3500.00
+      },
+      "total": 3500.00
+    },
+    "liabilities": {
+      "customer_wallets": 2000.00, "game_escrow": 40.00, "competition_escrow": 0.00, "stuck_escrow": 0.00,
+      "coin_liability": 0.00, "pending_holds": 0.00, "unmatched_deposits": 75.00, "total": 2115.00
+    },
+    "house_wallet": 300.00,
+    "difference": 1085.00,
+    "notes": []
+  }
+}</pre></div>
+<div class="endpoint-section"><h4>Error Responses</h4>
+<pre>// 404 - no snapshot for as_of
+{"success": false, "message": "There is no snapshot for that date."}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/trial-balance</span><span class="endpoint-desc">Ledger movement by account, with a balance check</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Debits and credits per account and entry type. Deposits, withdrawals and manual adjustments are single-sided in the ledger (the cash side is M-Pesa); every other entry is paired and must net to zero. <code>check.balanced</code> says whether it does, <code>check.imbalance</code> is the amount left over, and <code>imbalance_by_category</code> shows where it comes from. Coin entries are in coins, not KES, and are left out. <code>exclude_test</code> does not apply, because the check only holds over the whole ledger.</p></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>from, to</td><td>date</td><td><span class="optional">Optional</span></td><td>See common parameters</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "generated_at": "2026-09-20T12:00:00+03:00",
+    "meta": {},
+    "lines": [
+      {"account": "customer_wallets", "entry_type": "deposit", "category": "cash_in", "unit": "KES", "debit": 0.00, "credit": 500.00, "entries": 1},
+      {"account": "house_wallet", "entry_type": "house_cut", "category": "house_revenue", "unit": "KES", "debit": 0.00, "credit": 50.00, "entries": 6}
+    ],
+    "totals": {"debit": 640.00, "credit": 1090.00},
+    "check": {"balanced": true, "imbalance": 0.00, "imbalance_by_category": []},
+    "notes": []
+  }
+}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/reconciliation</span><span class="endpoint-desc">16 pass/warn/fail controls over the ledger, wallets and payments</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Runs the checks below. Balance checks look at current state; checks that scan entries or payments use the range (the last 30 days when <code>from</code> is not sent). Each check has a <code>status</code> (<code>pass</code>, <code>warn</code> or <code>fail</code>), a <code>count</code> of items, an <code>amount</code> of money involved and up to 10 <code>samples</code>. The overall <code>status</code> is the worst of them.</p></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>from, to</td><td>date</td><td><span class="optional">Optional</span></td><td>Default: last 30 days</td></tr></table></div>
+<div class="endpoint-section"><h4>Checks</h4>
+<table class="params-table"><tr><th>Key</th><th>Status when it trips</th><th>What it checks</th></tr>
+<tr><td>customer_wallet_drift</td><td>fail</td><td>Customer wallet balances match opening balance plus ledger credits minus debits</td></tr>
+<tr><td>game_wallet_drift</td><td>fail</td><td>Same for game wallets (from the day escrow releases were ledgered)</td></tr>
+<tr><td>competition_wallet_drift</td><td>fail</td><td>Same for competition wallets</td></tr>
+<tr><td>ledger_arithmetic</td><td>fail</td><td>Every ledger entry adds up: before + credit - debit = after</td></tr>
+<tr><td>ledger_balance</td><td>fail</td><td>Paired ledger entries net to zero (see trial balance)</td></tr>
+<tr><td>unclassified_entries</td><td>warn</td><td>Ledger entries that have no wallet type</td></tr>
+<tr><td>unmatched_deposits</td><td>warn</td><td>Money received from unknown customers and not credited</td></tr>
+<tr><td>deposits_without_ledger</td><td>fail</td><td>Processed deposits that never reached the ledger (gift and emoji purchases are not expected to)</td></tr>
+<tr><td>stuck_withdrawals</td><td>warn</td><td>Withdrawals pending longer than 24 hours</td></tr>
+<tr><td>failed_withdrawals_not_reversed</td><td>fail</td><td>A payout failed but the customer was not refunded</td></tr>
+<tr><td>stuck_escrow</td><td>warn</td><td>Money left in game or competition wallets that are no longer open</td></tr>
+<tr><td>aged_escrow</td><td>warn</td><td>Open game or competition wallets holding money, untouched for over 24 hours</td></tr>
+<tr><td>negative_balances</td><td>fail</td><td>Any wallet with a negative balance</td></tr>
+<tr><td>house_cut_rates</td><td>warn</td><td>House cuts that differ from the fee schedule (only cuts linked to their transaction can be checked)</td></tr>
+<tr><td>mpesa_balance_freshness</td><td>warn</td><td>M-Pesa balances fetched in the last 3 hours</td></tr>
+<tr><td>cash_coverage</td><td>fail</td><td>M-Pesa cash covers everything owed to customers</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "generated_at": "2026-09-20T12:00:00+03:00",
+    "meta": {},
+    "status": "warn",
+    "counts": {"pass": 14, "warn": 2, "fail": 0},
+    "checks": [
+      {
+        "key": "unmatched_deposits", "title": "Deposits from unknown customers", "status": "warn",
+        "count": 2, "amount": 275.00,
+        "detail": "Cash is held but not credited to anyone. Credit the right customer or refund it.",
+        "samples": [{"id": 71, "trans_id": "SIA12345", "msisdn": "254712345678", "trans_amount": "200.00"}]
+      },
+      {"key": "customer_wallet_drift", "title": "Customer wallet balances match the ledger", "status": "pass", "count": 0, "amount": 0.00, "detail": null, "samples": []}
+    ]
+  }
+}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/taxes</span><span class="endpoint-desc">Estimated tax for the period and net income after tax</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Applies the configured rate of each tax to its base for the period. <strong>All rates are off (0) until the server is configured</strong>, and <code>configured</code> is <code>false</code> until then; the bases are still shown. These are estimates for planning, not tax returns. Confirm rates and which taxes apply with your accountant or tax adviser.</p>
+<table class="params-table"><tr><th>Tax</th><th>Base</th><th>Kind</th></tr>
+<tr><td>excise_duty</td><td>stakes in the period</td><td>expense (reduces net income after tax)</td></tr>
+<tr><td>withholding_tax</td><td>winnings paid to customers</td><td>pass_through (collected and passed on, not a cost)</td></tr>
+<tr><td>income_tax</td><td>net income before tax, less the expense taxes above, never below zero</td><td>expense</td></tr></table></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>from, to, exclude_test</td><td>&nbsp;</td><td><span class="optional">Optional</span></td><td>See common parameters. Stakes and winnings cover the period since the ledger began</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "generated_at": "2026-09-20T12:00:00+03:00",
+    "meta": {},
+    "configured": true,
+    "net_income_before_tax": 6.00,
+    "taxes": {
+      "excise_duty": {"label": "Excise duty on stakes", "base": "stakes", "kind": "expense", "rate": 0.02, "base_amount": 100.00, "estimated_amount": 2.00},
+      "withholding_tax": {"label": "Withholding tax on winnings", "base": "winnings", "kind": "pass_through", "rate": 0.2, "base_amount": 90.00, "estimated_amount": 18.00},
+      "income_tax": {"label": "Income tax on net income", "base": "net_income", "kind": "expense", "rate": 0.3, "base_amount": 4.00, "estimated_amount": 1.20}
+    },
+    "totals": {"expense_taxes": 3.20, "pass_through_taxes": 18.00, "net_income_after_tax": 2.80},
+    "notes": []
+  }
+}</pre></div>
+</div></div>
+</div>
+
+<!-- FINANCE DRILL-DOWNS SECTION -->
+<div class="doc-section" data-section="finance-reports">
+<button class="expand-all" onclick="toggleAll('finance-reports')">Expand / Collapse All</button>
+<div class="callback-note">All lists take <code>from</code>, <code>to</code>, <code>exclude_test</code>, <code>page</code> and <code>per_page</code> (default 50, maximum 200) as described in <a href="#" data-section="finance-overview" style="color:var(--accent-blue)">Finance Overview</a>. Each list returns a <code>summary</code> covering everything the filters match. All endpoints are rate-limited to 20 requests/minute, and every list can be downloaded as CSV from <a href="#" data-section="finance-export" style="color:var(--accent-blue)">/finance/export/{report}</a>.</div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/deposits</span><span class="endpoint-desc">Payments received, what each bought and who it was for</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>status</td><td>integer</td><td><span class="optional">Optional</span></td><td><code>0</code> unmatched, <code>1</code> pending, <code>2</code> processed</td></tr>
+<tr><td>kind</td><td>string</td><td><span class="optional">Optional</span></td><td><code>wallet_deposit</code>, <code>load</code>, <code>gift</code>, <code>emoji</code>, <code>unmatched</code></td></tr>
+<tr><td>customer_id</td><td>integer</td><td><span class="optional">Optional</span></td><td>Only this customer's payments</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "generated_at": "2026-09-20T12:00:00+03:00",
+    "meta": {},
+    "summary": {
+      "payments": 4, "amount": 1250.00,
+      "by_kind": {"wallet_deposit": {"payments": 3, "amount": 1050.00}, "unmatched": {"payments": 1, "amount": 200.00}},
+      "by_status": {"processed": {"payments": 3, "amount": 1050.00}, "unmatched": {"payments": 1, "amount": 200.00}},
+      "top_depositors": [{"customer_id": 900, "customer_name": "Alice Wanjiru", "payments": 2, "amount": 750.00}]
+    },
+    "items": [
+      {"id": 71, "trans_id": "SIA12345", "amount": 500.00, "kind": "wallet_deposit", "status": "processed", "customer_id": 900, "customer_name": "Alice Wanjiru", "msisdn": "2547****5678", "bill_ref_no": "0712**5678", "created_at": "2026-09-20T10:00:00+03:00"}
+    ],
+    "pagination": {"page": 1, "per_page": 50, "total": 4, "last_page": 1}
+  }
+}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/withdrawals</span><span class="endpoint-desc">Payouts by status, failure reasons and pending age</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>status</td><td>string</td><td><span class="optional">Optional</span></td><td><code>pending</code>, <code>paid</code> or <code>failed</code></td></tr>
+<tr><td>customer_id</td><td>integer</td><td><span class="optional">Optional</span></td><td>Only this customer's payouts</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "summary": {
+      "payments": 5, "amount": 350.00,
+      "by_status": {"paid": {"payments": 1, "amount": 150.00}, "failed": {"payments": 2, "amount": 100.00}, "pending": {"payments": 2, "amount": 100.00}},
+      "failure_reasons": [{"reason": "Insufficient float", "payments": 2, "amount": 100.00}],
+      "oldest_pending_hours": 30,
+      "stuck_pending": {"threshold_hours": 24, "payments": 1, "amount": 80.00}
+    },
+    "items": [
+      {"id": 12, "transaction_id": 33, "amount": 150.00, "status": "paid", "receipt": "R1", "error_message": null, "customer_id": 900, "customer_name": "Alice Wanjiru", "age_hours": null, "created_at": "2026-09-20T09:00:00+03:00"}
+    ],
+    "pagination": {"page": 1, "per_page": 50, "total": 5, "last_page": 1}
+  }
+}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/purchases</span><span class="endpoint-desc">Loads, gifts and emojis: cash paid, value given, and a series</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>type</td><td>string</td><td><span class="optional">Optional</span></td><td><code>load</code>, <code>gift</code> or <code>emoji</code></td></tr>
+<tr><td>customer_id</td><td>integer</td><td><span class="optional">Optional</span></td><td>Only this customer</td></tr>
+<tr><td>group_by</td><td>string</td><td><span class="optional">Optional</span></td><td>Bucket for <code>summary.series</code></td></tr></table>
+<p style="color:var(--text-secondary);font-size:13px;margin-top:8px;">With <code>exclude_test</code> on (default), purchases flagged as test are left out as well as test customers' purchases.</p></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "summary": {
+      "purchases": 3, "amount": 450.00,
+      "by_type": {"load": {"purchases": 1, "amount": 300.00, "value": 280.00}, "gift": {"purchases": 1, "amount": 100.00, "value": 0.00}},
+      "series": [{"period": "2026-09-20", "load": 300.00, "gift": 100.00, "emoji": 50.00, "other": 0.00, "total": 450.00}]
+    },
+    "items": [
+      {"id": 8, "customer_id": 900, "customer_name": "Alice Wanjiru", "type": "load", "amount": 300.00, "value": 280.00, "deposit_id": 71, "is_test": false, "created_at": "2026-09-20T10:00:00+03:00"}
+    ],
+    "pagination": {"page": 1, "per_page": 50, "total": 3, "last_page": 1}
+  }
+}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/games</span><span class="endpoint-desc">One row per game: stakes, payouts, refunds, outcome and house take</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Games are dated by when the game wallet was created. <code>house_take</code> is stakes minus what players were paid and refunded minus anything still in the game wallet, so it is only shown once the game is closed (<code>null</code> while open). It includes both the cut taken at credit and the cut taken at payout. A negative take means players were paid or refunded more than they staked. With <code>exclude_test</code> on, any game a test customer staked in is left out.</p>
+<table class="params-table"><tr><th>Outcome</th><th>Meaning</th></tr>
+<tr><td>open</td><td>The game wallet is still open</td></tr>
+<tr><td>completed</td><td>Closed and a player was paid</td></tr>
+<tr><td>dropped</td><td>Closed after a drop-connection payout or refund</td></tr>
+<tr><td>refunded</td><td>Closed with refunds and no payout</td></tr>
+<tr><td>closed_empty</td><td>Closed with no payout and no refund</td></tr></table></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>outcome</td><td>string</td><td><span class="optional">Optional</span></td><td>One of the outcomes above</td></tr>
+<tr><td>game_type</td><td>integer</td><td><span class="optional">Optional</span></td><td>Game type</td></tr>
+<tr><td>players</td><td>integer</td><td><span class="optional">Optional</span></td><td>Games with exactly this many players</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "summary": {
+      "games": 2, "stakes": 300.00, "paid_to_players": 180.00, "refunded": 0.00, "house_take": 20.00,
+      "by_outcome": {"completed": {"games": 1, "stakes": 200.00, "paid_to_players": 180.00, "refunded": 0.00, "house_take": 20.00}},
+      "by_players": {"1": {"games": 1, "stakes": 100.00, "paid_to_players": 0.00, "refunded": 0.00, "house_take": 0.00}, "2": {"games": 1, "stakes": 200.00, "paid_to_players": 180.00, "refunded": 0.00, "house_take": 20.00}}
+    },
+    "items": [
+      {"id": 41, "game_id": "GAME-9001", "game_type": 1, "outcome": "completed", "players": 2, "stakes": 200.00, "paid_to_players": 180.00, "house_payout": 10.00, "refunded": 0.00, "escrow_balance": 0.00, "house_take": 20.00, "created_at": "2026-09-20T09:30:00+03:00"}
+    ],
+    "pagination": {"page": 1, "per_page": 50, "total": 2, "last_page": 1}
+  }
+}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/competitions</span><span class="endpoint-desc">One row per competition: entries, house cut, pool, prizes and what is held</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">One row per competition (<code>cmp_uid</code>), all players' wallets together, dated by when the first wallet was created. <code>pool</code> is entries minus the house cut; <code>unaccounted</code> is pool minus prizes paid minus money still held in open wallets, which should be near zero for a finished competition. The house cut is only known for entries linked to their ledger cut, so older competitions show a cut of 0 and the whole entry as pool. With <code>exclude_test</code> on, competitions a test customer played in are left out.</p></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>game_type</td><td>integer</td><td><span class="optional">Optional</span></td><td><code>1</code> tournament, <code>2</code> jackpot</td></tr>
+<tr><td>jp_rounds</td><td>integer</td><td><span class="optional">Optional</span></td><td>Number of rounds</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "summary": {
+      "competitions": 2, "players": 3, "entries": 200.00, "house_cut": 30.00, "prizes_paid": 0.00, "outstanding": 170.00,
+      "by_type_and_rounds": [{"type": "tournament", "rounds": 3, "competitions": 1, "players": 2, "entries": 100.00, "house_cut": 10.00, "prizes_paid": 0.00, "outstanding": 90.00}]
+    },
+    "items": [
+      {"cmp_uid": "U100", "competition_id": "COMP-U100", "type": "tournament", "rounds": 3, "players": 2, "entries": 100.00, "house_cut": 10.00, "pool": 90.00, "prizes_paid": 0.00, "outstanding": 90.00, "unaccounted": 0.00, "started_at": "2026-09-20T09:00:00+03:00"}
+    ],
+    "pagination": {"page": 1, "per_page": 50, "total": 2, "last_page": 1}
+  }
+}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/ledger</span><span class="endpoint-desc">Every ledger entry, filterable</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">The full audit trail of money movements, newest first. Entries for the house customer stay visible when <code>exclude_test</code> is on, because house cuts are real money. <code>category</code> is one of <code>cash_in</code>, <code>cash_out</code>, <code>stake</code>, <code>payout</code>, <code>house_revenue</code>, <code>refund</code>, <code>adjustment</code>, <code>transfer</code>, <code>escrow_movement</code>, <code>coin</code>, and includes each type's reversals.</p></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>entry_type</td><td>string</td><td><span class="optional">Optional</span></td><td>e.g. <code>deposit</code>, <code>game_bet</code>, <code>house_cut</code>, <code>adjustment</code></td></tr>
+<tr><td>category</td><td>string</td><td><span class="optional">Optional</span></td><td>One of the categories above</td></tr>
+<tr><td>wallet_type</td><td>string</td><td><span class="optional">Optional</span></td><td><code>wallet</code>, <code>game_wallet</code>, <code>competition_wallet</code>, <code>coin_wallet</code></td></tr>
+<tr><td>wallet_id</td><td>integer</td><td><span class="optional">Optional</span></td><td>Use together with <code>wallet_type</code>, because ids repeat across wallet types</td></tr>
+<tr><td>customer_id</td><td>integer</td><td><span class="optional">Optional</span></td><td>Only this customer's entries</td></tr>
+<tr><td>status</td><td>string</td><td><span class="optional">Optional</span></td><td><code>settled</code> or <code>reversed</code></td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "summary": {
+      "entries": 14, "debit": 640.00, "credit": 1090.00,
+      "by_entry_type": [{"entry_type": "deposit", "category": "cash_in", "entries": 2, "debit": 0.00, "credit": 800.00}]
+    },
+    "items": [
+      {
+        "id": 501, "entry_id": "0b6f4c1e-8a3b-4e6f-9c1d-2f7d5e1a9b34", "created_at": "2026-09-20T09:31:00+03:00",
+        "entry_type": "house_cut", "category": "house_revenue", "account": "house_wallet",
+        "wallet_type": "wallet", "wallet_id": 1, "customer_id": 1,
+        "debit": 0.00, "credit": 5.00, "balance_before": 300.00, "balance_after": 305.00, "status": "settled",
+        "reference": "GameTransaction#812",
+        "metadata": {"source": "game_credit", "game_wallet_id": 41}
+      }
+    ],
+    "pagination": {"page": 1, "per_page": 50, "total": 14, "last_page": 1}
+  }
+}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/adjustments</span><span class="endpoint-desc">Manual balance changes with the reason and who made them</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Every change made through the wallet balance endpoints, the customer wallet update and the wallet update. <code>reason</code> is what the caller sent, or <code>unspecified</code>; <code>actor</code> is the API key that made the change (<code>api_key:&lt;id&gt;</code>). <code>summary.without_reason</code> counts adjustments made without a reason.</p></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>customer_id</td><td>integer</td><td><span class="optional">Optional</span></td><td>Only this customer's adjustments</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "summary": {
+      "entries": 3, "credited": 55.00, "debited": 20.00, "net": 35.00, "without_reason": 1,
+      "by_reason": [{"reason": "promo bonus", "entries": 1, "net": 50.00}],
+      "by_actor": [{"actor": "api_key:4", "entries": 3, "net": 35.00}]
+    },
+    "items": [
+      {"id": 612, "created_at": "2026-09-20T10:15:00+03:00", "entry_type": "adjustment", "customer_id": 900, "customer_name": "Alice Wanjiru", "direction": "credit", "amount": 50.00, "balance_before": 1000.00, "balance_after": 1050.00, "reason": "promo bonus", "actor": "api_key:4", "operation": "add_balance", "status": "settled"}
+    ],
+    "pagination": {"page": 1, "per_page": 50, "total": 3, "last_page": 1}
+  }
+}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/customers/top</span><span class="endpoint-desc">Customers ranked by activity, and how concentrated wallet balances are</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Customer wallet activity from the ledger over the range (default: last 30 days). <code>net_gaming</code> is winnings plus refunds minus stakes; positive means the customer is ahead. <code>balance</code> is the wallet balance now. Not paged: <code>limit</code> caps the list. <code>summary.concentration</code> is the share of all customer wallet balances held by the 10 largest wallets.</p></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>sort</td><td>string</td><td><span class="optional">Optional</span></td><td><code>deposited</code> (default), <code>staked</code>, <code>won</code>, <code>withdrawn</code>, <code>net_gaming</code>, <code>balance</code></td></tr>
+<tr><td>limit</td><td>integer</td><td><span class="optional">Optional</span></td><td>1 to 100, default 10</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "summary": {"customer_wallets_total": 2580.00, "concentration": {"top_wallets": 10, "balance": 2580.00, "share_percent": 100.0}},
+    "items": [
+      {"customer_id": 900, "customer_name": "Alice Wanjiru", "deposited": 500.00, "withdrawn": 0.00, "staked": 100.00, "won": 0.00, "refunded": 0.00, "net_gaming": -100.00, "balance": 1400.00}
+    ]
+  }
+}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/customers/{encryptedIdentifier}/statement</span><span class="endpoint-desc">One customer's wallet statement with opening and closing balance</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Ledger movements on the customer's wallet, oldest first, with a running <code>balance_after</code>. <code>opening_balance</code> is the balance after the last entry before <code>from</code>. <code>statement.reconciles</code> is true when opening plus credits minus debits equals closing. Default range: last 30 days. <code>exclude_test</code> does not apply.</p></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>from, to, page, per_page</td><td>&nbsp;</td><td><span class="optional">Optional</span></td><td>See common parameters</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "meta": {},
+    "customer": {"id": 900, "name": "Alice Wanjiru", "account_no": "ACC-900", "phone_no": "2547****5678"},
+    "wallet": {"id": 900, "balance_now": 1290.00},
+    "statement": {"opening_balance": 1200.00, "credits": 190.00, "debits": 100.00, "closing_balance": 1290.00, "entries": 3, "reconciles": true},
+    "items": [
+      {"id": 601, "created_at": "2026-09-20T10:00:00+03:00", "entry_type": "deposit", "category": "cash_in", "debit": 0.00, "credit": 100.00, "balance_after": 1300.00, "status": "settled", "reason": null}
+    ],
+    "pagination": {"page": 1, "per_page": 50, "total": 3, "last_page": 1}
+  }
+}</pre></div>
+<div class="endpoint-section"><h4>Error Responses</h4>
+<pre>// 404
+{"success": false, "message": "Customer not found"}
+{"success": false, "message": "Customer has no wallet"}</pre></div>
+</div></div>
+</div>
+
+<!-- FINANCE EXPENSES SECTION -->
+<div class="doc-section" data-section="finance-expenses">
+<button class="expand-all" onclick="toggleAll('finance-expenses')">Expand / Collapse All</button>
+<div class="callback-note">Expenses are entered by hand (for example from the M-Pesa statement or supplier invoices); Safaricom does not report the fees you pay. An expense is never edited or deleted: a wrong one is <strong>voided</strong> with a reason and entered again. Active expenses reduce <code>net_income</code> in the income statement and summary.</div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/finance/expenses</span><span class="endpoint-desc">Record an expense</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">30/min</span></div>
+<div class="endpoint-section"><h4>Request Body</h4>
+<table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>expense_date</td><td>date (Y-m-d)</td><td><span class="required">Required</span></td><td>Today or earlier. Reports place the expense in the period containing this date</td></tr>
+<tr><td>category</td><td>string</td><td><span class="required">Required</span></td><td><code>mpesa_charges</code>, <code>hosting</code>, <code>sms</code>, <code>salaries</code>, <code>marketing</code>, <code>licences_and_fees</code> or <code>other</code></td></tr>
+<tr><td>amount</td><td>numeric</td><td><span class="required">Required</span></td><td>KES, greater than 0, up to 99,999,999.99</td></tr>
+<tr><td>description</td><td>string</td><td><span class="optional">Optional</span></td><td>Up to 255 characters</td></tr>
+<tr><td>reference</td><td>string</td><td><span class="optional">Optional</span></td><td>Up to 100 characters, for example an M-Pesa receipt number. Can be used by only one active expense, so the same receipt cannot be entered twice. Reusable once the earlier expense is voided</td></tr></table></div>
+<div class="endpoint-section"><h4>Request</h4>
+<pre>POST /api/v1/finance/expenses HTTP/1.1
+Host: api.kadi-kings.co.ke
+X-API-KEY: your-api-key-here
+Content-Type: application/json
+Idempotency-Key: expense-inv-1001
+
+{
+  "expense_date": "2026-09-20",
+  "category": "hosting",
+  "amount": 1500.50,
+  "description": "Server for September",
+  "reference": "INV-1001"
+}</pre></div>
+<div class="endpoint-section"><h4>Response (201)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "id": 7, "expense_date": "2026-09-20", "category": "hosting", "amount": 1500.50,
+    "description": "Server for September", "reference": "INV-1001", "status": "active",
+    "entered_by": "api_key:4", "voided_at": null, "voided_by": null, "void_reason": null
+  }
+}</pre></div>
+<div class="endpoint-section"><h4>Notes</h4>
+<p style="color:var(--text-secondary);font-size:13px;">A repeated identical request replays the earlier response (see Idempotency). That includes a rejection: after fixing what was wrong, change the body or send a new <code>Idempotency-Key</code>.</p></div>
+<div class="endpoint-section"><h4>Error Responses</h4>
+<pre>// 422 - e.g. unknown category, future date, or duplicate reference
+{"message": "The selected category is invalid.", "errors": {"category": ["The selected category is invalid."]}}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/finance/expenses/{encryptedIdentifier}/void</span><span class="endpoint-desc">Void an expense with a reason</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">30/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">The expense stays on record, flagged as voided with who and when, and no longer counts in any total. To correct a mistake, void the wrong entry and record a new one.</p></div>
+<div class="endpoint-section"><h4>Request Body</h4>
+<table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>reason</td><td>string</td><td><span class="required">Required</span></td><td>3 to 255 characters</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "id": 7, "expense_date": "2026-09-20", "category": "hosting", "amount": 1500.50, "reference": "INV-1001",
+    "status": "voided", "entered_by": "api_key:4",
+    "voided_at": "2026-09-20T13:05:00+03:00", "voided_by": "api_key:4", "void_reason": "wrong amount"
+  }
+}</pre></div>
+<div class="endpoint-section"><h4>Error Responses</h4>
+<pre>// 404
+{"success": false, "message": "Expense not found"}
+
+// 409 - already voided
+{"success": false, "message": "Expense is already voided"}
+
+// 422 - missing or too short reason
+{"message": "The reason field is required.", "errors": {"reason": ["The reason field is required."]}}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/expenses</span><span class="endpoint-desc">List expenses with totals by category</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>from, to</td><td>date</td><td><span class="optional">Optional</span></td><td>Matched against the expense date</td></tr>
+<tr><td>status</td><td>string</td><td><span class="optional">Optional</span></td><td><code>active</code> (default), <code>voided</code> or <code>all</code></td></tr>
+<tr><td>category</td><td>string</td><td><span class="optional">Optional</span></td><td>One category</td></tr>
+<tr><td>page, per_page</td><td>integer</td><td><span class="optional">Optional</span></td><td>Default 50, maximum 200</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "generated_at": "2026-09-20T13:10:00+03:00",
+    "meta": {},
+    "summary": {
+      "categories": ["mpesa_charges", "hosting", "sms", "salaries", "marketing", "licences_and_fees", "other"],
+      "active": {"entries": 2, "amount": 1250.00},
+      "voided": {"entries": 1, "amount": 999.00},
+      "by_category": {"hosting": 1000.00, "sms": 250.00}
+    },
+    "items": [
+      {"id": 7, "expense_date": "2026-09-20", "category": "hosting", "amount": 1000.00, "description": "Server", "reference": "INV-1001", "status": "active", "entered_by": "api_key:4", "created_at": "2026-09-20T13:00:00+03:00", "voided_at": null, "voided_by": null, "void_reason": null}
+    ],
+    "pagination": {"page": 1, "per_page": 50, "total": 2, "last_page": 1}
+  }
+}</pre></div>
+</div></div>
+</div>
+
+<!-- FINANCE EXPORT SECTION -->
+<div class="doc-section" data-section="finance-export">
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/export/{report}</span><span class="endpoint-desc">Download a report as CSV</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Streams the report as a CSV file. It takes the same range and filters as the report itself and exports <strong>every</strong> row in the range, ignoring <code>page</code> and <code>per_page</code>. The file is UTF-8 with a byte order mark so Excel reads names correctly, named <code>finance-&lt;report&gt;-&lt;from&gt;-&lt;to&gt;.csv</code>. Phone numbers are masked. Text a spreadsheet would run as a formula (starting with <code>=</code>, <code>+</code>, <code>-</code> or <code>@</code>) is prefixed with an apostrophe so it stays text. Nested values such as ledger <code>metadata</code> are written as JSON in one cell. The range limit of 366 days applies, and very large exports take a while.</p></div>
+<div class="endpoint-section"><h4>Reports</h4>
+<table class="params-table"><tr><th>{report}</th><th>Same as</th><th>Rows</th></tr>
+<tr><td>ledger</td><td>/finance/ledger</td><td>One per ledger entry</td></tr>
+<tr><td>deposits</td><td>/finance/deposits</td><td>One per payment</td></tr>
+<tr><td>withdrawals</td><td>/finance/withdrawals</td><td>One per payout</td></tr>
+<tr><td>purchases</td><td>/finance/purchases</td><td>One per purchase</td></tr>
+<tr><td>adjustments</td><td>/finance/adjustments</td><td>One per manual adjustment</td></tr>
+<tr><td>games</td><td>/finance/games</td><td>One per game</td></tr>
+<tr><td>competitions</td><td>/finance/competitions</td><td>One per competition</td></tr>
+<tr><td>customers-top</td><td>/finance/customers/top</td><td>One per customer (default range: last 30 days)</td></tr>
+<tr><td>cash-flow</td><td>/finance/cash-flow</td><td>One per period</td></tr>
+<tr><td>income-statement</td><td>/finance/income-statement</td><td>One per period (includes expenses and net income)</td></tr>
+<tr><td>trial-balance</td><td>/finance/trial-balance</td><td>One per account and entry type</td></tr>
+<tr><td>expenses</td><td>/finance/expenses</td><td>One per expense</td></tr>
+<tr><td>taxes</td><td>/finance/taxes</td><td>One per tax</td></tr></table>
+<p style="color:var(--text-secondary);font-size:13px;margin-top:8px;">The customer statement cannot be exported yet.</p></div>
+<div class="endpoint-section"><h4>Request</h4>
+<pre>GET /api/v1/finance/export/deposits?from=2026-09-01&amp;to=2026-09-20&amp;status=2 HTTP/1.1
+Host: api.kadi-kings.co.ke
+X-API-KEY: your-api-key-here</pre></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>Content-Type: text/csv; charset=UTF-8
+Content-Disposition: attachment; filename="finance-deposits-2026-09-01-2026-09-20.csv"
+
+id,trans_id,amount,kind,status,customer_id,customer_name,msisdn,bill_ref_no,created_at
+71,SIA12345,500,wallet_deposit,processed,900,"Alice Wanjiru",2547****5678,0712**5678,2026-09-20T10:00:00+03:00</pre></div>
+<div class="endpoint-section"><h4>Error Responses</h4>
+<pre>// 404 - unknown report name
+{"success": false, "message": "Unknown report. Choose one of: ledger, deposits, ..."}
+
+// 422 - bad parameters, e.g. range over 366 days</pre></div>
 </div></div>
 </div>
 
@@ -1680,6 +2445,11 @@ var sectionTitles = {
     'financial': { title: 'Financial Operations', desc: 'STK Push loads and B2C balance' },
     'callbacks': { title: 'MPesa Callbacks', desc: 'Safaricom webhook endpoints' },
     'stats': { title: 'Statistics', desc: 'Customer, income, purchase, and gameplay statistics' },
+    'finance-overview': { title: 'Finance Overview', desc: 'Common parameters, response format, dates, test customers, caching, privacy and the fee schedule' },
+    'finance-statements': { title: 'Financial Statements', desc: 'Summary, income statement, cash flow, balance sheet, trial balance, reconciliation and taxes' },
+    'finance-reports': { title: 'Finance Drill-downs', desc: 'Deposits, withdrawals, purchases, games, competitions, ledger, adjustments and customer reports' },
+    'finance-expenses': { title: 'Expenses', desc: 'Record, void and list operating expenses' },
+    'finance-export': { title: 'CSV Export', desc: 'Download any finance report as a CSV file' },
     'utilities': { title: 'Utilities', desc: 'Encrypt/decrypt identifiers and test endpoints' },
     'playground': { title: 'Playground', desc: 'Test and demo endpoints for encryption/decryption' },
     'errors': { title: 'Error Responses', desc: 'Common HTTP error response formats' }

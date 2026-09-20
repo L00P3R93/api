@@ -5,11 +5,13 @@ namespace App\Http\Controllers\api\v1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\FinanceListRequest;
 use App\Services\FinanceDateRange;
+use App\Services\FinanceExpenseService;
 use App\Services\FinanceGameReportService;
 use App\Services\FinanceLedgerReportService;
 use App\Services\FinanceListing;
 use App\Services\FinancePaymentReportService;
 use App\Services\FinanceReportService;
+use App\Services\FinanceTaxService;
 use Generator;
 use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -18,7 +20,7 @@ class FinanceExportController extends Controller
 {
     private const REPORTS = [
         'ledger', 'deposits', 'withdrawals', 'purchases', 'adjustments', 'games', 'competitions',
-        'customers-top', 'cash-flow', 'income-statement', 'trial-balance',
+        'customers-top', 'cash-flow', 'income-statement', 'trial-balance', 'expenses', 'taxes',
     ];
 
     /** Days the top customers report covers when no range is given. */
@@ -29,6 +31,8 @@ class FinanceExportController extends Controller
         private FinanceLedgerReportService $ledger,
         private FinanceGameReportService $games,
         private FinanceReportService $reports,
+        private FinanceExpenseService $expenses,
+        private FinanceTaxService $taxes,
     ) {}
 
     /**
@@ -56,6 +60,8 @@ class FinanceExportController extends Controller
             'cash-flow' => $this->cashFlowRows($range),
             'income-statement' => $this->incomeStatementRows($range),
             'trial-balance' => $this->trialBalanceRows($range),
+            'expenses' => $this->fromListing($this->expenses->listing($range, $filters)),
+            'taxes' => $this->taxRows($range),
         };
 
         $filename = "finance-{$report}-{$range->from->toDateString()}-{$range->to->toDateString()}.csv";
@@ -106,10 +112,26 @@ class FinanceExportController extends Controller
      */
     private function incomeStatementRows(FinanceDateRange $range): array
     {
-        $columns = ['period', 'games', 'tournaments', 'jackpots', 'competitions_unattributed', 'gift_emoji_sales', 'other', 'total'];
+        $columns = ['period', 'games', 'tournaments', 'jackpots', 'competitions_unattributed', 'gift_emoji_sales', 'other', 'total', 'expenses', 'net_income'];
 
         $rows = (function () use ($range) {
             yield from $this->reports->incomeStatement($range)['series'];
+        })();
+
+        return [$columns, $rows];
+    }
+
+    /**
+     * @return array{0: list<string>, 1: Generator<int, array<string, mixed>>}
+     */
+    private function taxRows(FinanceDateRange $range): array
+    {
+        $columns = ['tax', 'label', 'base', 'kind', 'rate', 'base_amount', 'estimated_amount'];
+
+        $rows = (function () use ($range) {
+            foreach ($this->taxes->estimate($range)['taxes'] as $key => $line) {
+                yield ['tax' => $key] + $line;
+            }
         })();
 
         return [$columns, $rows];

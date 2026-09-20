@@ -21,6 +21,7 @@ class FinanceReportService
     public function __construct(
         private ChartOfAccounts $chart,
         private FinanceSnapshotService $snapshots,
+        private FinanceExpenseService $expenses,
     ) {}
 
     /**
@@ -80,7 +81,8 @@ class FinanceReportService
             $window = new FinanceDateRange($from, $now->endOfDay(), FinanceDateRange::GROUP_BY_MONTH, $excludeTest);
 
             $cash = $this->cashFlow($window)['totals'];
-            $revenue = $this->incomeStatement($window)['revenue'];
+            $statement = $this->incomeStatement($window);
+            $revenue = $statement['revenue'];
             $flows = $this->flows($window);
 
             $figures[$name] = [
@@ -95,6 +97,8 @@ class FinanceReportService
                     'gift_emoji_sales' => $revenue['gift_emoji_sales']['total'],
                     'total' => $revenue['total'],
                 ],
+                'expenses' => $statement['expenses']['total'],
+                'net_income' => $statement['net_income'],
                 'stakes' => $flows['stakes'],
                 'payouts' => $flows['payouts'],
                 'refunds' => $flows['refunds'],
@@ -167,8 +171,8 @@ class FinanceReportService
     }
 
     /**
-     * Revenue by stream. House cuts come from the ledger; gift and emoji sales are cash the house
-     * received directly. Expenses are not tracked yet.
+     * Revenue by stream, less recorded expenses. House cuts come from the ledger; gift and emoji
+     * sales are cash the house received directly.
      *
      * @return array<string, mixed>
      */
@@ -210,7 +214,13 @@ class FinanceReportService
             $giftEmoji[$row->purchase_type] += $amount;
         }
 
-        $totals = $template();
+        $expenses = $this->expenses->totals($range);
+        foreach ($series as $bucket => $figures) {
+            $series[$bucket]['expenses'] = $expenses['by_bucket'][$bucket] ?? 0.0;
+            $series[$bucket]['net_income'] = $figures['total'] - $series[$bucket]['expenses'];
+        }
+
+        $totals = $template() + ['expenses' => 0.0, 'net_income' => 0.0];
         $list = [];
         foreach ($series as $bucket => $figures) {
             foreach ($figures as $key => $value) {
@@ -235,8 +245,8 @@ class FinanceReportService
                 'other' => $totals['other'],
                 'total' => $totals['total'],
             ],
-            'expenses' => ['tracked' => false, 'total' => 0.0],
-            'net_income' => $totals['total'],
+            'expenses' => ['tracked' => true, 'total' => $totals['expenses'], 'by_category' => $expenses['by_category']],
+            'net_income' => $totals['net_income'],
             'memo' => [
                 'load_margin' => $load,
             ],
@@ -244,7 +254,7 @@ class FinanceReportService
                 'Revenue is house cuts as they are booked in the ledger plus gift and emoji sales at cash received.',
                 'competitions_unattributed are competition cuts booked before they were linked to their transaction, so tournament and jackpot cannot be told apart.',
                 'load_margin is cash received for wallet loads minus the wallet credit given. It is shown for information and is not part of revenue.',
-                'Expenses (M-Pesa charges, referral commission) are not tracked yet, so net_income equals total revenue.',
+                'Expenses are the entries recorded through /finance/expenses (voided ones excluded), dated by expense_date. net_income is before tax; see /finance/taxes.',
                 'house cuts cannot always be tied to a player, so exclude_test only removes cuts that are linked to a test customer or game.',
             ],
             'series' => $list,
