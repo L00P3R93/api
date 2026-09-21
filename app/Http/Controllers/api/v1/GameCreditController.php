@@ -45,7 +45,7 @@ class GameCreditController extends Controller
                     'customer_id' => $validated['customer_id'],
                     'payment_type' => 'deposit',
                     'amount' => $amount,
-                    'status' => 2,
+                    'status' => 1,
                 ]);
 
                 [$walletEntry, $gameEntry] = $this->ledgerService->recordGameBetWithHouseCut(
