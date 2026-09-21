@@ -36,9 +36,7 @@ class C2BConfirmationService
 
         $normalizedAccountNo = $this->normalizeAccountNo($rawAccountNo);
 
-        $customer = Customer::where('id_no', $rawAccountNo)
-            ->orWhere('account_no', $normalizedAccountNo)
-            ->first();
+        $customer = Customer::where('account_no', $normalizedAccountNo)->first();
 
         if (! $customer) {
             $deposit->update(['status' => 0]);
