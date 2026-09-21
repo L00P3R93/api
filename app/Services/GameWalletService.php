@@ -200,7 +200,7 @@ class GameWalletService
 
         $depositsByCustomer = GameTransaction::where('game_wallet_id', $gameWalletId)
             ->where('payment_type', 'deposit')
-            ->where('status', 2)
+            ->where('status', 1)
             ->select('customer_id', DB::raw('SUM(amount) as total_amount'))
             ->groupBy('customer_id')
             ->get();
