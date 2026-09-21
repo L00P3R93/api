@@ -954,6 +954,23 @@ Content-Type: application/json
 <div class="endpoint-section"><h4>Response (200)</h4>
 <pre>{"id": 1, "status": 1, "customer": "John Doe", "amount": 500.00}</pre></div>
 </div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/withdraw/{encryptedIdentifier}</span><span class="endpoint-desc">Withdraw from customer wallet to M-Pesa (B2C payout)</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">5/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Performs the actual M-Pesa B2C payout from the customer's wallet to their registered phone number. The wallet is debited and a withdrawal ledger entry is recorded up front, then the B2C request is sent. If M-Pesa rejects the request or errors, the debit is reversed against that ledger entry and the withdrawal is marked as failed (<code>disburse</code> 3) with the error message stored.</p></div>
+<div class="endpoint-section"><h4>Request Body</h4>
+<table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>amount</td><td>numeric</td><td><span class="required">Required</span></td><td>Amount to withdraw (min: 1). Must not exceed the wallet balance</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (201)</h4><pre>{"status": "success", "ledger_entry_id": "LE-000123"}</pre></div>
+<div class="endpoint-section"><h4>Errors</h4>
+<table class="params-table"><tr><th>Status</th><th>Description</th></tr>
+<tr><td>400</td><td><code>Insufficient wallet balance for withdrawal</code> or <code>Customer phone number not found</code></td></tr>
+<tr><td>404</td><td><code>Customer not found</code> or <code>Wallet not found</code></td></tr>
+<tr><td>422</td><td>Validation failed. <code>status</code> holds the field errors</td></tr>
+<tr><td>500</td><td>M-Pesa B2C failed. The debit is reversed and <code>status</code> holds the error message</td></tr></table></div>
+</div></div>
 </div>
 
 <!-- TRANSACTIONS SECTION -->
