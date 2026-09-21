@@ -205,7 +205,7 @@ class GameWalletService
             ->groupBy('customer_id')
             ->get();
 
-        if ($depositsByCustomer->isEmpty()) {
+        if ($depositsByCustomer->count() === 0) {
             return ['error' => 'No deposit transactions found for this game wallet', 'status' => 404];
         }
 
