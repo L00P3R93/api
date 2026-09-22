@@ -5,11 +5,15 @@ namespace App\Services;
 use App\Models\Customer;
 use App\Models\Deposit;
 use App\Models\Wallet;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class C2BConfirmationService
 {
-    public function __construct(private LedgerService $ledgerService) {}
+    public function __construct(
+        private LedgerService $ledgerService,
+        private ExciseDutyService $exciseDutyService,
+    ) {}
 
     public function processCallback(array $depositData): array
     {
@@ -26,38 +30,41 @@ class C2BConfirmationService
             ];
         }
 
-        $deposit = Deposit::create($depositData);
+        // One transaction, so a crash part way never leaves a deposit recorded without its wallet credit and excise duty.
+        return DB::transaction(function () use ($depositData) {
+            $deposit = Deposit::create($depositData);
 
-        $billRefParts = explode('#', $deposit->bill_ref_no);
-        $rawAccountNo = $billRefParts[0];
-        $coinValue = $billRefParts[1] ?? null;
-        $type = $billRefParts[2] ?? null;
-        $referralCode = $billRefParts[3] ?? null;
+            $billRefParts = explode('#', $deposit->bill_ref_no);
+            $rawAccountNo = $billRefParts[0];
+            $coinValue = $billRefParts[1] ?? null;
+            $type = $billRefParts[2] ?? null;
+            $referralCode = $billRefParts[3] ?? null;
 
-        $normalizedAccountNo = $this->normalizeAccountNo($rawAccountNo);
+            $normalizedAccountNo = $this->normalizeAccountNo($rawAccountNo);
 
-        $customer = Customer::where('account_no', $normalizedAccountNo)->first();
+            $customer = Customer::where('account_no', $normalizedAccountNo)->first();
 
-        if (! $customer) {
-            $deposit->update(['status' => 0]);
-            Log::channel('mpesa')->error('MPESA Confirmation Received [Invalid Customer]:', $depositData);
+            if (! $customer) {
+                $deposit->update(['status' => 0]);
+                Log::channel('mpesa')->error('MPESA Confirmation Received [Invalid Customer]:', $depositData);
+
+                return [
+                    'ResultCode' => 'C2B00016',
+                    'ResultDesc' => 'Invalid customer',
+                    'status' => 500,
+                ];
+            }
+
+            $this->processByType($type, $coinValue, $deposit, $customer, $referralCode);
+
+            $deposit->update(['status' => 2]);
 
             return [
-                'ResultCode' => 'C2B00016',
-                'ResultDesc' => 'Invalid customer',
-                'status' => 500,
+                'ResultCode' => '0',
+                'ResultDesc' => 'Accepted',
+                'status' => 201,
             ];
-        }
-
-        $this->processByType($type, $coinValue, $deposit, $customer, $referralCode);
-
-        $deposit->update(['status' => 2]);
-
-        return [
-            'ResultCode' => '0',
-            'ResultDesc' => 'Accepted',
-            'status' => 201,
-        ];
+        });
     }
 
     private function normalizeAccountNo(string $rawAccountNo): string
@@ -148,18 +155,20 @@ class C2BConfirmationService
             ['balance' => 0]
         );
 
-        $amountToAdd = $deposit->trans_amount;
+        $wallet = Wallet::lockForUpdate()->find($wallet->id);
 
-        $ledgerEntry = $this->ledgerService->recordDeposit($deposit, $wallet, (float) $amountToAdd);
+        $ledgerEntry = $this->ledgerService->recordDeposit($deposit, $wallet, (float) $deposit->trans_amount);
+
+        $exciseDutyCharge = $this->exciseDutyService->chargeIfApplicable($deposit, $wallet, ExciseDutyService::KIND_WALLET_DEPOSIT);
 
         $wallet->transactions()->create([
             'payment_id' => $deposit->id,
             'payment_ref' => $deposit->trans_id,
             'payment_type' => Deposit::class,
-            'amount' => $amountToAdd,
+            'amount' => $exciseDutyCharge?->net_amount ?? $deposit->trans_amount,
             'status' => 2,
             'balance_before' => $ledgerEntry->balance_before,
-            'balance_after' => $ledgerEntry->balance_after,
+            'balance_after' => $wallet->balance,
         ]);
     }
 }
