@@ -67,6 +67,9 @@ jobs:
             # Restart PHP-FPM
             sudo systemctl restart php8.4-fpm
 
+            # Restart Supervisor worker
+            sudo supervisorctl restart kadiapi-worker:*
+
             # Bring application back up
             php8.4 artisan up
           "

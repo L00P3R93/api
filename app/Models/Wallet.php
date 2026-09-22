@@ -2,30 +2,35 @@
 
 namespace App\Models;
 
+use Database\Factories\WalletFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Wallet extends Model
 {
-    /** @use HasFactory<\Database\Factories\WalletFactory> */
+    /** @use HasFactory<WalletFactory> */
     use HasFactory;
 
     protected $table = 'wallets';
 
     protected $fillable = [
         'customer_id',
-        'balance'
+        'balance',
+        'wallet_version',
     ];
 
-    public function customer(){
+    public function customer()
+    {
         return $this->belongsTo(Customer::class);
     }
 
-    public function transactions(){
+    public function transactions()
+    {
         return $this->hasMany(Transaction::class);
     }
 
-    public function walletTransactions(){
+    public function walletTransactions()
+    {
         return $this->hasMany(WalletTransaction::class);
     }
 }

@@ -126,10 +126,16 @@ return [
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
         ],
-        
+
         'mpesa' => [
             'driver' => 'single',
             'path' => storage_path('logs/mpesa.log'),
+            'level' => 'info',
+        ],
+
+        'wallet-webhook' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/wallet-webhook.log'),
             'level' => 'info',
         ],
 

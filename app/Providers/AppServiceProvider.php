@@ -3,10 +3,15 @@
 namespace App\Providers;
 
 use App\Models\User;
+use App\Models\Wallet;
+use App\Observers\WalletObserver;
+use App\Services\WalletWebhookService;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Opcodes\LogViewer\LogFile;
@@ -25,9 +30,23 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Bootstrap any application services.
      */
-    public function boot(): void
+    public function boot(WalletWebhookService $walletWebhookService): void
     {
         Model::unguard();
+
+        Wallet::observe(WalletObserver::class);
+
+        // boot() runs on every request under a traditional web server, so this is
+        // throttled to roughly once a day rather than logged literally every boot.
+        if (! $walletWebhookService->isEnabled()) {
+            Cache::remember('wallet-webhook:boot-log', now()->addDay(), function () use ($walletWebhookService) {
+                Log::channel('wallet-webhook')->info('disabled_at_boot', [
+                    'configured' => $walletWebhookService->isConfigured(),
+                ]);
+
+                return true;
+            });
+        }
 
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());

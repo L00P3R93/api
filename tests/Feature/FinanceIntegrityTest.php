@@ -355,3 +355,22 @@ it('excludes the configured test customers from the customer scope', function ()
 it('defaults the test customer list to the historic id below 500 rule', function () {
     expect(config('finance.test_customer_ids'))->toBe(range(1, 500));
 });
+
+// wallet_version (webhook balance_version source)
+
+it('increments wallet_version by exactly 1 when balance changes', function () {
+    $wallet = walletFor(100);
+    expect((int) $wallet->wallet_version)->toBe(0);
+
+    $wallet->update(['balance' => 150]);
+
+    expect((int) $wallet->fresh()->wallet_version)->toBe(1);
+});
+
+it('does not move wallet_version when balance is untouched', function () {
+    $wallet = walletFor(100);
+
+    $wallet->touch();
+
+    expect((int) $wallet->fresh()->wallet_version)->toBe(0);
+});
