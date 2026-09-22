@@ -8,8 +8,9 @@ class WalletWebhookFatalException extends RuntimeException
 {
     public function __construct(
         public readonly ?int $statusCode = null,
-        string $message = 'Wallet webhook delivery failed with a non-retryable response.',
+        public readonly ?string $responseBody = null,
+        ?string $message = null,
     ) {
-        parent::__construct($message);
+        parent::__construct($message ?? "Wallet webhook delivery failed with a non-retryable response (status {$statusCode}).");
     }
 }

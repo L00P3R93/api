@@ -2,6 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Exceptions\WalletWebhookFatalException;
+use App\Exceptions\WalletWebhookRetryableException;
 use App\Models\Wallet;
 use App\Services\WalletWebhookService;
 use Illuminate\Console\Command;
@@ -43,6 +45,14 @@ class SendWalletWebhook extends Command
 
         try {
             $this->service->send($eventId, $snapshot);
+        } catch (WalletWebhookRetryableException|WalletWebhookFatalException $e) {
+            $this->error("Delivery failed: {$e->getMessage()}");
+
+            if ($e->responseBody !== null && $e->responseBody !== '') {
+                $this->line("Response body: {$e->responseBody}");
+            }
+
+            return Command::FAILURE;
         } catch (Throwable $e) {
             $this->error("Delivery failed: {$e->getMessage()}");
 

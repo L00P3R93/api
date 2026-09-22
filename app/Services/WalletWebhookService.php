@@ -137,12 +137,13 @@ class WalletWebhookService
         }
 
         $status = $response->status();
+        $responseBody = Str::limit($response->body(), 500);
 
         if ($status === 429 || $status >= 500) {
-            throw new WalletWebhookRetryableException($status);
+            throw new WalletWebhookRetryableException($status, $responseBody);
         }
 
-        throw new WalletWebhookFatalException($status);
+        throw new WalletWebhookFatalException($status, $responseBody);
     }
 
     private function resolveReason(Wallet $wallet): string

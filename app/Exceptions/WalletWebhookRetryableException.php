@@ -9,9 +9,13 @@ class WalletWebhookRetryableException extends RuntimeException
 {
     public function __construct(
         public readonly ?int $statusCode = null,
-        string $message = 'Wallet webhook delivery failed, retrying.',
+        public readonly ?string $responseBody = null,
+        ?string $message = null,
         ?Throwable $previous = null,
     ) {
-        parent::__construct($message, previous: $previous);
+        parent::__construct(
+            $message ?? ($statusCode ? "Wallet webhook delivery failed, retrying (status {$statusCode})." : 'Wallet webhook delivery failed (connection error), retrying.'),
+            previous: $previous
+        );
     }
 }
