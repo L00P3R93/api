@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Customer;
+use App\Models\ExciseDutyCharge;
 use App\Models\FinanceExpense;
 use App\Models\GameWallet;
 use App\Models\Wallet;
@@ -58,7 +59,7 @@ it('ships with every tax rate off', function () {
         expect($tax['rate'])->toBe(0.0);
     }
 
-    expect(array_keys(config('finance.taxes')))->toBe(['excise_duty', 'withholding_tax', 'income_tax']);
+    expect(array_keys(config('finance.taxes')))->toBe(['withholding_tax', 'income_tax']);
 });
 
 it('shows the bases and no tax while the rates are off', function () {
@@ -69,7 +70,7 @@ it('shows the bases and no tax while the rates are off', function () {
 
     expect($data['configured'])->toBeFalse();
     expect($data['net_income_before_tax'])->toEqual(6);
-    expect($data['taxes']['excise_duty']['base_amount'])->toEqual(100);
+    expect($data['taxes']['excise_duty']['base_amount'])->toEqual(0);
     expect($data['taxes']['withholding_tax']['base_amount'])->toEqual(90);
     expect($data['taxes']['income_tax']['base_amount'])->toEqual(6);
 
@@ -82,7 +83,6 @@ it('shows the bases and no tax while the rates are off', function () {
 
 it('estimates each tax from its base and works income tax after the other cost taxes', function () {
     config([
-        'finance.taxes.excise_duty.rate' => 0.02,
         'finance.taxes.withholding_tax.rate' => 0.2,
         'finance.taxes.income_tax.rate' => 0.3,
     ]);
@@ -91,17 +91,16 @@ it('estimates each tax from its base and works income tax after the other cost t
 
     $data = taxReport($this);
 
-    // revenue 10, expenses 4, so 6 before tax; excise 2% of stakes 100 = 2; income tax 30% of (6 - 2) = 1.2
+    // revenue 10, expenses 4, so 6 before tax; withholding is pass-through, so income tax is 30% of 6 = 1.8
     expect($data['configured'])->toBeTrue();
-    expect($data['taxes']['excise_duty'])->toMatchArray(['base' => 'stakes', 'kind' => 'expense', 'rate' => 0.02, 'base_amount' => 100, 'estimated_amount' => 2]);
-    expect($data['taxes']['withholding_tax'])->toMatchArray(['base' => 'winnings', 'kind' => 'pass_through', 'rate' => 0.2, 'base_amount' => 90, 'estimated_amount' => 18]);
-    expect($data['taxes']['income_tax'])->toMatchArray(['base' => 'net_income', 'kind' => 'expense', 'rate' => 0.3, 'base_amount' => 4, 'estimated_amount' => 1.2]);
-    expect($data['totals'])->toEqual(['expense_taxes' => 3.2, 'pass_through_taxes' => 18, 'net_income_after_tax' => 2.8]);
+    expect($data['taxes']['withholding_tax'])->toMatchArray(['base' => 'winnings', 'kind' => 'pass_through', 'rate' => 0.2, 'base_amount' => 90, 'estimated_amount' => 18, 'actual' => false]);
+    expect($data['taxes']['income_tax'])->toMatchArray(['base' => 'net_income', 'kind' => 'expense', 'rate' => 0.3, 'base_amount' => 6, 'estimated_amount' => 1.8, 'actual' => false]);
+    expect($data['totals'])->toEqual(['expense_taxes' => 1.8, 'pass_through_taxes' => 18, 'net_income_after_tax' => 4.2]);
     expect(array_keys($data['taxes']))->toBe(['excise_duty', 'withholding_tax', 'income_tax']);
 });
 
 it('never charges income tax on a loss', function () {
-    config(['finance.taxes.income_tax.rate' => 0.3, 'finance.taxes.excise_duty.rate' => 0.5]);
+    config(['finance.taxes.income_tax.rate' => 0.3]);
     taxGame($this, $this->alice, 'TAX_3');
     FinanceExpense::factory()->create(['expense_date' => '2026-09-20', 'amount' => 100]);
 
@@ -110,7 +109,7 @@ it('never charges income tax on a loss', function () {
     expect($data['net_income_before_tax'])->toEqual(-90);
     expect($data['taxes']['income_tax']['base_amount'])->toEqual(0);
     expect($data['taxes']['income_tax']['estimated_amount'])->toEqual(0);
-    expect($data['totals']['net_income_after_tax'])->toEqual(-140);
+    expect($data['totals']['net_income_after_tax'])->toEqual(-90);
 });
 
 it('treats a pass-through tax as not reducing net income', function () {
@@ -125,12 +124,29 @@ it('treats a pass-through tax as not reducing net income', function () {
 });
 
 it('leaves test customers out of the stakes and winnings unless asked', function () {
-    config(['finance.taxes.excise_duty.rate' => 0.1]);
+    config(['finance.taxes.withholding_tax.rate' => 0.1]);
     taxGame($this, $this->alice, 'TAX_5');
     taxGame($this, $this->test, 'TAX_6');
 
-    expect(taxReport($this)['taxes']['excise_duty']['base_amount'])->toEqual(100);
-    expect(taxReport($this, '?exclude_test=0')['taxes']['excise_duty']['base_amount'])->toEqual(200);
+    expect(taxReport($this)['taxes']['withholding_tax']['base_amount'])->toEqual(90);
+    expect(taxReport($this, '?exclude_test=0')['taxes']['withholding_tax']['base_amount'])->toEqual(180);
+});
+
+it('shows the actual excise duty charged on deposits, net of reversals, as pass-through', function () {
+    config(['finance.excise_duty.enabled' => true, 'finance.excise_duty.rate' => 0.05]);
+    ExciseDutyCharge::factory()->create(['customer_id' => 900, 'wallet_id' => 900, 'gross_amount' => 100, 'excise_amount' => 5, 'net_amount' => 95]);
+    ExciseDutyCharge::factory()->create(['customer_id' => 900, 'wallet_id' => 900, 'gross_amount' => 300, 'excise_amount' => 15, 'net_amount' => 285]);
+    ExciseDutyCharge::factory()->reversed()->create(['customer_id' => 900, 'wallet_id' => 900, 'gross_amount' => 40, 'excise_amount' => 2, 'net_amount' => 38]);
+
+    $data = taxReport($this);
+
+    expect(array_keys($data['taxes']))->toBe(['excise_duty', 'withholding_tax', 'income_tax']);
+    expect($data['taxes']['excise_duty'])->toBe([
+        'label' => 'Excise duty on deposits', 'base' => 'deposits', 'kind' => 'pass_through', 'rate' => 0.05,
+        'base_amount' => 400, 'estimated_amount' => 20, 'actual' => true,
+    ]);
+    expect($data['configured'])->toBeTrue();
+    expect($data['totals'])->toEqual(['expense_taxes' => 0, 'pass_through_taxes' => 20, 'net_income_after_tax' => 0]);
 });
 
 it('describes the period and warns that these are estimates', function () {
@@ -141,12 +157,13 @@ it('describes the period and warns that these are estimates', function () {
 });
 
 it('exports the tax lines as CSV', function () {
-    config(['finance.taxes.excise_duty.rate' => 0.02]);
+    config(['finance.taxes.withholding_tax.rate' => 0.2]);
     taxGame($this, $this->alice, 'TAX_7');
 
     $rows = collect(explode("\n", trim(ltrim($this->get('/api/v1/finance/export/taxes', $this->headers)->streamedContent(), "\xEF\xBB\xBF"))))->map(fn (string $line) => str_getcsv($line));
 
     expect($rows->first())->toBe(['tax', 'label', 'base', 'kind', 'rate', 'base_amount', 'estimated_amount']);
     expect($rows)->toHaveCount(4);
-    expect($rows[1])->toBe(['excise_duty', 'Excise duty on stakes', 'stakes', 'expense', '0.02', '100', '2']);
+    expect($rows[1])->toBe(['excise_duty', 'Excise duty on deposits', 'deposits', 'pass_through', '0', '0', '0']);
+    expect($rows[2])->toBe(['withholding_tax', 'Withholding tax on winnings', 'winnings', 'pass_through', '0.2', '90', '18']);
 });

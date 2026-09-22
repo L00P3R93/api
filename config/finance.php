@@ -10,14 +10,15 @@ return [
     |--------------------------------------------------------------------------
     |
     | Customers listed here are excluded from customer stats and financial
-    | reports. Set FINANCE_TEST_CUSTOMER_IDS to a comma separated list to
-    | override. The default matches the historic "id below 120" rule, which
-    | also covers the house customer (id 1).
+    | reports. Set FINANCE_TEST_CUSTOMER_IDS to a comma separated list (for
+    | example on local or staging). Production has no test customers, so the
+    | default is none. The house wallet is kept apart by wallets.house_wallet_id,
+    | not by this list.
     |
     */
 
     'test_customer_ids' => $testCustomerIds === null || $testCustomerIds === ''
-        ? range(1, 500)
+        ? []
         : array_values(array_filter(array_map('intval', explode(',', $testCustomerIds)))),
 
     /*
@@ -100,7 +101,8 @@ return [
     | base (0.15 is 15%) and is off (0) until you set it, because the right
     | rates and bases depend on how your games are classed. Confirm them with
     | your accountant or tax adviser. These are estimates for planning, not
-    | tax returns.
+    | tax returns. Excise duty is not listed here: it is charged on deposits
+    | (see excise_duty below) and the tax report shows the actual amounts.
     |
     | base   stakes      customer stakes in the period
     |        winnings    winnings paid to customers in the period
@@ -112,12 +114,6 @@ return [
     */
 
     'taxes' => [
-        'excise_duty' => [
-            'label' => 'Excise duty on stakes',
-            'base' => 'stakes',
-            'kind' => 'expense',
-            'rate' => (float) env('FINANCE_TAX_EXCISE_RATE', 0),
-        ],
         'withholding_tax' => [
             'label' => 'Withholding tax on winnings',
             'base' => 'winnings',

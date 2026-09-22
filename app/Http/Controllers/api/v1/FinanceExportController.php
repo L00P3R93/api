@@ -4,6 +4,7 @@ namespace App\Http\Controllers\api\v1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\FinanceListRequest;
+use App\Services\ExciseDutyReportService;
 use App\Services\FinanceDateRange;
 use App\Services\FinanceExpenseService;
 use App\Services\FinanceGameReportService;
@@ -21,6 +22,7 @@ class FinanceExportController extends Controller
     private const REPORTS = [
         'ledger', 'deposits', 'withdrawals', 'purchases', 'adjustments', 'games', 'competitions',
         'customers-top', 'cash-flow', 'income-statement', 'trial-balance', 'expenses', 'taxes',
+        'excise-duty', 'excise-duty-charges', 'excise-duty-returns', 'excise-duty-remittances',
     ];
 
     /** Days the top customers report covers when no range is given. */
@@ -33,6 +35,7 @@ class FinanceExportController extends Controller
         private FinanceReportService $reports,
         private FinanceExpenseService $expenses,
         private FinanceTaxService $taxes,
+        private ExciseDutyReportService $exciseDuty,
     ) {}
 
     /**
@@ -62,6 +65,10 @@ class FinanceExportController extends Controller
             'trial-balance' => $this->trialBalanceRows($range),
             'expenses' => $this->fromListing($this->expenses->listing($range, $filters)),
             'taxes' => $this->taxRows($range),
+            'excise-duty' => $this->exciseDutyRows($range),
+            'excise-duty-charges' => $this->fromListing($this->exciseDuty->charges($range, $filters)),
+            'excise-duty-returns' => $this->exciseDutyReturnRows($range),
+            'excise-duty-remittances' => $this->fromListing($this->exciseDuty->remittances($range, $filters)),
         };
 
         $filename = "finance-{$report}-{$range->from->toDateString()}-{$range->to->toDateString()}.csv";
@@ -92,7 +99,7 @@ class FinanceExportController extends Controller
      */
     private function cashFlowRows(FinanceDateRange $range): array
     {
-        $columns = ['period', 'wallet_deposit', 'load', 'gift', 'emoji', 'unmatched', 'other', 'cash_in_total', 'paid', 'pending', 'failed', 'net_cash'];
+        $columns = ['period', 'wallet_deposit', 'load', 'gift', 'emoji', 'unmatched', 'other', 'cash_in_total', 'paid', 'pending', 'failed', 'excise_withheld', 'excise_remitted', 'net_cash'];
 
         $rows = (function () use ($range) {
             foreach ($this->reports->cashFlow($range)['series'] as $row) {
@@ -100,6 +107,7 @@ class FinanceExportController extends Controller
                     + $row['cash_in']
                     + ['cash_in_total' => $row['cash_in']['total']]
                     + $row['cash_out']
+                    + ['excise_withheld' => $row['excise_duty']['withheld'], 'excise_remitted' => $row['excise_duty']['remitted']]
                     + ['net_cash' => $row['net_cash']];
             }
         })();
@@ -132,6 +140,34 @@ class FinanceExportController extends Controller
             foreach ($this->taxes->estimate($range)['taxes'] as $key => $line) {
                 yield ['tax' => $key] + $line;
             }
+        })();
+
+        return [$columns, $rows];
+    }
+
+    /**
+     * @return array{0: list<string>, 1: Generator<int, array<string, mixed>>}
+     */
+    private function exciseDutyRows(FinanceDateRange $range): array
+    {
+        $columns = ['period', 'deposits', 'gross_deposits', 'excise_charged', 'excise_reversed', 'excise_net', 'excise_remitted'];
+
+        $rows = (function () use ($range) {
+            yield from $this->exciseDuty->summary($range)['series'];
+        })();
+
+        return [$columns, $rows];
+    }
+
+    /**
+     * @return array{0: list<string>, 1: Generator<int, array<string, mixed>>}
+     */
+    private function exciseDutyReturnRows(FinanceDateRange $range): array
+    {
+        $columns = ['period', 'period_start', 'period_end', 'due_date', 'charges', 'gross_deposits', 'excise_charged', 'excise_reversed', 'excise_due', 'excise_remitted', 'outstanding', 'overdue'];
+
+        $rows = (function () use ($range) {
+            yield from $this->exciseDuty->returns($range);
         })();
 
         return [$columns, $rows];

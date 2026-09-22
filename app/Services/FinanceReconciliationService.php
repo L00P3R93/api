@@ -18,6 +18,7 @@ class FinanceReconciliationService
     public function __construct(
         private FinanceReportService $reports,
         private FinanceSnapshotService $snapshots,
+        private ExciseDutyReportService $exciseDuty,
     ) {}
 
     /**
@@ -37,6 +38,10 @@ class FinanceReconciliationService
             $this->unclassifiedEntries(),
             $this->unmatchedDeposits(),
             $this->depositsWithoutLedger($range),
+            $this->depositsWithoutExciseDuty($range),
+            $this->exciseDutyAmounts($range),
+            $this->exciseDutyLedger($range),
+            $this->overdueExciseDuty(),
             $this->stuckWithdrawals(),
             $this->failedWithdrawalsNotReversed(),
             $this->stuckEscrow(),
@@ -213,6 +218,117 @@ class FinanceReconciliationService
             (clone $missing)->count(),
             (float) (clone $missing)->sum('i.trans_amount'),
             (clone $missing)->limit(self::SAMPLE_SIZE)->get(['i.id', 'i.trans_id', 'i.trans_amount', 'i.created_at'])->map(fn ($row) => (array) $row)->all()
+        );
+    }
+
+    /**
+     * Plain wallet deposits credited while excise duty was on, with no excise duty charge.
+     *
+     * @return array<string, mixed>
+     */
+    private function depositsWithoutExciseDuty(FinanceDateRange $range): array
+    {
+        $title = 'Wallet deposits have their excise duty charged';
+
+        if (! config('finance.excise_duty.enabled')) {
+            return $this->result('deposits_without_excise_duty', $title, 'fail', 0, 0.0, [], 'Excise duty is switched off, so it was not checked.');
+        }
+
+        $effectiveFrom = config('finance.excise_duty.effective_from');
+
+        $missing = DB::table('incoming_payments as i')
+            ->join('ledger_entries as l', function ($join) {
+                $join->on('l.referenceable_id', '=', 'i.id')
+                    ->where('l.referenceable_type', Deposit::class)
+                    ->where('l.entry_type', 'deposit');
+            })
+            ->leftJoin('purchases as p', 'p.deposit_id', '=', 'i.id')
+            ->leftJoin('excise_duty_charges as x', 'x.deposit_id', '=', 'i.id')
+            ->where('i.status', 2)
+            ->where('i.trans_amount', '>', 0)
+            ->whereNull('p.id')
+            ->whereNull('x.id')
+            ->when(filled($effectiveFrom), fn ($query) => $query->where('i.created_at', '>=', CarbonImmutable::parse($effectiveFrom, config('app.timezone'))->startOfDay()))
+            ->whereBetween('i.created_at', [$range->from, $range->to]);
+
+        return $this->result(
+            'deposits_without_excise_duty',
+            $title,
+            'fail',
+            (clone $missing)->count(),
+            (float) (clone $missing)->sum('i.trans_amount'),
+            (clone $missing)->limit(self::SAMPLE_SIZE)->get(['i.id', 'i.trans_id', 'i.trans_amount', 'i.created_at'])->map(fn ($row) => (array) $row)->all(),
+            'amount is the gross of the deposits that were credited in full.'
+        );
+    }
+
+    /**
+     * Each charge is round(gross x rate, 2), and gross = excise + net.
+     *
+     * @return array<string, mixed>
+     */
+    private function exciseDutyAmounts(FinanceDateRange $range): array
+    {
+        $wrong = DB::table('excise_duty_charges')
+            ->whereBetween('charged_at', [$range->from, $range->to])
+            ->where(fn ($query) => $query
+                ->whereRaw('ABS(excise_amount - ROUND(gross_amount * rate, 2)) > ?', [$this->tolerance()])
+                ->orWhereRaw('ABS(gross_amount - excise_amount - net_amount) > ?', [$this->tolerance()]));
+
+        return $this->result(
+            'excise_duty_amounts',
+            'Excise duty charges are worked out correctly',
+            'fail',
+            (clone $wrong)->count(),
+            (float) (clone $wrong)->selectRaw('COALESCE(SUM(ABS(excise_amount - ROUND(gross_amount * rate, 2))), 0) as amount')->value('amount'),
+            (clone $wrong)->limit(self::SAMPLE_SIZE)->get(['id', 'deposit_id', 'gross_amount', 'rate', 'excise_amount', 'net_amount'])->map(fn ($row) => (array) $row)->all()
+        );
+    }
+
+    /**
+     * Each charge points at its excise_duty ledger entry, for the same amount, in the matching state.
+     *
+     * @return array<string, mixed>
+     */
+    private function exciseDutyLedger(FinanceDateRange $range): array
+    {
+        $mismatched = DB::table('excise_duty_charges as x')
+            ->leftJoin('ledger_entries as l', 'l.id', '=', 'x.ledger_entry_id')
+            ->whereBetween('x.charged_at', [$range->from, $range->to])
+            ->where(fn ($query) => $query
+                ->whereNull('l.id')
+                ->orWhere('l.entry_type', '!=', 'excise_duty')
+                ->orWhereRaw('ABS(l.debit - x.excise_amount) > ?', [$this->tolerance()])
+                ->orWhereRaw("(x.status = 'charged' AND l.status != 'settled')")
+                ->orWhereRaw("(x.status = 'reversed' AND l.status != 'reversed')"));
+
+        return $this->result(
+            'excise_duty_ledger',
+            'Excise duty charges match the ledger',
+            'fail',
+            (clone $mismatched)->count(),
+            (float) (clone $mismatched)->sum('x.excise_amount'),
+            (clone $mismatched)->limit(self::SAMPLE_SIZE)->get(['x.id', 'x.deposit_id', 'x.excise_amount', 'x.status', 'l.id as ledger_entry_id', 'l.debit', 'l.status as ledger_status'])->map(fn ($row) => (array) $row)->all()
+        );
+    }
+
+    /**
+     * Months whose excise duty is still unpaid after the filing day of the next month.
+     *
+     * @return array<string, mixed>
+     */
+    private function overdueExciseDuty(): array
+    {
+        $overdue = $this->exciseDuty->overdueReturns();
+
+        return $this->result(
+            'overdue_excise_duty',
+            'Excise duty is paid to KRA by the due date',
+            'warn',
+            count($overdue),
+            array_sum(array_column($overdue, 'outstanding')),
+            array_slice($overdue, 0, self::SAMPLE_SIZE),
+            'Pay KRA, then record it with POST /finance/excise-duty/remittances.'
         );
     }
 
@@ -404,7 +520,7 @@ class FinanceReconciliationService
     private function cashCoverage(): array
     {
         $position = $this->snapshots->currentPosition();
-        $title = 'M-Pesa cash covers what is owed to customers';
+        $title = 'M-Pesa cash covers what is owed to customers and KRA';
 
         if ($position['mpesa_balances'] === null) {
             return $this->result('cash_coverage', $title, 'warn', 1, 0.0, [], 'No M-Pesa balance has been fetched yet.');
@@ -417,7 +533,7 @@ class FinanceReconciliationService
 
         $owed = $position['customer_wallets_total'] + $position['game_escrow_total'] + $position['competition_escrow_total']
             + $position['stuck_escrow_total'] + $position['coin_liability'] + $position['pending_holds_total']
-            + $position['unmatched_deposits_total'];
+            + $position['unmatched_deposits_total'] + $position['excise_duty_payable'];
 
         $shortfall = round($owed - $cash, 2);
 

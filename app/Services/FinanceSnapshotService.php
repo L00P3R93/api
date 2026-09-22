@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Coin;
 use App\Models\CompetitionWallet;
 use App\Models\Deposit;
+use App\Models\ExciseDutyCharge;
 use App\Models\FinancialSnapshot;
 use App\Models\GameWallet;
 use App\Models\MpesaBalance;
@@ -29,8 +30,9 @@ class FinanceSnapshotService
      *
      * Customer wallets and coins exclude the house wallet and the configured test customers.
      * Stuck escrow is money still sitting in a game or competition wallet that is no longer open.
+     * Excise duty payable is duty taken from deposits and not yet in a KRA remittance.
      *
-     * @return array{customer_wallets_total: float, house_wallet_balance: float, game_escrow_total: float, competition_escrow_total: float, stuck_escrow_total: float, coin_liability: float, pending_holds_total: float, unmatched_deposits_total: float, mpesa_balances: array<string, array<string, array{amount: float, as_of: string}>>|null}
+     * @return array{customer_wallets_total: float, house_wallet_balance: float, game_escrow_total: float, competition_escrow_total: float, stuck_escrow_total: float, coin_liability: float, pending_holds_total: float, unmatched_deposits_total: float, excise_duty_payable: float, mpesa_balances: array<string, array<string, array{amount: float, as_of: string}>>|null}
      */
     public function currentPosition(): array
     {
@@ -53,6 +55,7 @@ class FinanceSnapshotService
             'coin_liability' => $this->money($coins * config('finance.coin_rate')),
             'pending_holds_total' => $this->money(PendingBalance::where('status', 'holding')->sum('amount')),
             'unmatched_deposits_total' => $this->money(Deposit::where('status', 0)->sum('trans_amount')),
+            'excise_duty_payable' => $this->money(ExciseDutyCharge::charged()->whereNull('remittance_id')->sum('excise_amount')),
             'mpesa_balances' => $this->latestMpesaBalances(),
         ];
     }

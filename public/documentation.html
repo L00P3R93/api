@@ -328,6 +328,7 @@
             <li><a href="#" data-section="finance-statements"><span class="nav-icon">&#129534;</span> <span>Statements</span></a></li>
             <li><a href="#" data-section="finance-reports"><span class="nav-icon">&#128269;</span> <span>Drill-downs</span></a></li>
             <li><a href="#" data-section="finance-expenses"><span class="nav-icon">&#129534;</span> <span>Expenses</span></a></li>
+            <li><a href="#" data-section="finance-excise"><span class="nav-icon">&#127963;</span> <span>Excise Duty</span></a></li>
             <li><a href="#" data-section="finance-export"><span class="nav-icon">&#128229;</span> <span>CSV Export</span></a></li>
         </ul>
         <div class="nav-section">Utilities</div>
@@ -869,14 +870,15 @@ Idempotency-Key: idem-12345
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
-<pre>[{"id": 1, "trans_id": "QHK123ABC", "trans_type": "CustomerPayBillOnline", "trans_time": "2025-01-15 10:30:00", "trans_amount": 100.00, "short_code": "174379", "bill_ref_no": "12345678", "msisdn": "254712345678", "name": "John Doe", "status": 2, "customer": "John Doe"}]</pre></div>
+<pre>[{"id": 1, "trans_id": "QHK123ABC", "trans_type": "CustomerPayBillOnline", "trans_time": "2025-01-15 10:30:00", "trans_amount": 100.00, "short_code": "174379", "bill_ref_no": "12345678", "msisdn": "254712345678", "name": "John Doe", "status": 2, "excise_amount": "5.00", "net_amount": "95.00", "customer": "John Doe"}]</pre>
+<p style="color:var(--text-secondary);font-size:13px;margin-top:8px;"><code>excise_amount</code> and <code>net_amount</code> are the excise duty taken and what was credited to the wallet. Both are <code>null</code> when no excise duty was charged (feature off, a coin load, gift or emoji, or a deposit before excise duty started).</p></div>
 </div></div>
 <div class="endpoint">
 <div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/deposits/{encryptedIdentifier}</span><span class="endpoint-desc">Get a single deposit</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
-<pre>{"id": 1, "trans_id": "QHK123ABC", "trans_amount": 100.00, "name": "John Doe", "status": 2, "customer": "John Doe"}</pre></div>
+<pre>{"data": {"id": 1, "trans_id": "QHK123ABC", "trans_amount": 100.00, "name": "John Doe", "status": 2, "excise_amount": "5.00", "net_amount": "95.00", "customer": "John Doe"}}</pre></div>
 </div></div>
 <div class="endpoint">
 <div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/deposits</span><span class="endpoint-desc">Records a new deposit (MPesa C2B webhook)</span><span class="chevron">&#9654;</span></div>
@@ -908,11 +910,13 @@ Content-Type: application/json
   "MSISDN": "254712345678",
   "FirstName": "John"
 }</pre></div>
+<div class="endpoint-section"><h4>Excise duty</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">When excise duty is on, 5% of <code>TransAmount</code> is taken from the deposit. The wallet is credited with the full amount and then debited with the duty (two ledger entries, <code>deposit</code> and <code>excise_duty</code>), so the customer keeps 95%. <code>transaction.amount</code> is what the customer kept and <code>balance_after</code> is the balance after the duty. The credit, the duty and the transaction row are saved together or not at all. See <a href="#" data-section="finance-excise" style="color:var(--accent-blue)">Excise Duty</a>.</p></div>
 <div class="endpoint-section"><h4>Response (201)</h4>
 <pre>{
   "message": "Deposit successful",
-  "wallet": {"id": 1, "customer_id": 1, "balance": 1600.00},
-  "transaction": {"id": 1, "amount": 100.00, "status": 2, "balance_before": 1500.00, "balance_after": 1600.00},
+  "wallet": {"id": 1, "customer_id": 1, "balance": 1595.00},
+  "transaction": {"id": 1, "amount": "95.00", "status": 2, "balance_before": 1500.00, "balance_after": 1595.00},
   "ledger_entry_id": "LE-001"
 }</pre></div>
 </div></div>
@@ -1391,7 +1395,7 @@ Content-Type: application/json
 <div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/c2b/confirm</span><span class="endpoint-desc">Provides a test endpoint for C2B confirmation callback</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-rate">100/min</span></div>
-<div class="callback-note">Called by Safaricom when a C2B payment is confirmed. Processes deposit and credits wallet.</div>
+<div class="callback-note">Called by Safaricom when a C2B payment is confirmed. Processes deposit and credits wallet. For a plain wallet deposit, 5% excise duty is taken from the amount when excise duty is on, so the wallet gains 95% (coin loads, gifts and emoji are not charged). The whole callback runs in one database transaction: if anything fails, nothing is saved and Safaricom can retry. See <a href="#" data-section="finance-excise" style="color:var(--accent-blue)">Excise Duty</a>.</div>
 <div class="endpoint-section"><h4>Response (200)</h4><pre>{"ResultCode": "0", "ResultDesc": "Accepted"}</pre></div>
 </div></div>
 <div class="endpoint">
@@ -1421,7 +1425,7 @@ Content-Type: application/json
 </div>
 <!-- STATS SECTION -->
 <div class="doc-section" data-section="stats">
-<div class="callback-note">All stats endpoints are rate-limited to 20 requests/minute. Customer counts (<code>/stats/customers</code> and the referral variant) leave out test customers: ids 1 to 500 by default, configurable on the server. Days follow Nairobi time. For full financial reporting (income statement, cash flow, balance sheet, reconciliation, expenses and CSV export) see <a href="#" data-section="finance-overview" style="color:var(--accent-blue)">Finance Reporting</a>; the income figures here only cover today and the last 30 days.</div>
+<div class="callback-note">All stats endpoints are rate-limited to 20 requests/minute. Customer counts (<code>/stats/customers</code> and the referral variant) leave out test customers. There are none by default; they can be listed on the server with <code>FINANCE_TEST_CUSTOMER_IDS</code>. Days follow Nairobi time. For full financial reporting (income statement, cash flow, balance sheet, reconciliation, expenses and CSV export) see <a href="#" data-section="finance-overview" style="color:var(--accent-blue)">Finance Reporting</a>; the income figures here only cover today and the last 30 days.</div>
 <div class="endpoint">
 <div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/stats/customers</span><span class="endpoint-desc">Lists all customers in the system</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
@@ -1502,12 +1506,13 @@ Content-Type: application/json
 <div class="doc-section" data-section="finance-overview">
 <div class="auth-box">
 <h3>What the finance endpoints are</h3>
-<p>Everything under <code>/api/v1/finance/</code> reports on money: income, cash flow, what is owed to customers, and where the numbers come from. All endpoints are read-only <code>GET</code> requests except recording and voiding <a href="#" data-section="finance-expenses" style="color:var(--accent-blue)">expenses</a>. They all need the <code>X-API-KEY</code> header.</p>
+<p>Everything under <code>/api/v1/finance/</code> reports on money: income, cash flow, what is owed to customers, and where the numbers come from. All endpoints are read-only <code>GET</code> requests except recording and voiding <a href="#" data-section="finance-expenses" style="color:var(--accent-blue)">expenses</a> and <a href="#" data-section="finance-excise" style="color:var(--accent-blue)">excise duty remittances</a>. They all need the <code>X-API-KEY</code> header.</p>
 <table class="params-table">
 <tr><th>Group</th><th>Endpoints</th></tr>
 <tr><td><a href="#" data-section="finance-statements" style="color:var(--accent-blue)">Financial Statements</a></td><td>summary, income-statement, cash-flow, balance-sheet, trial-balance, reconciliation, taxes</td></tr>
 <tr><td><a href="#" data-section="finance-reports" style="color:var(--accent-blue)">Drill-downs</a></td><td>deposits, withdrawals, purchases, games, competitions, ledger, adjustments, customers/top, customer statement</td></tr>
 <tr><td><a href="#" data-section="finance-expenses" style="color:var(--accent-blue)">Expenses</a></td><td>record, void and list expenses</td></tr>
+<tr><td><a href="#" data-section="finance-excise" style="color:var(--accent-blue)">Excise Duty</a></td><td>excise-duty, excise-duty/charges, excise-duty/returns, excise-duty/remittances (list, record, void)</td></tr>
 <tr><td><a href="#" data-section="finance-export" style="color:var(--accent-blue)">CSV Export</a></td><td>any report as a CSV download</td></tr>
 </table>
 </div>
@@ -1558,12 +1563,12 @@ Content-Type: application/json
 
 <div class="auth-box">
 <h3>Test customers</h3>
-<p>By default reports leave out test customers (customer ids 1 to 500, configurable on the server), including the house customer for customer-level figures. Send <code>exclude_test=0</code> to include them. House cuts cannot always be tied to a player, so the income statement only removes cuts it can link to a test customer or a game a test customer played.</p>
+<p>Reports can leave out test customers listed on the server in <code>FINANCE_TEST_CUSTOMER_IDS</code>. <strong>There are none by default</strong>, so in production every customer is included. When some are listed, reports leave them out unless you send <code>exclude_test=0</code>. The house wallet is always kept apart from customer wallets, whatever this list says. House cuts cannot always be tied to a player, so the income statement only removes cuts it can link to a test customer or a game a test customer played.</p>
 </div>
 
 <div class="auth-box">
 <h3>Caching and rate limits</h3>
-<p>Reports whose range includes today are cached for about 2 minutes, so a figure can lag by that long. Closed ranges and past balance sheets are cached for an hour. The drill-down lists are not cached. Finance <code>GET</code> endpoints share the <code>stats</code> limit of 20 requests per minute; recording or voiding an expense uses the <code>write</code> limit of 30 per minute.</p>
+<p>Reports whose range includes today are cached for about 2 minutes, so a figure can lag by that long. Closed ranges and past balance sheets are cached for an hour. The drill-down lists are not cached. Finance <code>GET</code> endpoints share the <code>stats</code> limit of 20 requests per minute; recording or voiding an expense or an excise duty remittance uses the <code>write</code> limit of 30 per minute.</p>
 </div>
 
 <div class="auth-box">
@@ -1667,7 +1672,7 @@ Content-Type: application/json
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
 <div class="endpoint-section"><h4>Description</h4>
-<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Cash in is what customers actually paid (incoming payments), split into <code>wallet_deposit</code>, <code>load</code>, <code>gift</code>, <code>emoji</code> and <code>unmatched</code> (money received from an unknown customer and not credited to anyone; it is included in the total). Cash out is outgoing payments by status: <code>paid</code>, <code>pending</code>, <code>failed</code>. <code>net_cash</code> is cash in minus paid. Works for dates before the ledger began.</p></div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Cash in is what customers actually paid (incoming payments), split into <code>wallet_deposit</code>, <code>load</code>, <code>gift</code>, <code>emoji</code> and <code>unmatched</code> (money received from an unknown customer and not credited to anyone; it is included in the total). Cash out is outgoing payments by status: <code>paid</code>, <code>pending</code>, <code>failed</code>. <code>excise_duty.withheld</code> is the excise duty taken from deposits in the period (already inside cash in) and <code>excise_duty.remitted</code> is what was paid to KRA in the period, by payment date. <code>net_cash</code> is cash in minus paid withdrawals minus excise duty remitted. Works for dates before the ledger began.</p></div>
 <div class="endpoint-section"><h4>Query Parameters</h4>
 <table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
 <tr><td>from, to, group_by, exclude_test</td><td>&nbsp;</td><td><span class="optional">Optional</span></td><td>See common parameters</td></tr></table></div>
@@ -1680,10 +1685,11 @@ Content-Type: application/json
     "totals": {
       "cash_in": {"wallet_deposit": 500.00, "load": 300.00, "gift": 100.00, "emoji": 0.00, "unmatched": 200.00, "other": 0.00, "total": 1100.00},
       "cash_out": {"paid": 150.00, "pending": 40.00, "failed": 60.00},
+      "excise_duty": {"withheld": 25.00, "remitted": 0.00},
       "net_cash": 950.00
     },
     "series": [
-      {"period": "2026-09-20", "cash_in": {"wallet_deposit": 500.00, "load": 300.00, "gift": 100.00, "emoji": 0.00, "unmatched": 200.00, "other": 0.00, "total": 1100.00}, "cash_out": {"paid": 150.00, "pending": 40.00, "failed": 60.00}, "net_cash": 950.00}
+      {"period": "2026-09-20", "cash_in": {"wallet_deposit": 500.00, "load": 300.00, "gift": 100.00, "emoji": 0.00, "unmatched": 200.00, "other": 0.00, "total": 1100.00}, "cash_out": {"paid": 150.00, "pending": 40.00, "failed": 60.00}, "excise_duty": {"withheld": 25.00, "remitted": 0.00}, "net_cash": 950.00}
     ]
   }
 }</pre></div>
@@ -1694,7 +1700,7 @@ Content-Type: application/json
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
 <div class="endpoint-section"><h4>Description</h4>
-<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Assets are the latest balance of every M-Pesa account (from the hourly balance fetch), listed individually. Liabilities are what is owed: customer wallets (test customers and the house wallet excluded), open game and competition wallets, <code>stuck_escrow</code> (money left in finished wallets), coin liability, pending holds and <code>unmatched_deposits</code>. <code>house_wallet</code> is shown separately. <code>difference</code> is cash minus liabilities minus the house wallet. It is not expected to be zero: it also holds gift and emoji sales not yet moved to the house wallet, M-Pesa charges, and timing between the hourly balance fetch and wallet movements. A daily snapshot is taken at 23:59 Nairobi time; <code>as_of</code> reads that day's snapshot.</p></div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Assets are the latest balance of every M-Pesa account (from the hourly balance fetch), listed individually. Liabilities are what is owed: customer wallets (test customers and the house wallet excluded), open game and competition wallets, <code>stuck_escrow</code> (money left in finished wallets), coin liability, pending holds, <code>unmatched_deposits</code> and <code>excise_duty_payable</code> (excise duty taken from deposits and not yet in a recorded <a href="#" data-section="finance-excise" style="color:var(--accent-blue)">KRA remittance</a>; snapshots from before it was tracked show 0). <code>house_wallet</code> is shown separately. <code>difference</code> is cash minus liabilities minus the house wallet. It is not expected to be zero: it also holds gift and emoji sales not yet moved to the house wallet, M-Pesa charges, and timing between the hourly balance fetch and wallet movements. A daily snapshot is taken at 23:59 Nairobi time; <code>as_of</code> reads that day's snapshot.</p></div>
 <div class="endpoint-section"><h4>Query Parameters</h4>
 <table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
 <tr><td>as_of</td><td>date (Y-m-d)</td><td><span class="optional">Optional</span></td><td>Not in the future. Returns that day's snapshot. <code>404</code> if there is none. Omit for the live position</td></tr></table></div>
@@ -1717,10 +1723,10 @@ Content-Type: application/json
     },
     "liabilities": {
       "customer_wallets": 2000.00, "game_escrow": 40.00, "competition_escrow": 0.00, "stuck_escrow": 0.00,
-      "coin_liability": 0.00, "pending_holds": 0.00, "unmatched_deposits": 75.00, "total": 2115.00
+      "coin_liability": 0.00, "pending_holds": 0.00, "unmatched_deposits": 75.00, "excise_duty_payable": 25.00, "total": 2140.00
     },
     "house_wallet": 300.00,
-    "difference": 1085.00,
+    "difference": 1060.00,
     "notes": []
   }
 }</pre></div>
@@ -1734,7 +1740,7 @@ Content-Type: application/json
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
 <div class="endpoint-section"><h4>Description</h4>
-<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Debits and credits per account and entry type. Deposits, withdrawals and manual adjustments are single-sided in the ledger (the cash side is M-Pesa); every other entry is paired and must net to zero. <code>check.balanced</code> says whether it does, <code>check.imbalance</code> is the amount left over, and <code>imbalance_by_category</code> shows where it comes from. Coin entries are in coins, not KES, and are left out. <code>exclude_test</code> does not apply, because the check only holds over the whole ledger.</p></div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Debits and credits per account and entry type. Deposits, withdrawals, manual adjustments and excise duty (category <code>tax_withheld</code>, owed to KRA) are single-sided in the ledger (the cash side is M-Pesa); every other entry is paired and must net to zero. <code>check.balanced</code> says whether it does, <code>check.imbalance</code> is the amount left over, and <code>imbalance_by_category</code> shows where it comes from. Coin entries are in coins, not KES, and are left out. <code>exclude_test</code> does not apply, because the check only holds over the whole ledger.</p></div>
 <div class="endpoint-section"><h4>Query Parameters</h4>
 <table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
 <tr><td>from, to</td><td>date</td><td><span class="optional">Optional</span></td><td>See common parameters</td></tr></table></div>
@@ -1756,7 +1762,7 @@ Content-Type: application/json
 </div></div>
 
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/reconciliation</span><span class="endpoint-desc">16 pass/warn/fail controls over the ledger, wallets and payments</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/reconciliation</span><span class="endpoint-desc">20 pass/warn/fail controls over the ledger, wallets, payments and excise duty</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
 <div class="endpoint-section"><h4>Description</h4>
@@ -1774,6 +1780,10 @@ Content-Type: application/json
 <tr><td>unclassified_entries</td><td>warn</td><td>Ledger entries that have no wallet type</td></tr>
 <tr><td>unmatched_deposits</td><td>warn</td><td>Money received from unknown customers and not credited</td></tr>
 <tr><td>deposits_without_ledger</td><td>fail</td><td>Processed deposits that never reached the ledger (gift and emoji purchases are not expected to)</td></tr>
+<tr><td>deposits_without_excise_duty</td><td>fail</td><td>Plain wallet deposits credited in full while excise duty was on (from its start date). Passes with a note when excise duty is off</td></tr>
+<tr><td>excise_duty_amounts</td><td>fail</td><td>Each charge is 5% of the gross rounded to the cent, and gross = excise + net</td></tr>
+<tr><td>excise_duty_ledger</td><td>fail</td><td>Each charge matches its <code>excise_duty</code> ledger entry: same amount, and reversed only when the charge was reversed</td></tr>
+<tr><td>overdue_excise_duty</td><td>warn</td><td>Months whose excise duty is still unpaid after the 20th of the next month</td></tr>
 <tr><td>stuck_withdrawals</td><td>warn</td><td>Withdrawals pending longer than 24 hours</td></tr>
 <tr><td>failed_withdrawals_not_reversed</td><td>fail</td><td>A payout failed but the customer was not refunded</td></tr>
 <tr><td>stuck_escrow</td><td>warn</td><td>Money left in game or competition wallets that are no longer open</td></tr>
@@ -1781,7 +1791,7 @@ Content-Type: application/json
 <tr><td>negative_balances</td><td>fail</td><td>Any wallet with a negative balance</td></tr>
 <tr><td>house_cut_rates</td><td>warn</td><td>House cuts that differ from the fee schedule (only cuts linked to their transaction can be checked)</td></tr>
 <tr><td>mpesa_balance_freshness</td><td>warn</td><td>M-Pesa balances fetched in the last 3 hours</td></tr>
-<tr><td>cash_coverage</td><td>fail</td><td>M-Pesa cash covers everything owed to customers</td></tr></table></div>
+<tr><td>cash_coverage</td><td>fail</td><td>M-Pesa cash covers everything owed to customers and the excise duty owed to KRA</td></tr></table></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
 <pre>{
   "success": true,
@@ -1789,7 +1799,7 @@ Content-Type: application/json
     "generated_at": "2026-09-20T12:00:00+03:00",
     "meta": {},
     "status": "warn",
-    "counts": {"pass": 14, "warn": 2, "fail": 0},
+    "counts": {"pass": 18, "warn": 2, "fail": 0},
     "checks": [
       {
         "key": "unmatched_deposits", "title": "Deposits from unknown customers", "status": "warn",
@@ -1804,15 +1814,15 @@ Content-Type: application/json
 </div></div>
 
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/taxes</span><span class="endpoint-desc">Estimated tax for the period and net income after tax</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/taxes</span><span class="endpoint-desc">Excise duty charged, estimated other taxes and net income after tax</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
 <div class="endpoint-section"><h4>Description</h4>
-<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Applies the configured rate of each tax to its base for the period. <strong>All rates are off (0) until the server is configured</strong>, and <code>configured</code> is <code>false</code> until then; the bases are still shown. These are estimates for planning, not tax returns. Confirm rates and which taxes apply with your accountant or tax adviser.</p>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;"><code>excise_duty</code> is the <strong>actual</strong> duty taken from deposits in the period, net of reversals (<code>actual: true</code>); for what is due and paid each month use <a href="#" data-section="finance-excise" style="color:var(--accent-blue)">/finance/excise-duty/returns</a>. The other lines apply the configured rate of each tax to its base (<code>actual: false</code>). <strong>Those rates are off (0) until the server is configured</strong>, and <code>configured</code> is <code>false</code> until a rate is set or excise duty is on; the bases are still shown. The estimates are for planning, not tax returns. Confirm rates and which taxes apply with your accountant or tax adviser.</p>
 <table class="params-table"><tr><th>Tax</th><th>Base</th><th>Kind</th></tr>
-<tr><td>excise_duty</td><td>stakes in the period</td><td>expense (reduces net income after tax)</td></tr>
+<tr><td>excise_duty</td><td>gross wallet deposits charged in the period (actual duty, not an estimate)</td><td>pass_through (taken from customers and paid to KRA, not a cost)</td></tr>
 <tr><td>withholding_tax</td><td>winnings paid to customers</td><td>pass_through (collected and passed on, not a cost)</td></tr>
-<tr><td>income_tax</td><td>net income before tax, less the expense taxes above, never below zero</td><td>expense</td></tr></table></div>
+<tr><td>income_tax</td><td>net income before tax, less any expense taxes above, never below zero</td><td>expense</td></tr></table></div>
 <div class="endpoint-section"><h4>Query Parameters</h4>
 <table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
 <tr><td>from, to, exclude_test</td><td>&nbsp;</td><td><span class="optional">Optional</span></td><td>See common parameters. Stakes and winnings cover the period since the ledger began</td></tr></table></div>
@@ -1825,11 +1835,11 @@ Content-Type: application/json
     "configured": true,
     "net_income_before_tax": 6.00,
     "taxes": {
-      "excise_duty": {"label": "Excise duty on stakes", "base": "stakes", "kind": "expense", "rate": 0.02, "base_amount": 100.00, "estimated_amount": 2.00},
-      "withholding_tax": {"label": "Withholding tax on winnings", "base": "winnings", "kind": "pass_through", "rate": 0.2, "base_amount": 90.00, "estimated_amount": 18.00},
-      "income_tax": {"label": "Income tax on net income", "base": "net_income", "kind": "expense", "rate": 0.3, "base_amount": 4.00, "estimated_amount": 1.20}
+      "excise_duty": {"label": "Excise duty on deposits", "base": "deposits", "kind": "pass_through", "rate": 0.05, "base_amount": 500.00, "estimated_amount": 25.00, "actual": true},
+      "withholding_tax": {"label": "Withholding tax on winnings", "base": "winnings", "kind": "pass_through", "rate": 0.2, "base_amount": 90.00, "estimated_amount": 18.00, "actual": false},
+      "income_tax": {"label": "Income tax on net income", "base": "net_income", "kind": "expense", "rate": 0.3, "base_amount": 6.00, "estimated_amount": 1.80, "actual": false}
     },
-    "totals": {"expense_taxes": 3.20, "pass_through_taxes": 18.00, "net_income_after_tax": 2.80},
+    "totals": {"expense_taxes": 1.80, "pass_through_taxes": 43.00, "net_income_after_tax": 4.20},
     "notes": []
   }
 }</pre></div>
@@ -1989,7 +1999,7 @@ Content-Type: application/json
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
 <div class="endpoint-section"><h4>Description</h4>
-<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">The full audit trail of money movements, newest first. Entries for the house customer stay visible when <code>exclude_test</code> is on, because house cuts are real money. <code>category</code> is one of <code>cash_in</code>, <code>cash_out</code>, <code>stake</code>, <code>payout</code>, <code>house_revenue</code>, <code>refund</code>, <code>adjustment</code>, <code>transfer</code>, <code>escrow_movement</code>, <code>coin</code>, and includes each type's reversals.</p></div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">The full audit trail of money movements, newest first. Entries for the house customer stay visible when <code>exclude_test</code> is on, because house cuts are real money. <code>category</code> is one of <code>cash_in</code>, <code>cash_out</code>, <code>stake</code>, <code>payout</code>, <code>house_revenue</code>, <code>refund</code>, <code>adjustment</code>, <code>transfer</code>, <code>escrow_movement</code>, <code>coin</code>, <code>tax_withheld</code> (excise duty), and includes each type's reversals.</p></div>
 <div class="endpoint-section"><h4>Query Parameters</h4>
 <table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
 <tr><td>entry_type</td><td>string</td><td><span class="optional">Optional</span></td><td>e.g. <code>deposit</code>, <code>game_bet</code>, <code>house_cut</code>, <code>adjustment</code></td></tr>
@@ -2063,7 +2073,7 @@ Content-Type: application/json
   "data": {
     "summary": {"customer_wallets_total": 2580.00, "concentration": {"top_wallets": 10, "balance": 2580.00, "share_percent": 100.0}},
     "items": [
-      {"customer_id": 900, "customer_name": "Alice Wanjiru", "deposited": 500.00, "withdrawn": 0.00, "staked": 100.00, "won": 0.00, "refunded": 0.00, "net_gaming": -100.00, "balance": 1400.00}
+      {"customer_id": 900, "customer_name": "Alice Wanjiru", "deposited": 500.00, "excise_paid": 25.00, "withdrawn": 0.00, "staked": 100.00, "won": 0.00, "refunded": 0.00, "net_gaming": -100.00, "balance": 1400.00}
     ]
   }
 }</pre></div>
@@ -2205,6 +2215,199 @@ Idempotency-Key: expense-inv-1001
 </div></div>
 </div>
 
+<!-- FINANCE EXCISE DUTY SECTION -->
+<div class="doc-section" data-section="finance-excise">
+<button class="expand-all" onclick="toggleAll('finance-excise')">Expand / Collapse All</button>
+<div class="callback-note">Excise duty of <strong>5%</strong> is taken from every plain M-Pesa deposit into a customer wallet (C2B confirmation, STK deposits and <code>POST /deposits</code>). A KES 100 deposit is credited in full, then KES 5.00 is debited as <code>excise_duty</code>, leaving KES 95.00. The duty is rounded half up to the cent and there is no minimum deposit. Coin loads, gifts, emoji and deposits from unknown customers are not charged. The duty is <strong>not revenue</strong>: it is held as <code>excise_duty_payable</code> on the balance sheet until you pay KRA and record a remittance. Returns and payment are due by the <strong>20th of the following month</strong>. Excise duty is switched on and dated on the server (<code>FINANCE_EXCISE_DUTY_ENABLED</code>, <code>FINANCE_EXCISE_DUTY_EFFECTIVE_FROM</code>); deposits before the start date are never charged. The rate is saved on each charge.</div>
+<div class="callback-note">The summary and charges list follow <code>exclude_test</code> like other reports. The payable amount, monthly returns and remittances always cover every customer, because that is what is owed to KRA. When a deposit is refunded, its excise duty is given back unless it has already been remitted. All <code>GET</code> endpoints are rate-limited to 20 requests/minute and can be downloaded as CSV from <a href="#" data-section="finance-export" style="color:var(--accent-blue)">/finance/export/{report}</a>.</div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/excise-duty</span><span class="endpoint-desc">Excise duty charged, reversed and remitted, with what is still owed</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;"><code>excise_charged</code> is every charge made in the period, <code>excise_reversed</code> the part later given back, and <code>excise_net</code> what is owed for the period. <code>excise_remitted</code> is what was paid to KRA in the period, by payment date, whatever period the payment covered. <code>payable.outstanding</code> is every charge not yet in a remittance, from all time.</p></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>from, to, group_by, exclude_test</td><td>&nbsp;</td><td><span class="optional">Optional</span></td><td>See common parameters</td></tr></table></div>
+<div class="endpoint-section"><h4>Request</h4>
+<pre>GET /api/v1/finance/excise-duty?from=2026-09-01&amp;to=2026-09-20&amp;group_by=week HTTP/1.1
+Host: api.kadi-kings.co.ke
+X-API-KEY: your-api-key-here</pre></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "generated_at": "2026-09-20T12:00:00+03:00",
+    "meta": {},
+    "enabled": true,
+    "rate": 0.05,
+    "effective_from": "2026-09-01",
+    "totals": {"deposits": 2, "gross_deposits": 300.00, "excise_charged": 15.00, "excise_reversed": 0.00, "excise_net": 15.00, "excise_remitted": 0.00},
+    "payable": {"outstanding": 15.00, "oldest_unremitted_at": "2026-09-20T10:00:00+03:00"},
+    "series": [
+      {"period": "2026-09-14", "deposits": 2, "gross_deposits": 300.00, "excise_charged": 15.00, "excise_reversed": 0.00, "excise_net": 15.00, "excise_remitted": 0.00}
+    ],
+    "notes": []
+  }
+}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/excise-duty/charges</span><span class="endpoint-desc">Excise duty per deposit</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>from, to, exclude_test</td><td>&nbsp;</td><td><span class="optional">Optional</span></td><td>Matched against when the customer paid (<code>charged_at</code>)</td></tr>
+<tr><td>status</td><td>string</td><td><span class="optional">Optional</span></td><td><code>charged</code>, <code>reversed</code>, <code>remitted</code> (in a KRA payment) or <code>unremitted</code> (charged and still owed). Default: all</td></tr>
+<tr><td>customer_id</td><td>integer</td><td><span class="optional">Optional</span></td><td>One customer</td></tr>
+<tr><td>page, per_page</td><td>integer</td><td><span class="optional">Optional</span></td><td>Default 50, maximum 200</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "generated_at": "2026-09-20T12:00:00+03:00",
+    "meta": {},
+    "summary": {
+      "charges": 1, "gross_deposits": 100.00, "excise": 5.00,
+      "by_status": {"charged": {"charges": 1, "gross_deposits": 100.00, "excise": 5.00}},
+      "unremitted": {"charges": 1, "excise": 5.00}
+    },
+    "items": [
+      {"id": 12, "charged_at": "2026-09-20T10:00:00+03:00", "deposit_id": 71, "trans_id": "SIA12345", "customer_id": 900, "customer_name": "Alice Wanjiru", "msisdn": "2547****5678", "gross_amount": 100.00, "rate": 0.05, "excise_amount": 5.00, "net_amount": 95.00, "status": "charged", "remittance_id": null, "kra_reference": null}
+    ],
+    "pagination": {"page": 1, "per_page": 50, "total": 1, "last_page": 1}
+  }
+}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/excise-duty/returns</span><span class="endpoint-desc">Monthly returns: due, paid, outstanding and due date</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">One row per calendar month the range touches, covering the whole month and every customer. <code>excise_due</code> is charged minus reversed, <code>excise_remitted</code> is the part already in a recorded remittance, and <code>outstanding</code> is what is left. <code>overdue</code> is true once the due date (the 20th of the next month) has passed with money still outstanding. File the KRA return from this report.</p></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>from, to</td><td>date</td><td><span class="optional">Optional</span></td><td>Any day in the first and last month. Default: this month</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "generated_at": "2026-09-20T12:00:00+03:00",
+    "meta": {},
+    "filing_day": 20,
+    "payable": 18.00,
+    "items": [
+      {"period": "2026-08", "period_start": "2026-08-01", "period_end": "2026-08-31", "due_date": "2026-09-20", "charges": 2, "gross_deposits": 300.00, "excise_charged": 15.00, "excise_reversed": 0.00, "excise_due": 15.00, "excise_remitted": 15.00, "outstanding": 0.00, "overdue": false},
+      {"period": "2026-09", "period_start": "2026-09-01", "period_end": "2026-09-30", "due_date": "2026-10-20", "charges": 1, "gross_deposits": 60.00, "excise_charged": 3.00, "excise_reversed": 0.00, "excise_due": 3.00, "excise_remitted": 0.00, "outstanding": 3.00, "overdue": false}
+    ]
+  }
+}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/finance/excise-duty/remittances</span><span class="endpoint-desc">Record a payment to KRA</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">30/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Record it after paying KRA. Every charge in the period that is not yet in a remittance is attached to this one, and <code>amount_due</code> is their total. <code>amount_paid</code> is what you actually paid; <code>difference</code> is paid minus due. Attached charges are no longer counted in <code>excise_duty_payable</code>, and their excise duty can no longer be given back on a refund. A remittance is never edited or deleted: void a wrong one and record it again.</p></div>
+<div class="endpoint-section"><h4>Request Body</h4>
+<table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>period_start</td><td>date (Y-m-d)</td><td><span class="required">Required</span></td><td>First day covered, today or earlier. Usually the 1st of the month</td></tr>
+<tr><td>period_end</td><td>date (Y-m-d)</td><td><span class="required">Required</span></td><td>Last day covered, not before <code>period_start</code> and not in the future</td></tr>
+<tr><td>amount_paid</td><td>numeric</td><td><span class="required">Required</span></td><td>KES paid to KRA, greater than 0</td></tr>
+<tr><td>kra_reference</td><td>string</td><td><span class="required">Required</span></td><td>Up to 100 characters, for example the payment registration number. Can be used by only one active remittance; reusable once that one is voided</td></tr>
+<tr><td>paid_at</td><td>date (Y-m-d)</td><td><span class="optional">Optional</span></td><td>When it was paid, today or earlier. Default: now. Cash flow shows the payment on this date</td></tr></table></div>
+<div class="endpoint-section"><h4>Request</h4>
+<pre>POST /api/v1/finance/excise-duty/remittances HTTP/1.1
+Host: api.kadi-kings.co.ke
+X-API-KEY: your-api-key-here
+Content-Type: application/json
+Idempotency-Key: excise-2026-08
+
+{
+  "period_start": "2026-08-01",
+  "period_end": "2026-08-31",
+  "amount_paid": 15.00,
+  "kra_reference": "PRN2026080001",
+  "paid_at": "2026-09-18"
+}</pre></div>
+<div class="endpoint-section"><h4>Response (201)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "id": 3, "period_start": "2026-08-01", "period_end": "2026-08-31", "charges": 2,
+    "amount_due": 15.00, "amount_paid": 15.00, "difference": 0.00, "kra_reference": "PRN2026080001",
+    "paid_at": "2026-09-18T00:00:00+03:00", "status": "active", "recorded_by": "api_key:4",
+    "voided_at": null, "voided_by": null, "void_reason": null
+  }
+}</pre></div>
+<div class="endpoint-section"><h4>Error Responses</h4>
+<pre>// 422 - nothing left to remit in the period
+{"success": false, "message": "There is no unremitted excise duty in that period."}
+
+// 422 - e.g. future period, amount 0, or KRA reference already used
+{"message": "The kra reference has already been taken.", "errors": {"kra_reference": ["The kra reference has already been taken."]}}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/finance/excise-duty/remittances/{encryptedIdentifier}/void</span><span class="endpoint-desc">Void a remittance with a reason</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">30/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">The remittance stays on record, flagged as voided with who and when. Its charges are detached and count as owed again, so the right payment can be recorded.</p></div>
+<div class="endpoint-section"><h4>Request Body</h4>
+<table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>reason</td><td>string</td><td><span class="required">Required</span></td><td>3 to 255 characters</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "id": 3, "period_start": "2026-08-01", "period_end": "2026-08-31", "charges": 0,
+    "amount_due": 15.00, "amount_paid": 15.00, "difference": 0.00, "kra_reference": "PRN2026080001",
+    "status": "voided", "recorded_by": "api_key:4",
+    "voided_at": "2026-09-20T13:05:00+03:00", "voided_by": "api_key:4", "void_reason": "wrong period"
+  }
+}</pre></div>
+<div class="endpoint-section"><h4>Error Responses</h4>
+<pre>// 404
+{"success": false, "message": "Remittance not found"}
+
+// 409 - already voided
+{"success": false, "message": "Remittance is already voided"}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/excise-duty/remittances</span><span class="endpoint-desc">List payments to KRA</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>from, to</td><td>date</td><td><span class="optional">Optional</span></td><td>Remittances whose period overlaps the range</td></tr>
+<tr><td>status</td><td>string</td><td><span class="optional">Optional</span></td><td><code>active</code> (default), <code>voided</code> or <code>all</code></td></tr>
+<tr><td>page, per_page</td><td>integer</td><td><span class="optional">Optional</span></td><td>Default 50, maximum 200</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "generated_at": "2026-09-20T13:10:00+03:00",
+    "meta": {},
+    "summary": {
+      "active": {"remittances": 1, "amount_due": 15.00, "amount_paid": 15.00},
+      "voided": {"remittances": 0, "amount_due": 0.00, "amount_paid": 0.00},
+      "payable": 3.00
+    },
+    "items": [
+      {"id": 3, "period_start": "2026-08-01", "period_end": "2026-08-31", "charges": 2, "amount_due": 15.00, "amount_paid": 15.00, "difference": 0.00, "kra_reference": "PRN2026080001", "paid_at": "2026-09-18T00:00:00+03:00", "status": "active", "recorded_by": "api_key:4", "created_at": "2026-09-18T09:00:00+03:00", "voided_at": null, "voided_by": null, "void_reason": null}
+    ],
+    "pagination": {"page": 1, "per_page": 50, "total": 1, "last_page": 1}
+  }
+}</pre></div>
+</div></div>
+</div>
+
 <!-- FINANCE EXPORT SECTION -->
 <div class="doc-section" data-section="finance-export">
 <div class="endpoint">
@@ -2227,7 +2430,12 @@ Idempotency-Key: expense-inv-1001
 <tr><td>income-statement</td><td>/finance/income-statement</td><td>One per period (includes expenses and net income)</td></tr>
 <tr><td>trial-balance</td><td>/finance/trial-balance</td><td>One per account and entry type</td></tr>
 <tr><td>expenses</td><td>/finance/expenses</td><td>One per expense</td></tr>
-<tr><td>taxes</td><td>/finance/taxes</td><td>One per tax</td></tr></table>
+<tr><td>taxes</td><td>/finance/taxes</td><td>One per tax</td></tr>
+<tr><td>excise-duty</td><td>/finance/excise-duty</td><td>One per period</td></tr>
+<tr><td>excise-duty-charges</td><td>/finance/excise-duty/charges</td><td>One per charged deposit</td></tr>
+<tr><td>excise-duty-returns</td><td>/finance/excise-duty/returns</td><td>One per month</td></tr>
+<tr><td>excise-duty-remittances</td><td>/finance/excise-duty/remittances</td><td>One per KRA payment</td></tr></table>
+<p style="color:var(--text-secondary);font-size:13px;margin-top:8px;">The <code>cash-flow</code> export has <code>excise_withheld</code> and <code>excise_remitted</code> columns before <code>net_cash</code>.</p>
 <p style="color:var(--text-secondary);font-size:13px;margin-top:8px;">The customer statement cannot be exported yet.</p></div>
 <div class="endpoint-section"><h4>Request</h4>
 <pre>GET /api/v1/finance/export/deposits?from=2026-09-01&amp;to=2026-09-20&amp;status=2 HTTP/1.1
@@ -2466,6 +2674,7 @@ var sectionTitles = {
     'finance-statements': { title: 'Financial Statements', desc: 'Summary, income statement, cash flow, balance sheet, trial balance, reconciliation and taxes' },
     'finance-reports': { title: 'Finance Drill-downs', desc: 'Deposits, withdrawals, purchases, games, competitions, ledger, adjustments and customer reports' },
     'finance-expenses': { title: 'Expenses', desc: 'Record, void and list operating expenses' },
+    'finance-excise': { title: 'Excise Duty', desc: 'Excise duty taken from deposits, monthly returns and payments to KRA' },
     'finance-export': { title: 'CSV Export', desc: 'Download any finance report as a CSV file' },
     'utilities': { title: 'Utilities', desc: 'Encrypt/decrypt identifiers and test endpoints' },
     'playground': { title: 'Playground', desc: 'Test and demo endpoints for encryption/decryption' },

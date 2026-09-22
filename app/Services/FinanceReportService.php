@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\CompetitionTransaction;
 use App\Models\Deposit;
+use App\Models\ExciseDutyCharge;
 use App\Models\FinancialSnapshot;
 use App\Models\GameTransaction;
 use App\Models\LedgerEntry;
@@ -22,6 +23,7 @@ class FinanceReportService
         private ChartOfAccounts $chart,
         private FinanceSnapshotService $snapshots,
         private FinanceExpenseService $expenses,
+        private ExciseDutyReportService $exciseDuty,
     ) {}
 
     /**
@@ -117,6 +119,7 @@ class FinanceReportService
     /**
      * Money in and out through M-Pesa. Cash in comes from incoming payments (what was actually paid),
      * split by what the payment bought; cash out from outgoing payments by disbursement status.
+     * Excise duty withheld from deposits is shown apart; only what was paid to KRA leaves net cash.
      *
      * @return array{totals: array<string, mixed>, series: list<array<string, mixed>>}
      */
@@ -125,6 +128,7 @@ class FinanceReportService
         $template = fn () => [
             'cash_in' => array_fill_keys(self::CASH_IN_KINDS, 0.0) + ['total' => 0.0],
             'cash_out' => ['paid' => 0.0, 'pending' => 0.0, 'failed' => 0.0],
+            'excise_duty' => ['withheld' => 0.0, 'remitted' => 0.0],
         ];
 
         $series = [];
@@ -151,6 +155,16 @@ class FinanceReportService
             $series[$bucket]['cash_out'][$status] += (float) $row->amount;
         }
 
+        foreach ($this->exciseDuty->chargeRows($range) as $row) {
+            if ($row->status === ExciseDutyCharge::STATUS_CHARGED) {
+                $series[$this->bucket($range, $row->day)]['excise_duty']['withheld'] += (float) $row->excise;
+            }
+        }
+
+        foreach ($this->exciseDuty->remittanceRows($range) as $row) {
+            $series[$this->bucket($range, $row->day)]['excise_duty']['remitted'] += (float) $row->amount;
+        }
+
         $totals = $template();
         $list = [];
         foreach ($series as $bucket => $figures) {
@@ -160,14 +174,27 @@ class FinanceReportService
             foreach ($figures['cash_out'] as $key => $value) {
                 $totals['cash_out'][$key] += $value;
             }
+            foreach ($figures['excise_duty'] as $key => $value) {
+                $totals['excise_duty'][$key] += $value;
+            }
 
-            $list[] = ['period' => $bucket] + $figures + ['net_cash' => $figures['cash_in']['total'] - $figures['cash_out']['paid']];
+            $list[] = ['period' => $bucket] + $figures + ['net_cash' => $this->netCash($figures)];
         }
 
         return $this->rounded([
-            'totals' => $totals + ['net_cash' => $totals['cash_in']['total'] - $totals['cash_out']['paid']],
+            'totals' => $totals + ['net_cash' => $this->netCash($totals)],
             'series' => $list,
         ]);
+    }
+
+    /**
+     * Cash received less withdrawals paid out and excise duty paid to KRA.
+     *
+     * @param  array{cash_in: array<string, float>, cash_out: array<string, float>, excise_duty: array<string, float>}  $figures
+     */
+    private function netCash(array $figures): float
+    {
+        return $figures['cash_in']['total'] - $figures['cash_out']['paid'] - $figures['excise_duty']['remitted'];
     }
 
     /**
@@ -282,7 +309,7 @@ class FinanceReportService
 
             $position = $snapshot->only([
                 'customer_wallets_total', 'house_wallet_balance', 'game_escrow_total', 'competition_escrow_total',
-                'stuck_escrow_total', 'coin_liability', 'pending_holds_total', 'unmatched_deposits_total', 'mpesa_balances',
+                'stuck_escrow_total', 'coin_liability', 'pending_holds_total', 'unmatched_deposits_total', 'excise_duty_payable', 'mpesa_balances',
             ]);
             $source = 'snapshot';
             $date = $asOf;
@@ -304,6 +331,7 @@ class FinanceReportService
             'coin_liability' => (float) $position['coin_liability'],
             'pending_holds' => (float) $position['pending_holds_total'],
             'unmatched_deposits' => (float) $position['unmatched_deposits_total'],
+            'excise_duty_payable' => (float) $position['excise_duty_payable'],
         ];
         $totalLiabilities = array_sum($liabilities);
         $house = (float) $position['house_wallet_balance'];
@@ -318,6 +346,7 @@ class FinanceReportService
             'notes' => [
                 'difference is cash minus everything owed to customers minus the house wallet. It is not zero by design: it also holds gift and emoji sales not yet moved to the house wallet, M-Pesa charges, and timing between the hourly balance fetch and wallet movements.',
                 'Test customers are excluded from customer wallets and coin liability.',
+                'excise_duty_payable is duty taken from deposits and owed to KRA until a remittance is recorded. Snapshots taken before it was tracked show 0.',
             ],
         ]);
     }

@@ -227,6 +227,7 @@ class FinanceLedgerReportService
      *
      * Filters: sort (net_gaming, deposited, staked, won, withdrawn, balance), limit (default 10).
      * net_gaming is winnings plus refunds minus stakes: positive means the customer is up.
+     * deposited is the gross deposit; excise_paid is the duty taken from it.
      *
      * @param  array<string, string>  $filters
      */
@@ -250,6 +251,7 @@ class FinanceLedgerReportService
         $staked = $sum('stake', 'debit');
         $won = $sum('payout', 'credit');
         $refunded = $sum('refund', 'credit');
+        $excisePaid = $sum('tax_withheld', 'debit');
 
         $rows = DB::table('ledger_entries as l')
             ->join('wallets as w', 'w.id', '=', 'l.wallet_id')
@@ -259,7 +261,7 @@ class FinanceLedgerReportService
             ->whereNotNull('l.customer_id')
             ->whereBetween('l.created_at', [$range->from, $range->to])
             ->when($excluded !== [], fn (Builder $query) => $query->whereNotIn('l.customer_id', $excluded))
-            ->selectRaw("l.customer_id, c.name as customer_name, w.balance as balance, {$deposited} as deposited, {$withdrawn} as withdrawn, {$staked} as staked, {$won} as won, {$refunded} as refunded, ({$won} + {$refunded} - {$staked}) as net_gaming")
+            ->selectRaw("l.customer_id, c.name as customer_name, w.balance as balance, {$deposited} as deposited, {$excisePaid} as excise_paid, {$withdrawn} as withdrawn, {$staked} as staked, {$won} as won, {$refunded} as refunded, ({$won} + {$refunded} - {$staked}) as net_gaming")
             ->groupBy('l.customer_id', 'c.name', 'w.balance')
             ->orderByDesc($sort)
             ->orderBy('l.customer_id')
@@ -289,6 +291,7 @@ class FinanceLedgerReportService
                 'customer_id' => (int) $row->customer_id,
                 'customer_name' => $row->customer_name,
                 'deposited' => $this->money($row->deposited),
+                'excise_paid' => $this->money($row->excise_paid),
                 'withdrawn' => $this->money($row->withdrawn),
                 'staked' => $this->money($row->staked),
                 'won' => $this->money($row->won),
@@ -297,7 +300,7 @@ class FinanceLedgerReportService
                 'balance' => $this->money($row->balance),
             ],
             $summary,
-            ['customer_id', 'customer_name', 'deposited', 'withdrawn', 'staked', 'won', 'refunded', 'net_gaming', 'balance'],
+            ['customer_id', 'customer_name', 'deposited', 'excise_paid', 'withdrawn', 'staked', 'won', 'refunded', 'net_gaming', 'balance'],
         );
     }
 

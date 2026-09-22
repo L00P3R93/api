@@ -129,7 +129,7 @@ it('exports the statements as flat rows', function () {
     Purchase::create(['customer_id' => 900, 'deposit_id' => $gift->id, 'purchase_type' => 'gift', 'amount' => 100, 'value' => 0]);
 
     $cash = downloadCsv($this, 'cash-flow?from=2026-09-19&to=2026-09-20');
-    expect($cash['header'])->toBe(['period', 'wallet_deposit', 'load', 'gift', 'emoji', 'unmatched', 'other', 'cash_in_total', 'paid', 'pending', 'failed', 'net_cash']);
+    expect($cash['header'])->toBe(['period', 'wallet_deposit', 'load', 'gift', 'emoji', 'unmatched', 'other', 'cash_in_total', 'paid', 'pending', 'failed', 'excise_withheld', 'excise_remitted', 'net_cash']);
     expect(array_column($cash['rows'], 'period'))->toBe(['2026-09-19', '2026-09-20']);
     expect($cash['rows'][1])->toMatchArray(['wallet_deposit' => '500', 'gift' => '100', 'cash_in_total' => '600', 'net_cash' => '600']);
 
