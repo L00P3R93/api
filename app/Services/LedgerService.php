@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Coin;
 use App\Models\CompetitionTransaction;
 use App\Models\CompetitionWallet;
+use App\Models\Deposit;
 use App\Models\GameWallet;
 use App\Models\LedgerEntry;
 use App\Models\PendingBalance;
@@ -33,6 +34,28 @@ class LedgerService
             credit: $amount,
             balanceBefore: $balanceBefore,
             balanceAfter: $wallet->balance
+        );
+    }
+
+    /**
+     * Take excise duty from a wallet that was just credited with a deposit.
+     */
+    public function recordExciseDuty(Deposit $deposit, Wallet $wallet, float $amount, float $rate): LedgerEntry
+    {
+        $balanceBefore = $wallet->balance;
+        $wallet->balance -= $amount;
+        $wallet->save();
+
+        return $this->createEntry(
+            entryType: 'excise_duty',
+            referenceable: $deposit,
+            wallet: $wallet,
+            customerId: $wallet->customer_id,
+            debit: $amount,
+            credit: 0,
+            balanceBefore: $balanceBefore,
+            balanceAfter: $wallet->balance,
+            metadata: ['deposit_id' => $deposit->id, 'rate' => $rate, 'gross_amount' => (float) $deposit->trans_amount]
         );
     }
 
@@ -521,7 +544,7 @@ class LedgerService
         }
 
         return match ($entry->entry_type) {
-            'deposit', 'withdrawal', 'wallet_transfer', 'refund', 'house_cut',
+            'deposit', 'excise_duty', 'withdrawal', 'wallet_transfer', 'refund', 'house_cut',
             'game_payout', 'competition_payout', 'adjustment' => LedgerEntry::WALLET_TYPE_WALLET,
             'game_bet' => match (true) {
                 isset($metadata['customer_wallet_id']) => LedgerEntry::WALLET_TYPE_GAME,

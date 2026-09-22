@@ -19,6 +19,8 @@ class WalletWebhookService
      */
     private const REASON_MAP = [
         'deposit' => 'deposit',
+        'excise_duty' => 'deposit',
+        'excise_duty_reversal' => 'deposit',
         'withdrawal' => 'withdrawal',
         'withdrawal_reversal' => 'withdrawal_reversal',
         'game_bet' => 'game',

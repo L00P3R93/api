@@ -8,13 +8,16 @@ use App\Http\Resources\DepositResource;
 use App\Models\Customer;
 use App\Models\Deposit;
 use App\Models\Wallet;
+use App\Services\ExciseDutyService;
 use App\Services\LedgerService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 class DepositController extends Controller
 {
     public function __construct(
-        private LedgerService $ledgerService
+        private LedgerService $ledgerService,
+        private ExciseDutyService $exciseDutyService,
     ) {}
 
     /**
@@ -70,28 +73,34 @@ class DepositController extends Controller
             ], 404);
         }
 
-        // Retrieve or create a wallet for the customer
-        $wallet = Wallet::firstOrCreate(
-            ['customer_id' => $customer->id],
-            ['balance' => 0]
-        );
+        // Credit, excise duty and transaction row are written together or not at all.
+        [$wallet, $transaction, $ledgerEntry] = DB::transaction(function () use ($customer, $deposit, $amount) {
+            $wallet = Wallet::firstOrCreate(
+                ['customer_id' => $customer->id],
+                ['balance' => 0]
+            );
+            $wallet = Wallet::lockForUpdate()->find($wallet->id);
 
-        // Record deposit via ledger (handles balance update + ledger entry)
-        $ledgerEntry = $this->ledgerService->recordDeposit($deposit, $wallet, (float) $amount);
+            // Record deposit via ledger (handles balance update + ledger entry)
+            $ledgerEntry = $this->ledgerService->recordDeposit($deposit, $wallet, (float) $amount);
 
-        // Create a Transaction record
-        $transaction = $wallet->transactions()->create([
-            'payment_id' => $deposit->id,
-            'payment_ref' => $deposit->trans_id,
-            'payment_type' => Deposit::class,
-            'amount' => $amount,
-            'status' => 2,
-            'balance_before' => $ledgerEntry->balance_before,
-            'balance_after' => $ledgerEntry->balance_after,
-        ]);
+            $exciseDutyCharge = $this->exciseDutyService->chargeIfApplicable($deposit, $wallet, ExciseDutyService::KIND_WALLET_DEPOSIT);
 
-        // Update deposit status to Completed
-        $deposit->update(['status' => '2']);
+            $transaction = $wallet->transactions()->create([
+                'payment_id' => $deposit->id,
+                'payment_ref' => $deposit->trans_id,
+                'payment_type' => Deposit::class,
+                'amount' => $exciseDutyCharge?->net_amount ?? $amount,
+                'status' => 2,
+                'balance_before' => $ledgerEntry->balance_before,
+                'balance_after' => $wallet->balance,
+            ]);
+
+            // Update deposit status to Completed
+            $deposit->update(['status' => '2']);
+
+            return [$wallet, $transaction, $ledgerEntry];
+        });
 
         return response()->json([
             'message' => 'Deposit successful',

@@ -134,6 +134,34 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Excise Duty on Deposits
+    |--------------------------------------------------------------------------
+    |
+    | Excise duty taken from each M-Pesa deposit into a customer wallet. The
+    | wallet is credited with the gross amount, then debited with the duty, so
+    | the customer keeps gross - round(gross * rate, 2). The duty is held as a
+    | liability (excise duty payable) until it is paid to KRA, never as revenue.
+    |
+    | enabled         off until finance switches it on.
+    | rate            fraction of the gross deposit (0.05 is 5%). Saved on each charge.
+    | effective_from  first day (app timezone, Y-m-d) deposits are charged.
+    |                 Deposits made before it are never charged.
+    | applies_to      deposit kinds that are charged. wallet_deposit is a plain
+    |                 deposit to the wallet. Coin loads, gifts and emoji are not.
+    | filing_day      day of the next month the return and payment are due.
+    |
+    */
+
+    'excise_duty' => [
+        'enabled' => (bool) env('FINANCE_EXCISE_DUTY_ENABLED', false),
+        'rate' => (float) env('FINANCE_EXCISE_DUTY_RATE', 0.05),
+        'effective_from' => env('FINANCE_EXCISE_DUTY_EFFECTIVE_FROM'),
+        'applies_to' => ['wallet_deposit'],
+        'filing_day' => 20,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | List Reports
     |--------------------------------------------------------------------------
     |
@@ -208,7 +236,7 @@ return [
     |                in "_reversal" takes the category of the entry it reverses.
     |
     | Categories: cash_in, cash_out, stake, payout, house_revenue, refund,
-    | adjustment, transfer, escrow_movement, coin.
+    | adjustment, transfer, escrow_movement, coin, tax_withheld.
     |
     */
 
@@ -222,6 +250,7 @@ return [
 
     'entry_types' => [
         'deposit' => 'cash_in',
+        'excise_duty' => 'tax_withheld',
         'withdrawal' => 'cash_out',
         'game_bet' => 'stake',
         'competition_bet' => 'stake',

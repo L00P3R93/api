@@ -1,0 +1,41 @@
+<?php
+
+namespace Database\Factories;
+
+use App\Models\ExciseDutyRemittance;
+use Illuminate\Database\Eloquent\Factories\Factory;
+
+/**
+ * @extends Factory<ExciseDutyRemittance>
+ */
+class ExciseDutyRemittanceFactory extends Factory
+{
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        $amount = fake()->randomFloat(2, 100, 50000);
+
+        return [
+            'period_start' => now()->subMonthNoOverflow()->startOfMonth()->toDateString(),
+            'period_end' => now()->subMonthNoOverflow()->endOfMonth()->toDateString(),
+            'amount_due' => $amount,
+            'amount_paid' => $amount,
+            'kra_reference' => strtoupper(fake()->bothify('PRN##########')),
+            'paid_at' => now(),
+            'recorded_by' => 'api_key:1',
+        ];
+    }
+
+    public function voided(string $reason = 'entered in error'): static
+    {
+        return $this->state(fn () => [
+            'voided_at' => now(),
+            'voided_by' => 'api_key:1',
+            'void_reason' => $reason,
+        ]);
+    }
+}

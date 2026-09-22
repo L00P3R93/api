@@ -21,6 +21,8 @@ class ResetFinancialData extends Command
      * @var list<string>
      */
     public const TABLES_TO_WIPE = [
+        'excise_duty_charges',
+        'excise_duty_remittances',
         'ledger_entries',
         'pending_balances',
         'outgoing_payments',
