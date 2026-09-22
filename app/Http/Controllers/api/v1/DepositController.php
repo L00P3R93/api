@@ -25,7 +25,7 @@ class DepositController extends Controller
      */
     public function index()
     {
-        return DepositResource::collection(Deposit::all());
+        return DepositResource::collection(Deposit::with('exciseDutyCharge')->get());
     }
 
     /**

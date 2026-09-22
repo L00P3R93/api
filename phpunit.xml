@@ -33,5 +33,8 @@
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="OPENSSL_KEY" value="a9378f354771d2bdf46c1fd1b5bcaf38"/>
         <env name="OPENSSL_METHOD" value="AES-128-CBC"/>
+        <env name="FINANCE_EXCISE_DUTY_ENABLED" value="false"/>
+        <env name="FINANCE_EXCISE_DUTY_EFFECTIVE_FROM" value=""/>
+        <env name="FINANCE_TEST_CUSTOMER_IDS" value=""/>
     </php>
 </phpunit>

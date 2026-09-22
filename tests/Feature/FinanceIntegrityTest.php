@@ -352,8 +352,16 @@ it('excludes the configured test customers from the customer scope', function ()
     expect($ids)->toContain($real->id);
 });
 
-it('defaults the test customer list to the historic id below 500 rule', function () {
-    expect(config('finance.test_customer_ids'))->toBe(range(1, 500));
+it('has no test customers by default', function () {
+    expect(config('finance.test_customer_ids'))->toBe([]);
+});
+
+it('leaves every customer in the customer scope when there are no test customers', function () {
+    config(['finance.test_customer_ids' => []]);
+
+    $customer = Customer::factory()->create(['id' => 5]);
+
+    expect(Customer::excludingTest()->pluck('id'))->toContain($customer->id);
 });
 
 // wallet_version (webhook balance_version source)

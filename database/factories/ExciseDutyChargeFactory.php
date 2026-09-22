@@ -27,11 +27,11 @@ class ExciseDutyChargeFactory extends Factory
         $excise = round($gross * $rate, 2);
 
         return [
-            'deposit_id' => fn () => Deposit::create([
+            'deposit_id' => fn (array $attributes) => Deposit::create([
                 'trans_id' => strtoupper(Str::random(10)),
                 'trans_type' => 'Pay Bill',
                 'trans_time' => now(),
-                'trans_amount' => $gross,
+                'trans_amount' => $attributes['gross_amount'],
                 'short_code' => '12345',
                 'bill_ref_no' => 'EXCISE',
                 'msisdn' => '254712345678',

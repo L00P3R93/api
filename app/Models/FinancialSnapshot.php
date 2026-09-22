@@ -21,6 +21,7 @@ class FinancialSnapshot extends Model
         'coin_liability',
         'pending_holds_total',
         'unmatched_deposits_total',
+        'excise_duty_payable',
         'mpesa_balances',
         'taken_at',
     ];
@@ -40,6 +41,7 @@ class FinancialSnapshot extends Model
             'coin_liability' => 'decimal:2',
             'pending_holds_total' => 'decimal:2',
             'unmatched_deposits_total' => 'decimal:2',
+            'excise_duty_payable' => 'decimal:2',
             'mpesa_balances' => 'array',
             'taken_at' => 'datetime',
         ];

@@ -22,6 +22,7 @@ use App\Http\Controllers\api\v1\DepositController;
 use App\Http\Controllers\api\v1\DropConnectionController;
 use App\Http\Controllers\api\v1\EmailVerifiedController;
 use App\Http\Controllers\api\v1\EncryptIdentifierController;
+use App\Http\Controllers\api\v1\ExciseDutyController;
 use App\Http\Controllers\api\v1\FinanceDrilldownController;
 use App\Http\Controllers\api\v1\FinanceExpenseController;
 use App\Http\Controllers\api\v1\FinanceExportController;
@@ -121,6 +122,12 @@ Route::prefix('/v1')->group(function () {
                 Route::get('/taxes', [FinanceReportController::class, 'taxes']);
                 Route::get('/expenses', [FinanceDrilldownController::class, 'expenses']);
 
+                // Excise duty on deposits
+                Route::get('/excise-duty', [ExciseDutyController::class, 'summary']);
+                Route::get('/excise-duty/charges', [ExciseDutyController::class, 'charges']);
+                Route::get('/excise-duty/returns', [ExciseDutyController::class, 'returns']);
+                Route::get('/excise-duty/remittances', [ExciseDutyController::class, 'remittances']);
+
                 // Drill-downs and CSV export
                 Route::get('/deposits', [FinanceDrilldownController::class, 'deposits']);
                 Route::get('/withdrawals', [FinanceDrilldownController::class, 'withdrawals']);
@@ -136,6 +143,7 @@ Route::prefix('/v1')->group(function () {
 
         // Finance: record an expense
         Route::post('/finance/expenses', [FinanceExpenseController::class, 'store'])->middleware(['idempotency', 'throttle:write']);
+        Route::post('/finance/excise-duty/remittances', [ExciseDutyController::class, 'store'])->middleware(['idempotency', 'throttle:write']);
 
         Route::get('/playground', [PlaygroundController::class, 'index']);
         Route::post('/playground', [PlaygroundController::class, 'store']);
@@ -158,6 +166,8 @@ Route::prefix('/v1')->group(function () {
             Route::get('/finance/customers/{encryptedIdentifier}/statement', [FinanceDrilldownController::class, 'customerStatement'])->middleware('throttle:stats');
             // Finance: void an expense
             Route::post('/finance/expenses/{encryptedIdentifier}/void', [FinanceExpenseController::class, 'void'])->middleware(['idempotency', 'throttle:write']);
+            // Finance: void an excise duty remittance
+            Route::post('/finance/excise-duty/remittances/{encryptedIdentifier}/void', [ExciseDutyController::class, 'void'])->middleware(['idempotency', 'throttle:write']);
 
             // Wallet Routes
             Route::get('/wallets/{encryptedIdentifier}', [WalletController::class, 'show']);
