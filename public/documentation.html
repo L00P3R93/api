@@ -682,6 +682,9 @@ Idempotency-Key: idem-12345
 <tr><td>tournament_games[] / jackpot_games[].competition_id</td><td>string</td><td>Competition identifier from the game side</td></tr>
 <tr><td>tournament_games[] / jackpot_games[].cmp_uid</td><td>string</td><td>Groups the wallets of every player in the same competition</td></tr>
 <tr><td>tournament_games[] / jackpot_games[].status</td><td>integer</td><td>1 = open, otherwise closed</td></tr>
+<tr><td>tournament_games[] / jackpot_games[].wins</td><td>integer</td><td>Rounds the customer won in this competition</td></tr>
+<tr><td>tournament_games[] / jackpot_games[].losses</td><td>integer</td><td>Rounds the customer lost in this competition</td></tr>
+<tr><td>tournament_games[] / jackpot_games[].games[]</td><td>array</td><td>Every round the customer played, newest first: <code>transaction_id</code>, <code>payment_type</code> (<code>win</code> or <code>loss</code>), <code>amount</code> (balance moved in the round), <code>level</code>, <code>created_at</code></td></tr>
 <tr><td>tournament_games[] / jackpot_games[].opponents[]</td><td>array</td><td>The other players' wallets in the same competition (<code>competition_wallet_id</code>, <code>customer_id</code>, <code>status</code>). Use one of these as <code>competition_wallet_id</code> when filing a complaint</td></tr>
 </table></div>
 <div class="endpoint-section"><h4>Response (200)</h4><pre>{
@@ -690,6 +693,11 @@ Idempotency-Key: idem-12345
   ],
   "tournament_games": [
     {"competition_wallet_id": 301, "competition_id": "TOURN-88", "cmp_uid": "74120", "game_type": 1, "level": 2, "balance": 0.00, "status": 0, "created_at": "2026-09-21 20:15:02",
+     "wins": 1, "losses": 1,
+     "games": [
+       {"transaction_id": 9042, "payment_type": "loss", "amount": 100.00, "level": 2, "created_at": "2026-09-21 20:31:47"},
+       {"transaction_id": 9017, "payment_type": "win", "amount": 50.00, "level": 1, "created_at": "2026-09-21 20:22:10"}
+     ],
      "opponents": [{"competition_wallet_id": 302, "customer_id": 45, "status": 0}]}
   ],
   "jackpot_games": []

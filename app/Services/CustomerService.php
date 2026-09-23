@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\CompetitionTransaction;
 use App\Models\CompetitionWallet;
 use App\Models\Customer;
 use App\Models\Deposit;
@@ -300,7 +301,9 @@ class CustomerService
     }
 
     /**
-     * @return Collection<int, array{competition_wallet_id: int, competition_id: ?string, cmp_uid: ?string, game_type: int, level: ?int, balance: float, status: int, created_at: string, opponents: list<array{competition_wallet_id: int, customer_id: ?int, status: int}>}>
+     * Each win/loss transaction on the customer's own competition wallet is one round (game) they played.
+     *
+     * @return Collection<int, array{competition_wallet_id: int, competition_id: ?string, cmp_uid: ?string, game_type: int, level: ?int, balance: float, status: int, created_at: string, wins: int, losses: int, games: list<array{transaction_id: int, payment_type: string, amount: float, level: ?int, created_at: string}>, opponents: list<array{competition_wallet_id: int, customer_id: ?int, status: int}>}>
      */
     private function recentCompetitions(int $customerId, int $gameType, int $limit): Collection
     {
@@ -320,6 +323,14 @@ class CustomerService
             ->get()
             ->groupBy('cmp_uid');
 
+        $games = CompetitionTransaction::query()
+            ->select(['id', 'competition_wallet_id', 'payment_type', 'amount', 'level', 'created_at'])
+            ->whereIn('competition_wallet_id', $wallets->pluck('id'))
+            ->whereIn('payment_type', ['win', 'loss'])
+            ->orderByDesc('id')
+            ->get()
+            ->groupBy('competition_wallet_id');
+
         return $wallets->map(fn (CompetitionWallet $wallet) => [
             'competition_wallet_id' => $wallet->id,
             'competition_id' => $wallet->competition_id,
@@ -329,6 +340,15 @@ class CustomerService
             'balance' => (float) $wallet->balance,
             'status' => (int) $wallet->status,
             'created_at' => $wallet->created_at?->toDateTimeString(),
+            'wins' => ($games[$wallet->id] ?? collect())->where('payment_type', 'win')->count(),
+            'losses' => ($games[$wallet->id] ?? collect())->where('payment_type', 'loss')->count(),
+            'games' => ($games[$wallet->id] ?? collect())->map(fn (CompetitionTransaction $game) => [
+                'transaction_id' => $game->id,
+                'payment_type' => $game->payment_type,
+                'amount' => (float) $game->amount,
+                'level' => $game->level,
+                'created_at' => $game->created_at?->toDateTimeString(),
+            ])->values()->all(),
             'opponents' => ($opponents[$wallet->cmp_uid] ?? collect())->map(fn (CompetitionWallet $opponent) => [
                 'competition_wallet_id' => $opponent->id,
                 'customer_id' => $opponent->customer_id,

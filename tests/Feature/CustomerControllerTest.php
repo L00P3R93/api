@@ -4,6 +4,7 @@ use App\Models\CompetitionWallet;
 use App\Models\Customer;
 use App\Models\GameTransaction;
 use App\Models\GameWallet;
+use App\Services\CompetitionPayoutService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -182,6 +183,24 @@ it('includes the other players competition wallets to file a complaint against',
         ->assertJsonPath('tournament_games.0.opponents', [
             ['competition_wallet_id' => $theirs->id, 'customer_id' => $opponent->id, 'status' => 1],
         ]);
+});
+
+it('shows the win or loss of every round played in a competition, newest first', function () {
+    [$mine, $theirs] = createJackpotWalletPair();
+    $payouts = app(CompetitionPayoutService::class);
+    $payouts->processPayout($mine->id, $theirs->id);
+    $payouts->processPayout($theirs->id, $mine->id);
+
+    $response = $this->getJson('/api/v1/customers/played/recent/'.encryptId($mine->customer_id), apiHeaders($this->apiKey->key));
+
+    $response->assertOk()
+        ->assertJsonCount(1, 'jackpot_games')
+        ->assertJsonPath('jackpot_games.0.wins', 1)
+        ->assertJsonPath('jackpot_games.0.losses', 1)
+        ->assertJsonCount(2, 'jackpot_games.0.games')
+        ->assertJsonPath('jackpot_games.0.games.0.payment_type', 'win')
+        ->assertJsonPath('jackpot_games.0.games.1.payment_type', 'loss')
+        ->assertJsonPath('jackpot_games.0.opponents.0.competition_wallet_id', $theirs->id);
 });
 
 it('excludes games other customers played', function () {
