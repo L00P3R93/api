@@ -22,6 +22,7 @@ class FinancialSnapshot extends Model
         'pending_holds_total',
         'unmatched_deposits_total',
         'excise_duty_payable',
+        'disputed_funds_total',
         'mpesa_balances',
         'taken_at',
     ];
@@ -42,6 +43,7 @@ class FinancialSnapshot extends Model
             'pending_holds_total' => 'decimal:2',
             'unmatched_deposits_total' => 'decimal:2',
             'excise_duty_payable' => 'decimal:2',
+            'disputed_funds_total' => 'decimal:2',
             'mpesa_balances' => 'array',
             'taken_at' => 'datetime',
         ];

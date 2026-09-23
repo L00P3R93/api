@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Util\Badge;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CompetitionWallet extends Model {
     /** @use HasFactory<\Database\Factories\WalletFactory> */
@@ -30,6 +31,17 @@ class CompetitionWallet extends Model {
     
     public function transactions() {
         return $this->hasMany(CompetitionTransaction::class, 'competition_wallet_id');
+    }
+
+    public function complaints(): HasMany {
+        return $this->hasMany(Complaint::class);
+    }
+
+    /**
+     * A wallet with a pending complaint is frozen: no payout to or from it and no withdrawal.
+     */
+    public function isUnderDispute(): bool {
+        return $this->complaints()->pending()->exists();
     }
 
     /**

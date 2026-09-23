@@ -146,6 +146,10 @@ class CompetitionWalletService
             throw new \InvalidArgumentException('Competition Wallet is not open for withdrawal');
         }
 
+        if ($competitionWallet->isUnderDispute()) {
+            throw new \InvalidArgumentException('Competition Wallet is frozen by a pending complaint');
+        }
+
         $customer = Customer::find($customerId);
         if (! $customer) {
             throw new \InvalidArgumentException('Customer not found');

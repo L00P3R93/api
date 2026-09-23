@@ -312,6 +312,7 @@
             <li><a href="#" data-section="game-bets"><span class="nav-icon">&#127920;</span> <span>Game Bets</span></a></li>
             <li><a href="#" data-section="comp-wallets"><span class="nav-icon">&#127942;</span> <span>Competition Wallets</span></a></li>
             <li><a href="#" data-section="comp-txns"><span class="nav-icon">&#128176;</span> <span>Competition Txns</span></a></li>
+            <li><a href="#" data-section="complaints"><span class="nav-icon">&#9878;</span> <span>Complaints</span></a></li>
         </ul>
         <div class="nav-section">Finance &amp; Payments</div>
         <ul>
@@ -1274,6 +1275,9 @@ Idempotency-Key: idem-game-refund-42
 // with receiver_withdraw: true
 {"status": "success", "withdrawal": {"status": "success"}}
 {"status": "success", "withdrawal": {"status": "failed", "error": "Competition Wallet is not open for withdrawal"}}</pre></div>
+<div class="endpoint-section"><h4>Error Responses</h4>
+<pre>// 400 - the sender or receiver has a pending <a href="#" data-section="complaints" style="color:var(--accent-blue)">complaint</a>
+{"error": "Competition Wallet is frozen by a pending complaint"}</pre></div>
 </div></div>
 <div class="endpoint">
 <div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/competition/withdraw/{encryptedIdentifier}</span><span class="endpoint-desc">Withdraw entire balance from competition wallet (minus house share)</span><span class="chevron">&#9654;</span></div>
@@ -1283,6 +1287,9 @@ Idempotency-Key: idem-game-refund-42
 <table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
 <tr><td>customer_id</td><td>string</td><td><span class="required">Required</span></td><td>Customer identifier</td></tr></table></div>
 <div class="endpoint-section"><h4>Response (200)</h4><pre>{"status": "success"}</pre></div>
+<div class="endpoint-section"><h4>Error Responses</h4>
+<pre>// 400 - the wallet has a pending <a href="#" data-section="complaints" style="color:var(--accent-blue)">complaint</a>
+{"status": "Competition Wallet is frozen by a pending complaint"}</pre></div>
 </div></div>
 </div>
 
@@ -1333,6 +1340,108 @@ Idempotency-Key: idem-game-refund-42
 <div class="endpoint-section"><h4>Response (200)</h4><pre>{"status": "Success"}</pre></div>
 </div></div>
 </div>
+<!-- COMPLAINTS SECTION -->
+<div class="doc-section" data-section="complaints">
+<button class="expand-all" onclick="toggleAll('complaints')">Expand / Collapse All</button>
+<div class="callback-note">A player complains about the result of a game, tournament or jackpot. Filing a complaint moves the disputed winnings out of the winner's reach straight away and holds them in <strong>dispute escrow</strong> until the complaint is closed. A complaint is <code>pending_dispute</code> until it is <code>resolved</code> (valid: the disputed transactions are reversed and every player is refunded), <code>rejected</code> (found invalid) or <code>cancelled</code> (withdrawn); the last two give the held money back. Held money is reported as <code>disputed_funds</code> on the <a href="#" data-section="finance-statements" style="color:var(--accent-blue)">balance sheet</a>.</div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/complaints</span><span class="endpoint-desc">File a complaint and hold the disputed winnings</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">30/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Send exactly one of <code>game_wallet_id</code> or <code>competition_wallet_id</code>. What is held depends on the subject:</p>
+<table class="params-table"><tr><th>Subject</th><th>Disputed transaction(s)</th><th>Held from</th></tr>
+<tr><td>Game</td><td>The winner's <code>payout</code> / <code>payout|dropped</code> game transactions (the house's and the complainant's own are left out)</td><td>The winner's wallet</td></tr>
+<tr><td>Tournament or jackpot, competition wallet open (status 1)</td><td>The named <code>win</code> or <code>deposit</code> transactions on that wallet, or the latest <code>win</code> when none are named</td><td>The competition wallet itself</td></tr>
+<tr><td>Tournament or jackpot, competition wallet closed</td><td>The <code>payout</code> transaction(s) of that wallet</td><td>The winner's wallet</td></tr></table>
+<p style="color:var(--text-secondary);font-size:13px;margin-top:10px;">The wallet balance drops by the held amount (ledger entry <code>dispute_hold</code>). When the wallet no longer has enough, whatever is there is held and the rest is recorded as <code>shortfall_amount</code>; a balance never goes negative. While a competition wallet has a pending complaint it is frozen: <a href="#" data-section="comp-wallets" style="color:var(--accent-blue)">/competition/payout</a> to or from it and <a href="#" data-section="comp-wallets" style="color:var(--accent-blue)">/competition/withdraw</a> return <code>400</code>. The winner's M-Pesa withdrawals are not blocked; they can only use what is left.</p></div>
+<div class="endpoint-section"><h4>Request Body</h4>
+<table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>customer_id</td><td>integer</td><td><span class="required">Required</span></td><td>The complainant. Must have played: a <code>deposit</code> in that game, or a competition wallet in the same competition (<code>cmp_uid</code>). Cannot complain about their own competition wallet</td></tr>
+<tr><td>game_wallet_id</td><td>integer</td><td><span class="optional">One of</span></td><td>The game complained about</td></tr>
+<tr><td>competition_wallet_id</td><td>integer</td><td><span class="optional">One of</span></td><td>The winner's competition wallet. Tournament or jackpot follows its <code>game_type</code></td></tr>
+<tr><td>transaction_ids</td><td>integer[]</td><td><span class="optional">Optional</span></td><td>Up to 50 transaction ids to dispute instead of the defaults above. Each must be one of the transactions the subject allows</td></tr>
+<tr><td>reason</td><td>string</td><td><span class="required">Required</span></td><td>3 to 255 characters</td></tr>
+<tr><td>description</td><td>string</td><td><span class="optional">Optional</span></td><td>Up to 2000 characters</td></tr></table></div>
+<div class="endpoint-section"><h4>Request</h4>
+<pre>POST /api/v1/complaints HTTP/1.1
+Host: api.kadi-kings.co.ke
+X-API-KEY: your-api-key-here
+Content-Type: application/json
+
+{
+  "customer_id": 42,
+  "game_wallet_id": 1051,
+  "reason": "The winner kept playing after I disconnected"
+}</pre></div>
+<div class="endpoint-section"><h4>Response (201)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "id": 3, "complaint_id": "9b1c2f0e-6a57-4f7e-9d0a-1f3c5b8e2a41", "customer_id": 42,
+    "subject_type": "game", "game_wallet_id": 1051, "competition_wallet_id": null,
+    "reason": "The winner kept playing after I disconnected", "description": null,
+    "status": "pending_dispute", "disputed_amount": 190.00, "held_amount": 150.00, "shortfall_amount": 40.00,
+    "filed_by": "api_key:4", "resolution_note": null, "closed_by": null, "closed_at": null,
+    "created_at": "2026-09-23T14:05:00+03:00",
+    "disputed_transactions": [
+      {
+        "id": 5, "transaction_type": "game_transaction", "transaction_id": 88213, "customer_id": 57,
+        "source_wallet_type": "wallet", "source_wallet_id": 57,
+        "amount": 190.00, "held_amount": 150.00, "shortfall_amount": 40.00, "balance": 150.00, "status": "held"
+      }
+    ]
+  }
+}</pre></div>
+<div class="endpoint-section"><h4>Notes</h4>
+<p style="color:var(--text-secondary);font-size:13px;"><code>transaction_type</code> is <code>game_transaction</code> or <code>competition_transaction</code>. <code>source_wallet_type</code> is <code>wallet</code> (a customer wallet) or <code>competition_wallet</code>. <code>balance</code> is what is still held for that transaction. A repeated identical request replays the earlier response (see Idempotency).</p></div>
+<div class="endpoint-section"><h4>Error Responses</h4>
+<pre>// 422 - validation, e.g. both subjects sent
+{"message": "The game wallet id field prohibits competition wallet id from being present.", "errors": {...}}
+// 422 - the complaint cannot be filed
+{"success": false, "message": "Only a player in this game can complain about it."}
+{"success": false, "message": "This game has no winner payout to dispute."}
+{"success": false, "message": "This competition wallet has no win to dispute."}
+{"success": false, "message": "A customer cannot complain about their own competition wallet."}
+{"success": false, "message": "transaction_ids must be winner payouts in this game. Not found: 88100."}
+// 409 - a transaction is already under an open complaint
+{"success": false, "message": "Transaction 88213 is already under an open complaint."}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/complaints</span><span class="endpoint-desc">List complaints, newest first</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>status</td><td>string</td><td><span class="optional">Optional</span></td><td><code>pending_dispute</code>, <code>resolved</code>, <code>rejected</code> or <code>cancelled</code></td></tr>
+<tr><td>subject_type</td><td>string</td><td><span class="optional">Optional</span></td><td><code>game</code>, <code>tournament</code> or <code>jackpot</code></td></tr>
+<tr><td>customer_id</td><td>integer</td><td><span class="optional">Optional</span></td><td>The complainant</td></tr>
+<tr><td>game_wallet_id</td><td>integer</td><td><span class="optional">Optional</span></td><td>Complaints about this game</td></tr>
+<tr><td>competition_wallet_id</td><td>integer</td><td><span class="optional">Optional</span></td><td>Complaints about this competition wallet</td></tr>
+<tr><td>from / to</td><td>date (Y-m-d)</td><td><span class="optional">Optional</span></td><td>Filed on or after / on or before</td></tr>
+<tr><td>page / per_page</td><td>integer</td><td><span class="optional">Optional</span></td><td><code>per_page</code> defaults to 50, maximum 200</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "data": [ { "id": 3, "status": "pending_dispute", "subject_type": "game", "disputed_amount": 190.00, "disputed_transactions": [ ... ], ... } ],
+  "links": { "first": "...", "last": "...", "prev": null, "next": null },
+  "meta": { "current_page": 1, "per_page": 50, "total": 1, ... }
+}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/complaints/{encryptedIdentifier}</span><span class="endpoint-desc">One complaint with its disputed transactions</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{"success": true, "data": { "id": 3, "complaint_id": "9b1c2f0e-...", "status": "pending_dispute", "disputed_transactions": [ ... ], ... }}</pre></div>
+<div class="endpoint-section"><h4>Error Responses</h4>
+<pre>// 404
+{"success": false, "message": "Complaint not found"}</pre></div>
+</div></div>
+</div>
+
 <!-- FINANCIAL SECTION -->
 <div class="doc-section" data-section="financial">
 <div class="endpoint">
@@ -1700,7 +1809,7 @@ Content-Type: application/json
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
 <div class="endpoint-section"><h4>Description</h4>
-<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Assets are the latest balance of every M-Pesa account (from the hourly balance fetch), listed individually. Liabilities are what is owed: customer wallets (test customers and the house wallet excluded), open game and competition wallets, <code>stuck_escrow</code> (money left in finished wallets), coin liability, pending holds, <code>unmatched_deposits</code> and <code>excise_duty_payable</code> (excise duty taken from deposits and not yet in a recorded <a href="#" data-section="finance-excise" style="color:var(--accent-blue)">KRA remittance</a>; snapshots from before it was tracked show 0). <code>house_wallet</code> is shown separately. <code>difference</code> is cash minus liabilities minus the house wallet. It is not expected to be zero: it also holds gift and emoji sales not yet moved to the house wallet, M-Pesa charges, and timing between the hourly balance fetch and wallet movements. A daily snapshot is taken at 23:59 Nairobi time; <code>as_of</code> reads that day's snapshot.</p></div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Assets are the latest balance of every M-Pesa account (from the hourly balance fetch), listed individually. Liabilities are what is owed: customer wallets (test customers and the house wallet excluded), open game and competition wallets, <code>stuck_escrow</code> (money left in finished wallets), coin liability, pending holds, <code>unmatched_deposits</code> and <code>excise_duty_payable</code> (excise duty taken from deposits and not yet in a recorded <a href="#" data-section="finance-excise" style="color:var(--accent-blue)">KRA remittance</a>; snapshots from before it was tracked show 0) and <code>disputed_funds</code> (winnings held while a <a href="#" data-section="complaints" style="color:var(--accent-blue)">complaint</a> is pending; still owed to a customer, snapshots from before complaints existed show 0). <code>house_wallet</code> is shown separately. <code>difference</code> is cash minus liabilities minus the house wallet. It is not expected to be zero: it also holds gift and emoji sales not yet moved to the house wallet, M-Pesa charges, and timing between the hourly balance fetch and wallet movements. A daily snapshot is taken at 23:59 Nairobi time; <code>as_of</code> reads that day's snapshot.</p></div>
 <div class="endpoint-section"><h4>Query Parameters</h4>
 <table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
 <tr><td>as_of</td><td>date (Y-m-d)</td><td><span class="optional">Optional</span></td><td>Not in the future. Returns that day's snapshot. <code>404</code> if there is none. Omit for the live position</td></tr></table></div>
@@ -1723,7 +1832,7 @@ Content-Type: application/json
     },
     "liabilities": {
       "customer_wallets": 2000.00, "game_escrow": 40.00, "competition_escrow": 0.00, "stuck_escrow": 0.00,
-      "coin_liability": 0.00, "pending_holds": 0.00, "unmatched_deposits": 75.00, "excise_duty_payable": 25.00, "total": 2140.00
+      "coin_liability": 0.00, "pending_holds": 0.00, "unmatched_deposits": 75.00, "excise_duty_payable": 25.00, "disputed_funds": 0.00, "total": 2140.00
     },
     "house_wallet": 300.00,
     "difference": 1060.00,
@@ -2004,7 +2113,7 @@ Content-Type: application/json
 <table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
 <tr><td>entry_type</td><td>string</td><td><span class="optional">Optional</span></td><td>e.g. <code>deposit</code>, <code>game_bet</code>, <code>house_cut</code>, <code>adjustment</code></td></tr>
 <tr><td>category</td><td>string</td><td><span class="optional">Optional</span></td><td>One of the categories above</td></tr>
-<tr><td>wallet_type</td><td>string</td><td><span class="optional">Optional</span></td><td><code>wallet</code>, <code>game_wallet</code>, <code>competition_wallet</code>, <code>coin_wallet</code></td></tr>
+<tr><td>wallet_type</td><td>string</td><td><span class="optional">Optional</span></td><td><code>wallet</code>, <code>game_wallet</code>, <code>competition_wallet</code>, <code>coin_wallet</code>, <code>dispute</code> (money held by a complaint; the wallet id is the disputed transaction id)</td></tr>
 <tr><td>wallet_id</td><td>integer</td><td><span class="optional">Optional</span></td><td>Use together with <code>wallet_type</code>, because ids repeat across wallet types</td></tr>
 <tr><td>customer_id</td><td>integer</td><td><span class="optional">Optional</span></td><td>Only this customer's entries</td></tr>
 <tr><td>status</td><td>string</td><td><span class="optional">Optional</span></td><td><code>settled</code> or <code>reversed</code></td></tr></table></div>

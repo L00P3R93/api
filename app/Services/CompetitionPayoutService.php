@@ -31,6 +31,9 @@ class CompetitionPayoutService
         if ($receiver->status !== 1) {
             throw new \InvalidArgumentException('Receiver Competition Wallet is not open');
         }
+        if ($sender->isUnderDispute() || $receiver->isUnderDispute()) {
+            throw new \InvalidArgumentException('Competition Wallet is frozen by a pending complaint');
+        }
         if ($sender->balance <= 0) {
             throw new \InvalidArgumentException('Insufficient balance in Sender Competition Wallet');
         }
@@ -81,6 +84,7 @@ class CompetitionPayoutService
     /**
      * Jackpot rounds transfer exactly like tournament rounds. `jp_rounds` is intentionally not
      * consulted here: it has no bearing on round-by-round transfer mechanics.
+     *
      * @throws \Throwable
      */
     public function handleJackpotPayout(CompetitionWallet $sender, CompetitionWallet $receiver): array
@@ -92,6 +96,7 @@ class CompetitionPayoutService
      * Move the sender's full balance to the receiver and record the paired loss/win transactions.
      *
      * @return array{status: string}
+     *
      * @throws \Throwable
      */
     private function transferRoundResult(CompetitionWallet $sender, CompetitionWallet $receiver): array

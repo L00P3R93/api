@@ -52,6 +52,7 @@ class ChartOfAccounts
             LedgerEntry::WALLET_TYPE_GAME => 'game_escrow',
             LedgerEntry::WALLET_TYPE_COMPETITION => 'competition_escrow',
             LedgerEntry::WALLET_TYPE_COIN => 'coin_wallets',
+            LedgerEntry::WALLET_TYPE_DISPUTE => 'disputed_funds',
             default => $walletId === (int) config('wallets.house_wallet_id', 1) ? 'house_wallet' : 'customer_wallets',
         };
     }
