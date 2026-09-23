@@ -166,6 +166,8 @@ Route::prefix('/v1')->group(function () {
             Route::post('/customers/transactions/{encryptedIdentifier}', [CustomerController::class, 'customer_transactions']);
             // Customer Games Played Route
             Route::get('/customers/played/{encryptedIdentifier}', [CustomerController::class, 'customer_played']);
+            // Customer latest 10 games, tournaments and jackpots (for filing complaints)
+            Route::get('/customers/played/recent/{encryptedIdentifier}', [CustomerController::class, 'customer_recent_played']);
             // Customer Purchases Routes
             Route::get('/customers/purchases/{encryptedIdentifier}', [CustomerController::class, 'customer_purchases']);
             // Finance: one customer's wallet statement
