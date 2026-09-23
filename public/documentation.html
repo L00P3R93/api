@@ -669,7 +669,7 @@ Idempotency-Key: idem-12345
 <p>To file a complaint with <code>POST /complaints</code>:</p>
 <ul>
 <li><strong>Single game:</strong> send the row's <code>game_wallet_id</code>.</li>
-<li><strong>Tournament or jackpot:</strong> send an <code>opponents[].competition_wallet_id</code>. A customer cannot complain about their own competition wallet.</li>
+<li><strong>Tournament or jackpot:</strong> pick a round the customer lost and send its <code>opponent.competition_wallet_id</code>. If <code>opponent.wallet_status</code> is 1 (open), also send <code>transaction_ids: [opponent.transaction_id]</code> to dispute that round's win. If it is closed, leave out <code>transaction_ids</code> and the opponent's payout is disputed. A customer cannot complain about their own competition wallet.</li>
 </ul></div>
 <div class="endpoint-section"><h4>Row Fields</h4>
 <table class="params-table"><tr><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -684,8 +684,8 @@ Idempotency-Key: idem-12345
 <tr><td>tournament_games[] / jackpot_games[].status</td><td>integer</td><td>1 = open, otherwise closed</td></tr>
 <tr><td>tournament_games[] / jackpot_games[].wins</td><td>integer</td><td>Rounds the customer won in this competition</td></tr>
 <tr><td>tournament_games[] / jackpot_games[].losses</td><td>integer</td><td>Rounds the customer lost in this competition</td></tr>
-<tr><td>tournament_games[] / jackpot_games[].games[]</td><td>array</td><td>Every round the customer played, newest first: <code>transaction_id</code>, <code>payment_type</code> (<code>win</code> or <code>loss</code>), <code>amount</code> (balance moved in the round), <code>level</code>, <code>created_at</code></td></tr>
-<tr><td>tournament_games[] / jackpot_games[].opponents[]</td><td>array</td><td>The other players' wallets in the same competition (<code>competition_wallet_id</code>, <code>customer_id</code>, <code>status</code>). Use one of these as <code>competition_wallet_id</code> when filing a complaint</td></tr>
+<tr><td>tournament_games[] / jackpot_games[].games[]</td><td>array</td><td>Every round the customer played, newest first: <code>transaction_id</code>, <code>payment_type</code> (<code>win</code> or <code>loss</code>), <code>amount</code> (balance moved in the round), <code>level</code>, <code>created_at</code>, <code>opponent</code></td></tr>
+<tr><td>games[].opponent</td><td>object|null</td><td>The other side of the round: <code>competition_wallet_id</code> and <code>customer_id</code> of the player who won or lost it against the customer, <code>wallet_status</code> (1 = open) and <code>transaction_id</code> (their <code>win</code> for a round the customer lost, their <code>loss</code> for a round the customer won). <code>null</code> when the other side cannot be found</td></tr>
 </table></div>
 <div class="endpoint-section"><h4>Response (200)</h4><pre>{
   "single_games": [
@@ -695,10 +695,11 @@ Idempotency-Key: idem-12345
     {"competition_wallet_id": 301, "competition_id": "TOURN-88", "cmp_uid": "74120", "game_type": 1, "level": 2, "balance": 0.00, "status": 0, "created_at": "2026-09-21 20:15:02",
      "wins": 1, "losses": 1,
      "games": [
-       {"transaction_id": 9042, "payment_type": "loss", "amount": 100.00, "level": 2, "created_at": "2026-09-21 20:31:47"},
-       {"transaction_id": 9017, "payment_type": "win", "amount": 50.00, "level": 1, "created_at": "2026-09-21 20:22:10"}
-     ],
-     "opponents": [{"competition_wallet_id": 302, "customer_id": 45, "status": 0}]}
+       {"transaction_id": 9042, "payment_type": "loss", "amount": 100.00, "level": 2, "created_at": "2026-09-21 20:31:47",
+        "opponent": {"competition_wallet_id": 302, "customer_id": 45, "wallet_status": 0, "transaction_id": 9043}},
+       {"transaction_id": 9017, "payment_type": "win", "amount": 50.00, "level": 1, "created_at": "2026-09-21 20:22:10",
+        "opponent": {"competition_wallet_id": 318, "customer_id": 61, "wallet_status": 0, "transaction_id": 9016}}
+     ]}
   ],
   "jackpot_games": []
 }</pre></div>

@@ -166,23 +166,53 @@ it('lists a single game once with the customer stake, player count and result', 
         ->and(collect($response->json('single_games'))->firstWhere('game_wallet_id', '!=', $game->id)['state'])->toBe('loss');
 });
 
-it('includes the other players competition wallets to file a complaint against', function () {
+it('pairs every tournament round with the opponent who played it', function () {
     $customer = Customer::factory()->create();
-    $opponent = Customer::factory()->create();
     $mine = playedCompetition($customer, 1, 'CMP-SHARED');
-    $theirs = playedCompetition($opponent, 1, 'CMP-SHARED');
-    playedCompetition($opponent, 1);
+    $beatMe = playedCompetition(Customer::factory()->create(), 1, 'CMP-SHARED');
+    $lostToMe = playedCompetition(Customer::factory()->create(), 1, 'CMP-SHARED');
+    playedCompetition(Customer::factory()->create(), 1, 'CMP-SHARED');
+    $payouts = app(CompetitionPayoutService::class);
+    $payouts->processPayout($mine->id, $beatMe->id);
+    $payouts->processPayout($lostToMe->id, $mine->id);
 
     $response = $this->getJson('/api/v1/customers/played/recent/'.encryptId($customer->id), apiHeaders($this->apiKey->key));
 
+    $winnersWin = $beatMe->transactions()->where('payment_type', 'win')->value('id');
+    $losersLoss = $lostToMe->transactions()->where('payment_type', 'loss')->value('id');
+
     $response->assertOk()
         ->assertJsonCount(1, 'tournament_games')
-        ->assertJsonCount(0, 'jackpot_games')
+        ->assertJsonMissingPath('tournament_games.0.opponents')
         ->assertJsonPath('tournament_games.0.competition_wallet_id', $mine->id)
-        ->assertJsonPath('tournament_games.0.cmp_uid', 'CMP-SHARED')
-        ->assertJsonPath('tournament_games.0.opponents', [
-            ['competition_wallet_id' => $theirs->id, 'customer_id' => $opponent->id, 'status' => 1],
+        ->assertJsonPath('tournament_games.0.games.0.payment_type', 'win')
+        ->assertJsonPath('tournament_games.0.games.0.opponent', [
+            'competition_wallet_id' => $lostToMe->id, 'customer_id' => $lostToMe->customer_id, 'wallet_status' => 1, 'transaction_id' => $losersLoss,
+        ])
+        ->assertJsonPath('tournament_games.0.games.1.payment_type', 'loss')
+        ->assertJsonPath('tournament_games.0.games.1.opponent', [
+            'competition_wallet_id' => $beatMe->id, 'customer_id' => $beatMe->customer_id, 'wallet_status' => 1, 'transaction_id' => $winnersWin,
         ]);
+});
+
+it('gives what is needed to file a complaint about a lost round', function () {
+    $customer = Customer::factory()->create();
+    $mine = playedCompetition($customer, 1, 'CMP-DISPUTE');
+    $winner = playedCompetition(Customer::factory()->create(), 1, 'CMP-DISPUTE');
+    app(CompetitionPayoutService::class)->processPayout($mine->id, $winner->id);
+
+    $opponent = $this->getJson('/api/v1/customers/played/recent/'.encryptId($customer->id), apiHeaders($this->apiKey->key))
+        ->json('tournament_games.0.games.0.opponent');
+
+    $this->postJson('/api/v1/complaints', [
+        'customer_id' => $customer->id,
+        'competition_wallet_id' => $opponent['competition_wallet_id'],
+        'transaction_ids' => [$opponent['transaction_id']],
+        'reason' => 'The winner used a bot',
+    ], apiHeaders($this->apiKey->key))
+        ->assertCreated()
+        ->assertJsonPath('data.competition_wallet_id', $winner->id)
+        ->assertJsonPath('data.disputed_transactions.0.transaction_id', $opponent['transaction_id']);
 });
 
 it('shows the win or loss of every round played in a competition, newest first', function () {
@@ -200,7 +230,8 @@ it('shows the win or loss of every round played in a competition, newest first',
         ->assertJsonCount(2, 'jackpot_games.0.games')
         ->assertJsonPath('jackpot_games.0.games.0.payment_type', 'win')
         ->assertJsonPath('jackpot_games.0.games.1.payment_type', 'loss')
-        ->assertJsonPath('jackpot_games.0.opponents.0.competition_wallet_id', $theirs->id);
+        ->assertJsonPath('jackpot_games.0.games.0.opponent.competition_wallet_id', $theirs->id)
+        ->assertJsonPath('jackpot_games.0.games.1.opponent.competition_wallet_id', $theirs->id);
 });
 
 it('excludes games other customers played', function () {

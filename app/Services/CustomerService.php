@@ -302,8 +302,10 @@ class CustomerService
 
     /**
      * Each win/loss transaction on the customer's own competition wallet is one round (game) they played.
+     * Every round is paired with the opponent's side of it: the loser's `loss` and the winner's `win` are
+     * written together, the win straight after the loss, for the same amount in the same competition.
      *
-     * @return Collection<int, array{competition_wallet_id: int, competition_id: ?string, cmp_uid: ?string, game_type: int, level: ?int, balance: float, status: int, created_at: string, wins: int, losses: int, games: list<array{transaction_id: int, payment_type: string, amount: float, level: ?int, created_at: string}>, opponents: list<array{competition_wallet_id: int, customer_id: ?int, status: int}>}>
+     * @return Collection<int, array{competition_wallet_id: int, competition_id: ?string, cmp_uid: ?string, game_type: int, level: ?int, balance: float, status: int, created_at: string, wins: int, losses: int, games: list<array{transaction_id: int, payment_type: string, amount: float, level: ?int, created_at: string, opponent: ?array{competition_wallet_id: int, customer_id: ?int, wallet_status: int, transaction_id: int}}>}>
      */
     private function recentCompetitions(int $customerId, int $gameType, int $limit): Collection
     {
@@ -315,21 +317,15 @@ class CustomerService
             ->limit($limit)
             ->get();
 
-        $opponents = CompetitionWallet::query()
-            ->select(['id', 'cmp_uid', 'customer_id', 'status'])
-            ->whereIn('cmp_uid', $wallets->pluck('cmp_uid')->filter()->unique())
-            ->where('customer_id', '!=', $customerId)
-            ->orderBy('id')
-            ->get()
-            ->groupBy('cmp_uid');
-
         $games = CompetitionTransaction::query()
             ->select(['id', 'competition_wallet_id', 'payment_type', 'amount', 'level', 'created_at'])
             ->whereIn('competition_wallet_id', $wallets->pluck('id'))
             ->whereIn('payment_type', ['win', 'loss'])
             ->orderByDesc('id')
-            ->get()
-            ->groupBy('competition_wallet_id');
+            ->get();
+
+        $opponentRounds = $this->opponentRounds($games, $wallets);
+        $games = $games->groupBy('competition_wallet_id');
 
         return $wallets->map(fn (CompetitionWallet $wallet) => [
             'competition_wallet_id' => $wallet->id,
@@ -348,13 +344,60 @@ class CustomerService
                 'amount' => (float) $game->amount,
                 'level' => $game->level,
                 'created_at' => $game->created_at?->toDateTimeString(),
-            ])->values()->all(),
-            'opponents' => ($opponents[$wallet->cmp_uid] ?? collect())->map(fn (CompetitionWallet $opponent) => [
-                'competition_wallet_id' => $opponent->id,
-                'customer_id' => $opponent->customer_id,
-                'status' => (int) $opponent->status,
+                'opponent' => $opponentRounds[$game->id] ?? null,
             ])->values()->all(),
         ])->values();
+    }
+
+    /**
+     * The other side of each round, keyed by the customer's transaction id: the `win` written just after a
+     * `loss`, or the `loss` written just before a `win`, for the same amount in the same competition.
+     *
+     * @param  Collection<int, CompetitionTransaction>  $games
+     * @param  Collection<int, CompetitionWallet>  $wallets
+     * @return array<int, array{competition_wallet_id: int, customer_id: ?int, wallet_status: int, transaction_id: int}>
+     */
+    private function opponentRounds(Collection $games, Collection $wallets): array
+    {
+        if ($games->isEmpty()) {
+            return [];
+        }
+
+        $nearbyIds = $games->flatMap(fn (CompetitionTransaction $game) => range($game->id - 5, $game->id + 5))->unique()->values();
+
+        $candidates = CompetitionTransaction::query()
+            ->select(['id', 'competition_wallet_id', 'payment_type', 'amount'])
+            ->whereIn('id', $nearbyIds)
+            ->whereNotIn('competition_wallet_id', $wallets->pluck('id'))
+            ->whereIn('payment_type', ['win', 'loss'])
+            ->with('wallet:id,cmp_uid,customer_id,status')
+            ->get();
+
+        $cmpUids = $wallets->pluck('cmp_uid', 'id');
+        $pairs = [];
+
+        foreach ($games as $game) {
+            $isLoss = $game->payment_type === 'loss';
+
+            $match = $candidates
+                ->filter(fn (CompetitionTransaction $candidate) => $candidate->payment_type === ($isLoss ? 'win' : 'loss')
+                    && ($isLoss ? $candidate->id > $game->id : $candidate->id < $game->id)
+                    && (float) $candidate->amount === (float) $game->amount
+                    && $candidate->wallet?->cmp_uid === $cmpUids[$game->competition_wallet_id])
+                ->sortBy(fn (CompetitionTransaction $candidate) => abs($candidate->id - $game->id))
+                ->first();
+
+            if ($match) {
+                $pairs[$game->id] = [
+                    'competition_wallet_id' => $match->competition_wallet_id,
+                    'customer_id' => $match->wallet->customer_id,
+                    'wallet_status' => (int) $match->wallet->status,
+                    'transaction_id' => $match->id,
+                ];
+            }
+        }
+
+        return $pairs;
     }
 
     public function getCustomerLeaderboard(?string $startDate = null, ?string $endDate = null): array
