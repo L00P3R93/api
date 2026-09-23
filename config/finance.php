@@ -200,6 +200,8 @@ return [
     |                          balance and untouched this long is flagged.
     | stuck_withdrawal_hours   a withdrawal pending this long is flagged.
     | stale_mpesa_balance_hours  the M-Pesa balance fetch is overdue after this.
+    | aged_dispute_days        a complaint still pending after this many days
+    |                          is flagged.
     |
     */
 
@@ -208,6 +210,7 @@ return [
         'stuck_game_hours' => 24,
         'stuck_withdrawal_hours' => 24,
         'stale_mpesa_balance_hours' => 3,
+        'aged_dispute_days' => (int) env('FINANCE_AGED_DISPUTE_DAYS', 3),
     ],
 
     /*
@@ -260,6 +263,8 @@ return [
         'escrow_release' => 'escrow_movement',
         'escrow_transfer' => 'escrow_movement',
         'dispute_hold' => 'escrow_movement',
+        'dispute_release' => 'escrow_movement',
+        'dispute_refund' => 'refund',
         'coin_purchase' => 'coin',
         'coin_exchange' => 'coin',
         'coin_transfer' => 'coin',

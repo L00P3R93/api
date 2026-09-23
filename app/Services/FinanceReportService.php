@@ -527,7 +527,7 @@ class FinanceReportService
                 $join->on('ct.id', '=', 'l.referenceable_id')->where('l.referenceable_type', CompetitionTransaction::class);
             })
             ->leftJoin('competition_wallets as cw', 'cw.id', '=', 'ct.competition_wallet_id')
-            ->where('l.entry_type', 'house_cut')
+            ->whereIn('l.entry_type', ['house_cut', 'house_cut_reversal'])
             ->whereBetween('l.created_at', [$range->from, $range->to])
             ->when($excluded !== [], function (Builder $query) use ($excluded, $source, $player, $marks) {
                 $query->whereRaw("({$player} IS NULL OR {$player} NOT IN ({$marks}))", $excluded)

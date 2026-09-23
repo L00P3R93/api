@@ -141,6 +141,7 @@ Route::prefix('/v1')->group(function () {
                 Route::get('/competitions', [FinanceDrilldownController::class, 'competitions']);
                 Route::get('/ledger', [FinanceDrilldownController::class, 'ledger']);
                 Route::get('/adjustments', [FinanceDrilldownController::class, 'adjustments']);
+                Route::get('/disputes', [FinanceDrilldownController::class, 'disputes']);
                 Route::get('/customers/top', [FinanceDrilldownController::class, 'topCustomers']);
                 Route::get('/export/{report}', FinanceExportController::class);
             });
@@ -262,6 +263,9 @@ Route::prefix('/v1')->group(function () {
 
             // Complaint Routes
             Route::get('/complaints/{encryptedIdentifier}', [ComplaintController::class, 'show']);
+            Route::post('/complaints/{encryptedIdentifier}/resolve', [ComplaintController::class, 'resolve'])->middleware(['idempotency', 'throttle:write']);
+            Route::post('/complaints/{encryptedIdentifier}/reject', [ComplaintController::class, 'reject'])->middleware(['idempotency', 'throttle:write']);
+            Route::post('/complaints/{encryptedIdentifier}/cancel', [ComplaintController::class, 'cancel'])->middleware(['idempotency', 'throttle:write']);
 
             // Playground Routes
             Route::get('/playground/{encryptedIdentifier}', [PlaygroundController::class, 'show'])->withoutMiddleware('decrypt.identifier');

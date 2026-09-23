@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Models\CompetitionTransaction;
+use App\Models\Complaint;
 use App\Models\Deposit;
+use App\Models\DisputedTransaction;
 use App\Models\GameTransaction;
 use App\Models\LedgerEntry;
 use App\Models\MpesaBalance;
@@ -33,6 +35,7 @@ class FinanceReconciliationService
             $this->ledgerDrift('customer_wallet_drift', 'Customer wallet balances match the ledger', 'wallets', LedgerEntry::WALLET_TYPE_WALLET, false),
             $this->ledgerDrift('game_wallet_drift', 'Game wallet balances match the ledger', 'game_wallets', LedgerEntry::WALLET_TYPE_GAME, true),
             $this->ledgerDrift('competition_wallet_drift', 'Competition wallet balances match the ledger', 'competition_wallets', LedgerEntry::WALLET_TYPE_COMPETITION, true),
+            $this->ledgerDrift('dispute_escrow_drift', 'Dispute escrow balances match the ledger', 'disputed_transactions', LedgerEntry::WALLET_TYPE_DISPUTE, false),
             $this->ledgerChain($range),
             $this->ledgerIdentity($range),
             $this->unclassifiedEntries(),
@@ -47,6 +50,8 @@ class FinanceReconciliationService
             $this->stuckEscrow(),
             $this->agedEscrow(),
             $this->negativeBalances(),
+            $this->heldOnClosedComplaints(),
+            $this->agedDisputes(),
             $this->houseCutRates($range),
             $this->mpesaBalanceFreshness(),
             $this->cashCoverage(),
@@ -445,6 +450,66 @@ class FinanceReconciliationService
             $rows->count(),
             abs((float) $rows->sum('balance')),
             $rows->sortBy('balance')->take(self::SAMPLE_SIZE)->values()->all()
+        );
+    }
+
+    /**
+     * Money still in dispute escrow for a complaint that is no longer pending.
+     *
+     * @return array<string, mixed>
+     */
+    private function heldOnClosedComplaints(): array
+    {
+        $rows = DB::table('disputed_transactions as d')
+            ->join('complaints as c', 'c.id', '=', 'd.complaint_id')
+            ->where('c.status', '!=', Complaint::STATUS_PENDING)
+            ->where(fn ($query) => $query->where('d.balance', '>', 0)->orWhere('d.status', DisputedTransaction::STATUS_HELD))
+            ->get(['d.id', 'd.complaint_id', 'c.status as complaint_status', 'd.status', 'd.balance']);
+
+        return $this->result(
+            'held_on_closed_complaints',
+            'Closed complaints hold no money',
+            'fail',
+            $rows->count(),
+            (float) $rows->sum('balance'),
+            $rows->take(self::SAMPLE_SIZE)->map(fn ($row) => [
+                'disputed_transaction_id' => (int) $row->id,
+                'complaint_id' => (int) $row->complaint_id,
+                'complaint_status' => $row->complaint_status,
+                'status' => $row->status,
+                'balance' => (float) $row->balance,
+            ])->all()
+        );
+    }
+
+    /**
+     * Complaints left pending too long, with the money they hold.
+     *
+     * @return array<string, mixed>
+     */
+    private function agedDisputes(): array
+    {
+        $days = (int) config('finance.reconciliation.aged_dispute_days');
+
+        $rows = Complaint::pending()
+            ->where('created_at', '<=', now()->subDays($days))
+            ->withSum(['disputedTransactions as held' => fn ($query) => $query->where('status', DisputedTransaction::STATUS_HELD)], 'balance')
+            ->orderBy('created_at')
+            ->get(['id', 'subject_type', 'created_at']);
+
+        return $this->result(
+            'aged_disputes',
+            "Complaints pending over {$days} days",
+            'warn',
+            $rows->count(),
+            (float) $rows->sum('held'),
+            $rows->take(self::SAMPLE_SIZE)->map(fn (Complaint $complaint) => [
+                'complaint_id' => $complaint->id,
+                'subject_type' => $complaint->subject_type,
+                'held' => round((float) $complaint->held, 2),
+                'filed_at' => $complaint->created_at->toIso8601String(),
+            ])->all(),
+            'Resolve, reject or cancel them so the held money reaches the right players.'
         );
     }
 

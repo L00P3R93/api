@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Coin;
 use App\Models\CompetitionTransaction;
 use App\Models\CompetitionWallet;
+use App\Models\Complaint;
 use App\Models\Deposit;
 use App\Models\DisputedTransaction;
 use App\Models\GameWallet;
@@ -573,6 +574,137 @@ class LedgerService
         );
 
         return [$sourceEntry, $disputeEntry];
+    }
+
+    /**
+     * Give everything still held in dispute escrow back to the wallet it was taken from.
+     *
+     * @return array{0: LedgerEntry, 1: LedgerEntry}|null [dispute escrow entry, source entry], or null when nothing is held
+     */
+    public function recordDisputeRelease(DisputedTransaction $dispute, Wallet|CompetitionWallet $source): ?array
+    {
+        $amount = (float) $dispute->balance;
+
+        if ($amount <= 0) {
+            return null;
+        }
+
+        $disputeBalanceBefore = $dispute->balance;
+        $sourceBalanceBefore = $source->balance;
+
+        $dispute->balance -= $amount;
+        $dispute->save();
+
+        $source->balance += $amount;
+        $source->save();
+
+        $metadata = ['complaint_id' => $dispute->complaint_id, 'disputed_transaction_id' => $dispute->id];
+
+        $disputeEntry = $this->createEntry(
+            entryType: 'dispute_release',
+            referenceable: $dispute,
+            wallet: $dispute,
+            customerId: null,
+            debit: $amount,
+            credit: 0,
+            balanceBefore: $disputeBalanceBefore,
+            balanceAfter: $dispute->balance,
+            metadata: $metadata
+        );
+
+        $sourceEntry = $this->createEntry(
+            entryType: 'dispute_release',
+            referenceable: $dispute,
+            wallet: $source,
+            customerId: $source instanceof Wallet ? $source->customer_id : null,
+            debit: 0,
+            credit: $amount,
+            balanceBefore: $sourceBalanceBefore,
+            balanceAfter: $source->balance,
+            metadata: $metadata
+        );
+
+        return [$disputeEntry, $sourceEntry];
+    }
+
+    /**
+     * Take the money held for a disputed transaction out of dispute escrow to pay refunds. The matching
+     * credits are the recordDisputeRefund() entries.
+     */
+    public function recordDisputeRefundFunding(DisputedTransaction $dispute): ?LedgerEntry
+    {
+        $amount = (float) $dispute->balance;
+
+        if ($amount <= 0) {
+            return null;
+        }
+
+        $balanceBefore = $dispute->balance;
+        $dispute->balance -= $amount;
+        $dispute->save();
+
+        return $this->createEntry(
+            entryType: 'dispute_refund',
+            referenceable: $dispute,
+            wallet: $dispute,
+            customerId: null,
+            debit: $amount,
+            credit: 0,
+            balanceBefore: $balanceBefore,
+            balanceAfter: $dispute->balance,
+            metadata: ['complaint_id' => $dispute->complaint_id, 'disputed_transaction_id' => $dispute->id]
+        );
+    }
+
+    /**
+     * Credit a player refunded by a resolved complaint.
+     */
+    public function recordDisputeRefund(Complaint $complaint, Wallet $wallet, float $amount): LedgerEntry
+    {
+        $balanceBefore = $wallet->balance;
+        $wallet->balance += $amount;
+        $wallet->save();
+
+        return $this->createEntry(
+            entryType: 'dispute_refund',
+            referenceable: $complaint,
+            wallet: $wallet,
+            customerId: $wallet->customer_id,
+            debit: 0,
+            credit: $amount,
+            balanceBefore: $balanceBefore,
+            balanceAfter: $wallet->balance,
+            metadata: ['complaint_id' => $complaint->id]
+        );
+    }
+
+    /**
+     * Take back a house cut so it can be refunded. The reversal keeps the original's reference and
+     * source, so the income statement reduces the same revenue line on the day it is reversed.
+     */
+    public function reverseHouseCut(LedgerEntry $houseCut, Complaint $complaint): LedgerEntry
+    {
+        $houseWallet = $houseCut->wallet;
+        $amount = (float) $houseCut->credit;
+
+        $balanceBefore = $houseWallet->balance;
+        $houseWallet->balance -= $amount;
+        $houseWallet->save();
+
+        $houseCut->status = 'reversed';
+        $houseCut->save();
+
+        return $this->createEntry(
+            entryType: 'house_cut_reversal',
+            referenceable: $houseCut->referenceable,
+            wallet: $houseWallet,
+            customerId: $houseWallet->customer_id,
+            debit: $amount,
+            credit: 0,
+            balanceBefore: $balanceBefore,
+            balanceAfter: $houseWallet->balance,
+            metadata: ($houseCut->metadata ?? []) + ['original_entry_id' => $houseCut->entry_id, 'complaint_id' => $complaint->id]
+        );
     }
 
     /**
