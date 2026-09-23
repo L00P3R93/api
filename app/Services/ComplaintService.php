@@ -91,6 +91,286 @@ class ComplaintService
     }
 
     /**
+     * A valid complaint: every disputed transaction is reversed and the players who funded it are refunded
+     * to their main wallets. A game refunds every player's net stake from what was held plus the game's
+     * house cuts, which are reversed. A tournament or jackpot reverses only the disputed rounds: the held
+     * money goes back to the players whose losses (or own stake) funded it. When the money falls short,
+     * what there is is shared in proportion to what each player is owed.
+     *
+     * @throws ComplaintException
+     */
+    public function resolve(int $complaintId, string $note, ?string $actor): Complaint
+    {
+        return DB::transaction(function () use ($complaintId, $note, $actor) {
+            $complaint = $this->lockedPendingComplaint($complaintId);
+            $disputes = $complaint->disputedTransactions()->held()->orderBy('id')->lockForUpdate()->get();
+            $houseCuts = new Collection;
+
+            if ($complaint->subject_type === Complaint::SUBJECT_GAME) {
+                Wallet::lockForUpdate()->find(config('wallets.house_wallet_id', 1));
+                $houseCuts = $this->gameHouseCuts((int) $complaint->game_wallet_id);
+                $pot = $disputes->sum(fn (DisputedTransaction $dispute) => (float) $dispute->balance)
+                    + $houseCuts->sum(fn (LedgerEntry $houseCut) => (float) $houseCut->credit);
+                $refunds = $this->share($pot, $this->gameStakes((int) $complaint->game_wallet_id));
+            } else {
+                $refunds = [];
+                foreach ($disputes as $dispute) {
+                    foreach ($this->share((float) $dispute->balance, $this->competitionFunders($dispute)) as $customerId => $amount) {
+                        $refunds[$customerId] = round(($refunds[$customerId] ?? 0.0) + $amount, 2);
+                    }
+                }
+            }
+
+            $wallets = [];
+            foreach (array_keys($refunds) as $customerId) {
+                $wallets[$customerId] = $this->customerWallet($customerId);
+            }
+
+            foreach ($disputes as $dispute) {
+                $this->ledgerService->recordDisputeRefundFunding($dispute);
+                $dispute->status = DisputedTransaction::STATUS_REVERSED;
+                $dispute->save();
+            }
+
+            foreach ($houseCuts as $houseCut) {
+                $this->ledgerService->reverseHouseCut($houseCut, $complaint);
+            }
+
+            foreach ($refunds as $customerId => $amount) {
+                $this->ledgerService->recordDisputeRefund($complaint, $wallets[$customerId], $amount);
+            }
+
+            $complaint->update([
+                'status' => Complaint::STATUS_RESOLVED,
+                'refunded_amount' => round(array_sum($refunds), 2),
+                'house_cuts_reversed' => round($houseCuts->sum(fn (LedgerEntry $houseCut) => (float) $houseCut->credit), 2),
+                'resolution_note' => $note,
+                'closed_by' => $actor,
+                'closed_at' => now(),
+            ]);
+
+            return $complaint->load(['disputedTransactions', 'refunds']);
+        });
+    }
+
+    /**
+     * An invalid complaint: everything held goes back to the wallets it was taken from.
+     *
+     * @throws ComplaintException
+     */
+    public function reject(int $complaintId, string $note, ?string $actor): Complaint
+    {
+        return $this->release($complaintId, Complaint::STATUS_REJECTED, $note, $actor);
+    }
+
+    /**
+     * A withdrawn complaint: everything held goes back to the wallets it was taken from.
+     *
+     * @throws ComplaintException
+     */
+    public function cancel(int $complaintId, string $note, ?string $actor): Complaint
+    {
+        return $this->release($complaintId, Complaint::STATUS_CANCELLED, $note, $actor);
+    }
+
+    /**
+     * @throws ComplaintException
+     */
+    private function release(int $complaintId, string $status, string $note, ?string $actor): Complaint
+    {
+        return DB::transaction(function () use ($complaintId, $status, $note, $actor) {
+            $complaint = $this->lockedPendingComplaint($complaintId);
+            $released = 0.0;
+
+            foreach ($complaint->disputedTransactions()->held()->orderBy('id')->lockForUpdate()->get() as $dispute) {
+                $released += (float) $dispute->balance;
+                $this->ledgerService->recordDisputeRelease($dispute, $this->sourceWallet($dispute));
+
+                $dispute->status = DisputedTransaction::STATUS_RELEASED;
+                $dispute->save();
+            }
+
+            $complaint->update([
+                'status' => $status,
+                'released_amount' => round($released, 2),
+                'resolution_note' => $note,
+                'closed_by' => $actor,
+                'closed_at' => now(),
+            ]);
+
+            return $complaint->load(['disputedTransactions', 'refunds']);
+        });
+    }
+
+    /**
+     * @throws ComplaintException
+     */
+    private function lockedPendingComplaint(int $complaintId): Complaint
+    {
+        $this->lockedWallets = [];
+        $complaint = Complaint::lockForUpdate()->find($complaintId);
+
+        if (! $complaint) {
+            throw new ComplaintException('Complaint not found', 404);
+        }
+
+        if (! $complaint->isPending()) {
+            throw ComplaintException::conflict("Complaint is already {$complaint->status}.");
+        }
+
+        return $complaint;
+    }
+
+    /**
+     * What each player put into a game and has not had back, keyed by customer id. The house is left out.
+     *
+     * @return array<int, float>
+     */
+    private function gameStakes(int $gameWalletId): array
+    {
+        $stakes = GameTransaction::where('game_wallet_id', $gameWalletId)
+            ->where('customer_id', '!=', $this->houseCustomerId())
+            ->selectRaw("customer_id, SUM(CASE WHEN payment_type = 'deposit' THEN amount ELSE 0 END) - SUM(CASE WHEN payment_type LIKE 'refund%' THEN amount ELSE 0 END) as net_stake")
+            ->groupBy('customer_id')
+            ->pluck('net_stake', 'customer_id');
+
+        return $stakes->map(fn ($stake) => (float) $stake)->filter(fn (float $stake) => $stake > 0)->all();
+    }
+
+    /**
+     * House cuts taken on a game's transactions that have not been reversed.
+     *
+     * @return Collection<int, LedgerEntry>
+     */
+    private function gameHouseCuts(int $gameWalletId): Collection
+    {
+        return LedgerEntry::where('entry_type', 'house_cut')
+            ->where('status', 'settled')
+            ->where('referenceable_type', GameTransaction::class)
+            ->whereIn('referenceable_id', GameTransaction::where('game_wallet_id', $gameWalletId)->select('id'))
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+    }
+
+    /**
+     * Who paid for a disputed competition transaction, and how much of it, keyed by customer id. A win was
+     * funded by the player who lost that round; a bet by the player who placed it; a payout by the losers of
+     * every round the wallet won plus the wallet owner's own remaining stake.
+     *
+     * @return array<int, float>
+     *
+     * @throws ComplaintException
+     */
+    private function competitionFunders(DisputedTransaction $dispute): array
+    {
+        $transaction = CompetitionTransaction::with('wallet')->findOrFail($dispute->disputable_id);
+        $funders = [];
+
+        $addFunder = function (int $customerId, float $amount) use (&$funders) {
+            if ($amount > 0) {
+                $funders[$customerId] = ($funders[$customerId] ?? 0.0) + $amount;
+            }
+        };
+
+        if ($transaction->payment_type === 'deposit') {
+            $addFunder((int) $transaction->customer_id, (float) $dispute->amount);
+        } elseif ($transaction->payment_type === 'win') {
+            $addFunder((int) $this->losingRound($transaction)->customer_id, (float) $transaction->amount);
+        } else {
+            $wins = CompetitionTransaction::where('competition_wallet_id', $transaction->competition_wallet_id)
+                ->where('payment_type', 'win')
+                ->orderBy('id')
+                ->get();
+
+            foreach ($wins as $win) {
+                $addFunder((int) $this->losingRound($win)->customer_id, (float) $win->amount);
+            }
+
+            $addFunder((int) $transaction->customer_id, round((float) $transaction->amount - (float) $wins->sum('amount'), 2));
+        }
+
+        if ($funders === []) {
+            throw new ComplaintException("No player to refund was found for transaction {$transaction->id}.");
+        }
+
+        return $funders;
+    }
+
+    /**
+     * The `loss` recorded with a round `win`: same competition, same amount, written just before it.
+     *
+     * @throws ComplaintException
+     */
+    private function losingRound(CompetitionTransaction $win): CompetitionTransaction
+    {
+        $loss = CompetitionTransaction::where('payment_type', 'loss')
+            ->where('amount', $win->amount)
+            ->where('id', '<', $win->id)
+            ->whereIn('competition_wallet_id', CompetitionWallet::where('cmp_uid', $win->wallet->cmp_uid)->select('id'))
+            ->orderByDesc('id')
+            ->first();
+
+        if (! $loss) {
+            throw new ComplaintException("The losing round for win {$win->id} was not found.");
+        }
+
+        return $loss;
+    }
+
+    /**
+     * Split an amount between players in proportion to what each is owed, in whole cents. Cents left over
+     * from rounding go to the largest claims first, so the parts always add up to the amount.
+     *
+     * @param  array<int, float>  $claims  keyed by customer id
+     * @return array<int, float>
+     */
+    private function share(float $amount, array $claims): array
+    {
+        $cents = (int) round($amount * 100);
+        $total = array_sum($claims);
+
+        if ($cents <= 0 || $total <= 0) {
+            return [];
+        }
+
+        $shares = [];
+        foreach ($claims as $customerId => $claim) {
+            $shares[$customerId] = intdiv((int) round($claim * 100) * $cents, (int) round($total * 100));
+        }
+
+        arsort($claims);
+        $left = $cents - array_sum($shares);
+        foreach (array_keys($claims) as $customerId) {
+            if ($left <= 0) {
+                break;
+            }
+            $shares[$customerId]++;
+            $left--;
+        }
+
+        return array_map(fn (int $share) => $share / 100, array_filter($shares, fn (int $share) => $share > 0));
+    }
+
+    /**
+     * The wallet a disputed transaction's money was held from.
+     *
+     * @throws ComplaintException
+     */
+    private function sourceWallet(DisputedTransaction $dispute): Wallet|CompetitionWallet
+    {
+        $wallet = $dispute->source_wallet_type === LedgerEntry::WALLET_TYPE_COMPETITION
+            ? CompetitionWallet::lockForUpdate()->find($dispute->source_wallet_id)
+            : Wallet::lockForUpdate()->find($dispute->source_wallet_id);
+
+        if (! $wallet) {
+            throw new ComplaintException("The wallet the money was held from ({$dispute->source_wallet_type} {$dispute->source_wallet_id}) no longer exists.");
+        }
+
+        return $wallet;
+    }
+
+    /**
      * The winner payouts of a game. The complainant must have played in it and cannot dispute their own payout.
      *
      * @param  list<int>  $transactionIds

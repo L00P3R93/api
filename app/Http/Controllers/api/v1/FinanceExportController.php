@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\FinanceListRequest;
 use App\Services\ExciseDutyReportService;
 use App\Services\FinanceDateRange;
+use App\Services\FinanceDisputeReportService;
 use App\Services\FinanceExpenseService;
 use App\Services\FinanceGameReportService;
 use App\Services\FinanceLedgerReportService;
@@ -22,7 +23,7 @@ class FinanceExportController extends Controller
     private const REPORTS = [
         'ledger', 'deposits', 'withdrawals', 'purchases', 'adjustments', 'games', 'competitions',
         'customers-top', 'cash-flow', 'income-statement', 'trial-balance', 'expenses', 'taxes',
-        'excise-duty', 'excise-duty-charges', 'excise-duty-returns', 'excise-duty-remittances',
+        'excise-duty', 'excise-duty-charges', 'excise-duty-returns', 'excise-duty-remittances', 'disputes',
     ];
 
     /** Days the top customers report covers when no range is given. */
@@ -36,6 +37,7 @@ class FinanceExportController extends Controller
         private FinanceExpenseService $expenses,
         private FinanceTaxService $taxes,
         private ExciseDutyReportService $exciseDuty,
+        private FinanceDisputeReportService $disputes,
     ) {}
 
     /**
@@ -69,6 +71,7 @@ class FinanceExportController extends Controller
             'excise-duty-charges' => $this->fromListing($this->exciseDuty->charges($range, $filters)),
             'excise-duty-returns' => $this->exciseDutyReturnRows($range),
             'excise-duty-remittances' => $this->fromListing($this->exciseDuty->remittances($range, $filters)),
+            'disputes' => $this->fromListing($this->disputes->listing($range, $filters)),
         };
 
         $filename = "finance-{$report}-{$range->from->toDateString()}-{$range->to->toDateString()}.csv";

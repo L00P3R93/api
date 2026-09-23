@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 /**
  * A customer's complaint about the result of a game, tournament or jackpot. While it is pending, the
@@ -48,6 +49,9 @@ class Complaint extends Model
         'disputed_amount',
         'held_amount',
         'shortfall_amount',
+        'refunded_amount',
+        'house_cuts_reversed',
+        'released_amount',
         'filed_by',
         'resolution_note',
         'closed_by',
@@ -63,6 +67,9 @@ class Complaint extends Model
             'disputed_amount' => 'decimal:2',
             'held_amount' => 'decimal:2',
             'shortfall_amount' => 'decimal:2',
+            'refunded_amount' => 'decimal:2',
+            'house_cuts_reversed' => 'decimal:2',
+            'released_amount' => 'decimal:2',
             'closed_at' => 'datetime',
         ];
     }
@@ -99,5 +106,16 @@ class Complaint extends Model
     public function disputedTransactions(): HasMany
     {
         return $this->hasMany(DisputedTransaction::class);
+    }
+
+    /**
+     * The credits paid to players when the complaint was resolved.
+     */
+    public function refunds(): MorphMany
+    {
+        return $this->morphMany(LedgerEntry::class, 'referenceable')
+            ->where('entry_type', 'dispute_refund')
+            ->where('wallet_type', LedgerEntry::WALLET_TYPE_WALLET)
+            ->orderBy('id');
     }
 }

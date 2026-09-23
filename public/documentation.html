@@ -1343,7 +1343,7 @@ Idempotency-Key: idem-game-refund-42
 <!-- COMPLAINTS SECTION -->
 <div class="doc-section" data-section="complaints">
 <button class="expand-all" onclick="toggleAll('complaints')">Expand / Collapse All</button>
-<div class="callback-note">A player complains about the result of a game, tournament or jackpot. Filing a complaint moves the disputed winnings out of the winner's reach straight away and holds them in <strong>dispute escrow</strong> until the complaint is closed. A complaint is <code>pending_dispute</code> until it is <code>resolved</code> (valid: the disputed transactions are reversed and every player is refunded), <code>rejected</code> (found invalid) or <code>cancelled</code> (withdrawn); the last two give the held money back. Held money is reported as <code>disputed_funds</code> on the <a href="#" data-section="finance-statements" style="color:var(--accent-blue)">balance sheet</a>.</div>
+<div class="callback-note">A player complains about the result of a game, tournament or jackpot. Filing a complaint moves the disputed winnings out of the winner's reach straight away and holds them in <strong>dispute escrow</strong> until the complaint is closed. A complaint is <code>pending_dispute</code> until it is <code>resolved</code> (valid: the disputed transactions are reversed and the players who paid for them are refunded), <code>rejected</code> (found invalid) or <code>cancelled</code> (withdrawn); the last two give the held money back. Held money is reported as <code>disputed_funds</code> on the <a href="#" data-section="finance-statements" style="color:var(--accent-blue)">balance sheet</a>.</div>
 
 <div class="endpoint">
 <div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/complaints</span><span class="endpoint-desc">File a complaint and hold the disputed winnings</span><span class="chevron">&#9654;</span></div>
@@ -1383,6 +1383,7 @@ Content-Type: application/json
     "subject_type": "game", "game_wallet_id": 1051, "competition_wallet_id": null,
     "reason": "The winner kept playing after I disconnected", "description": null,
     "status": "pending_dispute", "disputed_amount": 190.00, "held_amount": 150.00, "shortfall_amount": 40.00,
+    "refunded_amount": 0.00, "house_cuts_reversed": 0.00, "released_amount": 0.00,
     "filed_by": "api_key:4", "resolution_note": null, "closed_by": null, "closed_at": null,
     "created_at": "2026-09-23T14:05:00+03:00",
     "disputed_transactions": [
@@ -1391,11 +1392,12 @@ Content-Type: application/json
         "source_wallet_type": "wallet", "source_wallet_id": 57,
         "amount": 190.00, "held_amount": 150.00, "shortfall_amount": 40.00, "balance": 150.00, "status": "held"
       }
-    ]
+    ],
+    "refunds": []
   }
 }</pre></div>
 <div class="endpoint-section"><h4>Notes</h4>
-<p style="color:var(--text-secondary);font-size:13px;"><code>transaction_type</code> is <code>game_transaction</code> or <code>competition_transaction</code>. <code>source_wallet_type</code> is <code>wallet</code> (a customer wallet) or <code>competition_wallet</code>. <code>balance</code> is what is still held for that transaction. A repeated identical request replays the earlier response (see Idempotency).</p></div>
+<p style="color:var(--text-secondary);font-size:13px;"><code>transaction_type</code> is <code>game_transaction</code> or <code>competition_transaction</code>. <code>source_wallet_type</code> is <code>wallet</code> (a customer wallet) or <code>competition_wallet</code>. <code>balance</code> is what is still held for that transaction. <code>refunded_amount</code>, <code>house_cuts_reversed</code>, <code>released_amount</code> and <code>refunds</code> are filled in when the complaint is closed (see below). A repeated identical request replays the earlier response (see Idempotency).</p></div>
 <div class="endpoint-section"><h4>Error Responses</h4>
 <pre>// 422 - validation, e.g. both subjects sent
 {"message": "The game wallet id field prohibits competition wallet id from being present.", "errors": {...}}
@@ -1439,6 +1441,72 @@ Content-Type: application/json
 <div class="endpoint-section"><h4>Error Responses</h4>
 <pre>// 404
 {"success": false, "message": "Complaint not found"}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/complaints/{encryptedIdentifier}/resolve</span><span class="endpoint-desc">The complaint is valid: reverse the disputed transactions and refund the players</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">30/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Every disputed transaction on the complaint is reversed together, and refunds are always paid to the players' main (customer) wallets:</p>
+<table class="params-table"><tr><th>Subject</th><th>Who is refunded</th><th>Paid from</th></tr>
+<tr><td>Game</td><td>Every player gets back their stake in the game (deposits minus any refund they already had), including the winner</td><td>The held money plus every house cut taken on the game, which is reversed (ledger <code>house_cut_reversal</code>)</td></tr>
+<tr><td>Tournament or jackpot</td><td>Only the disputed rounds are reversed. A disputed <code>win</code> goes back to the player who lost that round; a disputed <code>deposit</code> to the player who placed it; a disputed <code>payout</code> to the losers of every round the wallet won, with any remainder (the winner's own stake) back to the winner</td><td>The held money only. Competition house cuts are not reversed</td></tr></table>
+<p style="color:var(--text-secondary);font-size:13px;margin-top:10px;">When there was a shortfall, players share what there is in proportion to what each is owed, so nobody is refunded in full. Amounts are split in whole cents; leftover cents go to the largest claims. Reversed house cuts reduce revenue in the income statement on the day of the reversal. A frozen competition wallet is unfrozen.</p></div>
+<div class="endpoint-section"><h4>Request Body</h4>
+<table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>note</td><td>string</td><td><span class="required">Required</span></td><td>3 to 255 characters, saved as <code>resolution_note</code></td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "id": 3, "status": "resolved", "subject_type": "game",
+    "disputed_amount": 180.00, "held_amount": 180.00, "shortfall_amount": 0.00,
+    "refunded_amount": 200.00, "house_cuts_reversed": 20.00, "released_amount": 0.00,
+    "resolution_note": "Winner used a bot", "closed_by": "api_key:4", "closed_at": "2026-09-24T09:30:00+03:00",
+    "disputed_transactions": [ { "id": 5, "status": "reversed", "balance": 0.00, ... } ],
+    "refunds": [
+      {"customer_id": 42, "wallet_id": 42, "amount": 100.00},
+      {"customer_id": 57, "wallet_id": 57, "amount": 100.00}
+    ],
+    ...
+  }
+}</pre></div>
+<div class="endpoint-section"><h4>Error Responses</h4>
+<pre>// 404
+{"success": false, "message": "Complaint not found"}
+// 409 - already closed
+{"success": false, "message": "Complaint is already rejected."}
+// 422 - missing note, or the losing round of a disputed win cannot be found
+{"success": false, "message": "The losing round for win 7712 was not found."}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/complaints/{encryptedIdentifier}/reject</span><span class="endpoint-desc">The complaint is invalid: give the held money back</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">30/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Everything still held goes back to the wallet it was taken from (the winner's wallet, or the competition wallet, which is unfrozen). Ledger entry <code>dispute_release</code>. Nothing else changes.</p></div>
+<div class="endpoint-section"><h4>Request Body</h4>
+<table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>note</td><td>string</td><td><span class="required">Required</span></td><td>3 to 255 characters</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{"success": true, "data": {"id": 3, "status": "rejected", "released_amount": 180.00, "refunded_amount": 0.00, "refunds": [], "disputed_transactions": [{"status": "released", "balance": 0.00, ...}], ...}}</pre></div>
+<div class="endpoint-section"><h4>Error Responses</h4>
+<pre>// 404, 409 and 422 as for resolve</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/complaints/{encryptedIdentifier}/cancel</span><span class="endpoint-desc">The complainant withdrew the complaint: give the held money back</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">30/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Same money movement as reject; the status is <code>cancelled</code>.</p></div>
+<div class="endpoint-section"><h4>Request Body</h4>
+<table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>note</td><td>string</td><td><span class="required">Required</span></td><td>3 to 255 characters</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{"success": true, "data": {"id": 3, "status": "cancelled", "released_amount": 180.00, ...}}</pre></div>
 </div></div>
 </div>
 
@@ -1619,7 +1687,7 @@ Content-Type: application/json
 <table class="params-table">
 <tr><th>Group</th><th>Endpoints</th></tr>
 <tr><td><a href="#" data-section="finance-statements" style="color:var(--accent-blue)">Financial Statements</a></td><td>summary, income-statement, cash-flow, balance-sheet, trial-balance, reconciliation, taxes</td></tr>
-<tr><td><a href="#" data-section="finance-reports" style="color:var(--accent-blue)">Drill-downs</a></td><td>deposits, withdrawals, purchases, games, competitions, ledger, adjustments, customers/top, customer statement</td></tr>
+<tr><td><a href="#" data-section="finance-reports" style="color:var(--accent-blue)">Drill-downs</a></td><td>deposits, withdrawals, purchases, games, competitions, ledger, adjustments, disputes, customers/top, customer statement</td></tr>
 <tr><td><a href="#" data-section="finance-expenses" style="color:var(--accent-blue)">Expenses</a></td><td>record, void and list expenses</td></tr>
 <tr><td><a href="#" data-section="finance-excise" style="color:var(--accent-blue)">Excise Duty</a></td><td>excise-duty, excise-duty/charges, excise-duty/returns, excise-duty/remittances (list, record, void)</td></tr>
 <tr><td><a href="#" data-section="finance-export" style="color:var(--accent-blue)">CSV Export</a></td><td>any report as a CSV download</td></tr>
@@ -1745,7 +1813,7 @@ Content-Type: application/json
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
 <div class="endpoint-section"><h4>Description</h4>
-<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Revenue is house cuts as they are booked in the ledger, plus gift and emoji sales at the cash received. Tournament and jackpot cuts are split by rounds where the cut is linked to its competition entry; older cuts appear as <code>competitions_unattributed</code>. <code>expenses</code> are the active entries recorded through <a href="#" data-section="finance-expenses" style="color:var(--accent-blue)">/finance/expenses</a>, dated by their expense date. <code>net_income</code> is revenue minus expenses, before tax (see <a href="#" data-section="finance-statements" style="color:var(--accent-blue)">/finance/taxes</a>). <code>memo.load_margin</code> is cash received for wallet loads minus the wallet credit given; it is shown for information and is not part of revenue.</p></div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Revenue is house cuts as they are booked in the ledger, plus gift and emoji sales at the cash received. Tournament and jackpot cuts are split by rounds where the cut is linked to its competition entry; older cuts appear as <code>competitions_unattributed</code>. <code>expenses</code> are the active entries recorded through <a href="#" data-section="finance-expenses" style="color:var(--accent-blue)">/finance/expenses</a>, dated by their expense date. <code>net_income</code> is revenue minus expenses, before tax (see <a href="#" data-section="finance-statements" style="color:var(--accent-blue)">/finance/taxes</a>). <code>memo.load_margin</code> is cash received for wallet loads minus the wallet credit given; it is shown for information and is not part of revenue. House cuts reversed when a <a href="#" data-section="complaints" style="color:var(--accent-blue)">complaint</a> is resolved reduce the same revenue line on the day they are reversed.</p></div>
 <div class="endpoint-section"><h4>Query Parameters</h4>
 <table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
 <tr><td>from, to, group_by, exclude_test</td><td>&nbsp;</td><td><span class="optional">Optional</span></td><td>See common parameters</td></tr></table></div>
@@ -1884,6 +1952,7 @@ Content-Type: application/json
 <tr><td>customer_wallet_drift</td><td>fail</td><td>Customer wallet balances match opening balance plus ledger credits minus debits</td></tr>
 <tr><td>game_wallet_drift</td><td>fail</td><td>Same for game wallets (from the day escrow releases were ledgered)</td></tr>
 <tr><td>competition_wallet_drift</td><td>fail</td><td>Same for competition wallets</td></tr>
+<tr><td>dispute_escrow_drift</td><td>fail</td><td>Same for money held in dispute escrow by complaints</td></tr>
 <tr><td>ledger_arithmetic</td><td>fail</td><td>Every ledger entry adds up: before + credit - debit = after</td></tr>
 <tr><td>ledger_balance</td><td>fail</td><td>Paired ledger entries net to zero (see trial balance)</td></tr>
 <tr><td>unclassified_entries</td><td>warn</td><td>Ledger entries that have no wallet type</td></tr>
@@ -1898,6 +1967,8 @@ Content-Type: application/json
 <tr><td>stuck_escrow</td><td>warn</td><td>Money left in game or competition wallets that are no longer open</td></tr>
 <tr><td>aged_escrow</td><td>warn</td><td>Open game or competition wallets holding money, untouched for over 24 hours</td></tr>
 <tr><td>negative_balances</td><td>fail</td><td>Any wallet with a negative balance</td></tr>
+<tr><td>held_on_closed_complaints</td><td>fail</td><td>Money still in dispute escrow for a complaint that is resolved, rejected or cancelled</td></tr>
+<tr><td>aged_disputes</td><td>warn</td><td>Complaints still pending after 3 days (<code>FINANCE_AGED_DISPUTE_DAYS</code>), with the money they hold</td></tr>
 <tr><td>house_cut_rates</td><td>warn</td><td>House cuts that differ from the fee schedule (only cuts linked to their transaction can be checked)</td></tr>
 <tr><td>mpesa_balance_freshness</td><td>warn</td><td>M-Pesa balances fetched in the last 3 hours</td></tr>
 <tr><td>cash_coverage</td><td>fail</td><td>M-Pesa cash covers everything owed to customers and the excise duty owed to KRA</td></tr></table></div>
@@ -2162,6 +2233,37 @@ Content-Type: application/json
       {"id": 612, "created_at": "2026-09-20T10:15:00+03:00", "entry_type": "adjustment", "customer_id": 900, "customer_name": "Alice Wanjiru", "direction": "credit", "amount": 50.00, "balance_before": 1000.00, "balance_after": 1050.00, "reason": "promo bonus", "actor": "api_key:4", "operation": "add_balance", "status": "settled"}
     ],
     "pagination": {"page": 1, "per_page": 50, "total": 3, "last_page": 1}
+  }
+}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/disputes</span><span class="endpoint-desc">Complaints and the money they held, refunded and released</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Complaints filed in the range, newest first. <code>still_held</code> is what each complaint holds in dispute escrow now; <code>summary.currently_held</code> is the total held by all complaints (the balance sheet's <code>disputed_funds</code>). <code>refunded_amount</code> includes <code>house_cuts_reversed</code>. See <a href="#" data-section="complaints" style="color:var(--accent-blue)">Complaints</a>.</p></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>status</td><td>string</td><td><span class="optional">Optional</span></td><td><code>pending_dispute</code>, <code>resolved</code>, <code>rejected</code> or <code>cancelled</code></td></tr>
+<tr><td>type</td><td>string</td><td><span class="optional">Optional</span></td><td><code>game</code>, <code>tournament</code> or <code>jackpot</code></td></tr>
+<tr><td>customer_id</td><td>integer</td><td><span class="optional">Optional</span></td><td>The complainant</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "summary": {
+      "by_status": {
+        "pending_dispute": {"complaints": 1, "disputed": 50.00, "held": 50.00, "shortfall": 0.00, "refunded": 0.00, "house_cuts_reversed": 0.00, "released": 0.00},
+        "resolved": {"complaints": 1, "disputed": 180.00, "held": 180.00, "shortfall": 0.00, "refunded": 200.00, "house_cuts_reversed": 20.00, "released": 0.00},
+        "rejected": {...}, "cancelled": {...}
+      },
+      "currently_held": 50.00
+    },
+    "items": [
+      {"id": 3, "complaint_id": "9b1c2f0e-...", "filed_at": "2026-09-23T14:05:00+03:00", "customer_id": 42, "subject_type": "game", "game_wallet_id": 1051, "competition_wallet_id": null, "reason": "Unfair result", "status": "resolved", "disputed_amount": 180.00, "held_amount": 180.00, "shortfall_amount": 0.00, "still_held": 0.00, "refunded_amount": 200.00, "house_cuts_reversed": 20.00, "released_amount": 0.00, "filed_by": "api_key:4", "closed_at": "2026-09-24T09:30:00+03:00", "closed_by": "api_key:4", "resolution_note": "Winner used a bot"}
+    ],
+    "pagination": {"page": 1, "per_page": 50, "total": 2, "last_page": 1}
   }
 }</pre></div>
 </div></div>
@@ -2543,7 +2645,8 @@ Idempotency-Key: excise-2026-08
 <tr><td>excise-duty</td><td>/finance/excise-duty</td><td>One per period</td></tr>
 <tr><td>excise-duty-charges</td><td>/finance/excise-duty/charges</td><td>One per charged deposit</td></tr>
 <tr><td>excise-duty-returns</td><td>/finance/excise-duty/returns</td><td>One per month</td></tr>
-<tr><td>excise-duty-remittances</td><td>/finance/excise-duty/remittances</td><td>One per KRA payment</td></tr></table>
+<tr><td>excise-duty-remittances</td><td>/finance/excise-duty/remittances</td><td>One per KRA payment</td></tr>
+<tr><td>disputes</td><td>/finance/disputes</td><td>One per complaint</td></tr></table>
 <p style="color:var(--text-secondary);font-size:13px;margin-top:8px;">The <code>cash-flow</code> export has <code>excise_withheld</code> and <code>excise_remitted</code> columns before <code>net_cash</code>.</p>
 <p style="color:var(--text-secondary);font-size:13px;margin-top:8px;">The customer statement cannot be exported yet.</p></div>
 <div class="endpoint-section"><h4>Request</h4>

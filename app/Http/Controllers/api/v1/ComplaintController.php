@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\api\v1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\CloseComplaintRequest;
 use App\Http\Requests\ListComplaintsRequest;
 use App\Http\Requests\StoreComplaintRequest;
 use App\Http\Resources\ComplaintResource;
@@ -24,7 +25,7 @@ class ComplaintController extends Controller
         $filters = $request->validated();
 
         $complaints = Complaint::query()
-            ->with('disputedTransactions')
+            ->with(['disputedTransactions', 'refunds'])
             ->when(isset($filters['status']), fn (Builder $query) => $query->where('status', $filters['status']))
             ->when(isset($filters['subject_type']), fn (Builder $query) => $query->where('subject_type', $filters['subject_type']))
             ->when(isset($filters['customer_id']), fn (Builder $query) => $query->where('customer_id', $filters['customer_id']))
@@ -51,11 +52,41 @@ class ComplaintController extends Controller
 
     public function show(string $encryptedIdentifier): JsonResponse
     {
-        $complaint = Complaint::with('disputedTransactions')->find($encryptedIdentifier);
+        $complaint = Complaint::with(['disputedTransactions', 'refunds'])->find($encryptedIdentifier);
 
         if (! $complaint) {
             return response()->json(['success' => false, 'message' => 'Complaint not found'], 404);
         }
+
+        return response()->json(['success' => true, 'data' => ComplaintResource::make($complaint)]);
+    }
+
+    /**
+     * The complaint is valid: reverse the disputed transactions and refund the players.
+     */
+    public function resolve(CloseComplaintRequest $request, string $encryptedIdentifier): JsonResponse
+    {
+        $complaint = $this->complaints->resolve((int) $encryptedIdentifier, $request->validated('note'), $this->actorFor($request));
+
+        return response()->json(['success' => true, 'data' => ComplaintResource::make($complaint)]);
+    }
+
+    /**
+     * The complaint is invalid: give the held money back.
+     */
+    public function reject(CloseComplaintRequest $request, string $encryptedIdentifier): JsonResponse
+    {
+        $complaint = $this->complaints->reject((int) $encryptedIdentifier, $request->validated('note'), $this->actorFor($request));
+
+        return response()->json(['success' => true, 'data' => ComplaintResource::make($complaint)]);
+    }
+
+    /**
+     * The complainant withdrew the complaint: give the held money back.
+     */
+    public function cancel(CloseComplaintRequest $request, string $encryptedIdentifier): JsonResponse
+    {
+        $complaint = $this->complaints->cancel((int) $encryptedIdentifier, $request->validated('note'), $this->actorFor($request));
 
         return response()->json(['success' => true, 'data' => ComplaintResource::make($complaint)]);
     }

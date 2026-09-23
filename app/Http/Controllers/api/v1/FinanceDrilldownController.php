@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\FinanceListRequest;
 use App\Services\CustomerService;
 use App\Services\FinanceDateRange;
+use App\Services\FinanceDisputeReportService;
 use App\Services\FinanceExpenseService;
 use App\Services\FinanceGameReportService;
 use App\Services\FinanceLedgerReportService;
@@ -26,6 +27,7 @@ class FinanceDrilldownController extends Controller
         private FinanceReportService $reports,
         private CustomerService $customers,
         private FinanceExpenseService $expenses,
+        private FinanceDisputeReportService $disputes,
     ) {}
 
     public function deposits(FinanceListRequest $request): JsonResponse
@@ -66,6 +68,11 @@ class FinanceDrilldownController extends Controller
     public function expenses(FinanceListRequest $request): JsonResponse
     {
         return $this->paged($request, $this->expenses->listing($request->dateRange(), $request->filters()));
+    }
+
+    public function disputes(FinanceListRequest $request): JsonResponse
+    {
+        return $this->paged($request, $this->disputes->listing($request->dateRange(), $request->filters()));
     }
 
     public function topCustomers(FinanceListRequest $request): JsonResponse
