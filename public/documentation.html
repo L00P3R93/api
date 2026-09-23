@@ -659,6 +659,47 @@ Idempotency-Key: idem-12345
 <div class="endpoint">
 <div class="endpoint-header" onclick="toggle(this)">
 <span class="method method-get">GET</span>
+<span class="endpoint-path">/api/v1/customers/played/recent/{encryptedIdentifier}</span>
+<span class="endpoint-desc">Latest 10 games, tournaments and jackpots (for filing complaints)</span>
+<span class="chevron">&#9654;</span>
+</div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
+<div class="endpoint-section"><p>Returns up to 10 of the customer's most recent entries of each type, newest first. There is no date window and no pagination. Each row is one game or competition wallet, not one transaction.</p>
+<p>To file a complaint with <code>POST /complaints</code>:</p>
+<ul>
+<li><strong>Single game:</strong> send the row's <code>game_wallet_id</code>.</li>
+<li><strong>Tournament or jackpot:</strong> send an <code>opponents[].competition_wallet_id</code>. A customer cannot complain about their own competition wallet.</li>
+</ul></div>
+<div class="endpoint-section"><h4>Row Fields</h4>
+<table class="params-table"><tr><th>Field</th><th>Type</th><th>Description</th></tr>
+<tr><td>single_games[].game_wallet_id</td><td>integer</td><td>Game wallet. Use as <code>game_wallet_id</code> when filing a complaint</td></tr>
+<tr><td>single_games[].game_id</td><td>string</td><td>Game identifier from the game side</td></tr>
+<tr><td>single_games[].players</td><td>integer</td><td>Number of stakes in the game</td></tr>
+<tr><td>single_games[].amount</td><td>decimal</td><td>The customer's stake</td></tr>
+<tr><td>single_games[].state</td><td>string</td><td><code>win</code> if the customer received a payout in the game, otherwise <code>loss</code></td></tr>
+<tr><td>tournament_games[] / jackpot_games[].competition_wallet_id</td><td>integer</td><td>The customer's own competition wallet</td></tr>
+<tr><td>tournament_games[] / jackpot_games[].competition_id</td><td>string</td><td>Competition identifier from the game side</td></tr>
+<tr><td>tournament_games[] / jackpot_games[].cmp_uid</td><td>string</td><td>Groups the wallets of every player in the same competition</td></tr>
+<tr><td>tournament_games[] / jackpot_games[].status</td><td>integer</td><td>1 = open, otherwise closed</td></tr>
+<tr><td>tournament_games[] / jackpot_games[].opponents[]</td><td>array</td><td>The other players' wallets in the same competition (<code>competition_wallet_id</code>, <code>customer_id</code>, <code>status</code>). Use one of these as <code>competition_wallet_id</code> when filing a complaint</td></tr>
+</table></div>
+<div class="endpoint-section"><h4>Response (200)</h4><pre>{
+  "single_games": [
+    {"game_wallet_id": 812, "game_id": "GAME-5521", "game_type": "Single Game", "players": 2, "amount": 100.00, "state": "loss", "created_at": "2026-09-22 18:04:11"}
+  ],
+  "tournament_games": [
+    {"competition_wallet_id": 301, "competition_id": "TOURN-88", "cmp_uid": "74120", "game_type": 1, "level": 2, "balance": 0.00, "status": 0, "created_at": "2026-09-21 20:15:02",
+     "opponents": [{"competition_wallet_id": 302, "customer_id": 45, "status": 0}]}
+  ],
+  "jackpot_games": []
+}</pre></div>
+<div class="endpoint-section"><h4>Response (404)</h4><pre>{"message": "Customer not found"}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)">
+<span class="method method-get">GET</span>
 <span class="endpoint-path">/api/v1/customers/purchases/{encryptedIdentifier}</span>
 <span class="endpoint-desc">Get customer purchases</span>
 <span class="chevron">&#9654;</span>

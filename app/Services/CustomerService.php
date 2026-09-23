@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\CompetitionWallet;
 use App\Models\Customer;
 use App\Models\Deposit;
 use App\Models\GameTransaction;
+use App\Models\GameWallet;
 use App\Models\Wallet;
 use App\Models\Withdraw;
 use Illuminate\Support\Carbon;
@@ -225,6 +227,114 @@ class CustomerService
             'tournament_games' => $tournamentGames,
             'jackpot_games' => $jackpotGames,
         ];
+    }
+
+    /**
+     * The customer's latest games, tournaments and jackpots, one row per game or competition wallet, newest first.
+     * Competition rows carry the other players' wallets in the same competition, which a complaint is filed against.
+     *
+     * @return array{customer: ?Customer, single_games?: Collection, tournament_games?: Collection, jackpot_games?: Collection}
+     */
+    public function getCustomerRecentPlayedGames($identifier, int $limit = 10): array
+    {
+        $customer = Customer::query()
+            ->where('id', $identifier)
+            ->orWhere('account_no', $identifier)
+            ->first();
+
+        if (! $customer) {
+            return ['customer' => null];
+        }
+
+        return [
+            'customer' => $customer,
+            'single_games' => $this->recentSingleGames($customer->id, $limit),
+            'tournament_games' => $this->recentCompetitions($customer->id, 1, $limit),
+            'jackpot_games' => $this->recentCompetitions($customer->id, 2, $limit),
+        ];
+    }
+
+    /**
+     * @return Collection<int, array{game_wallet_id: int, game_id: ?string, game_type: string, players: int, amount: float, state: string, created_at: string}>
+     */
+    private function recentSingleGames(int $customerId, int $limit): Collection
+    {
+        $stakes = GameTransaction::query()
+            ->selectRaw('game_wallet_id, MAX(id) as last_id, SUM(amount) as amount, MIN(created_at) as played_at')
+            ->where('customer_id', $customerId)
+            ->where('payment_type', 'deposit')
+            ->groupBy('game_wallet_id')
+            ->orderByDesc('last_id')
+            ->limit($limit)
+            ->get();
+
+        $gameWalletIds = $stakes->pluck('game_wallet_id');
+
+        $gameIds = GameWallet::query()
+            ->whereIn('id', $gameWalletIds)
+            ->pluck('game_id', 'id');
+
+        $wonGameWalletIds = GameTransaction::query()
+            ->whereIn('game_wallet_id', $gameWalletIds)
+            ->where('customer_id', $customerId)
+            ->whereIn('payment_type', ['payout', 'payout|dropped'])
+            ->pluck('game_wallet_id')
+            ->flip();
+
+        $playerCounts = GameTransaction::query()
+            ->selectRaw('game_wallet_id, COUNT(*) as total')
+            ->whereIn('game_wallet_id', $gameWalletIds)
+            ->where('payment_type', 'deposit')
+            ->groupBy('game_wallet_id')
+            ->pluck('total', 'game_wallet_id');
+
+        return $stakes->map(fn (GameTransaction $stake) => [
+            'game_wallet_id' => (int) $stake->game_wallet_id,
+            'game_id' => $gameIds[$stake->game_wallet_id] ?? null,
+            'game_type' => 'Single Game',
+            'players' => (int) ($playerCounts[$stake->game_wallet_id] ?? 0),
+            'amount' => (float) $stake->amount,
+            'state' => isset($wonGameWalletIds[$stake->game_wallet_id]) ? 'win' : 'loss',
+            'created_at' => Carbon::parse($stake->played_at)->toDateTimeString(),
+        ])->values();
+    }
+
+    /**
+     * @return Collection<int, array{competition_wallet_id: int, competition_id: ?string, cmp_uid: ?string, game_type: int, level: ?int, balance: float, status: int, created_at: string, opponents: list<array{competition_wallet_id: int, customer_id: ?int, status: int}>}>
+     */
+    private function recentCompetitions(int $customerId, int $gameType, int $limit): Collection
+    {
+        $wallets = CompetitionWallet::query()
+            ->select(['id', 'competition_id', 'cmp_uid', 'game_type', 'level', 'balance', 'status', 'created_at'])
+            ->where('customer_id', $customerId)
+            ->where('game_type', $gameType)
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get();
+
+        $opponents = CompetitionWallet::query()
+            ->select(['id', 'cmp_uid', 'customer_id', 'status'])
+            ->whereIn('cmp_uid', $wallets->pluck('cmp_uid')->filter()->unique())
+            ->where('customer_id', '!=', $customerId)
+            ->orderBy('id')
+            ->get()
+            ->groupBy('cmp_uid');
+
+        return $wallets->map(fn (CompetitionWallet $wallet) => [
+            'competition_wallet_id' => $wallet->id,
+            'competition_id' => $wallet->competition_id,
+            'cmp_uid' => $wallet->cmp_uid,
+            'game_type' => (int) $wallet->game_type,
+            'level' => $wallet->level,
+            'balance' => (float) $wallet->balance,
+            'status' => (int) $wallet->status,
+            'created_at' => $wallet->created_at?->toDateTimeString(),
+            'opponents' => ($opponents[$wallet->cmp_uid] ?? collect())->map(fn (CompetitionWallet $opponent) => [
+                'competition_wallet_id' => $opponent->id,
+                'customer_id' => $opponent->customer_id,
+                'status' => (int) $opponent->status,
+            ])->values()->all(),
+        ])->values();
     }
 
     public function getCustomerLeaderboard(?string $startDate = null, ?string $endDate = null): array

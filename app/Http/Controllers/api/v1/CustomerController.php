@@ -114,6 +114,27 @@ class CustomerController extends Controller
         }
     }
 
+    public function customer_recent_played($encryptedIdentifier): JsonResponse
+    {
+        try {
+            $result = $this->customerService->getCustomerRecentPlayedGames($encryptedIdentifier);
+
+            if (! $result['customer']) {
+                return response()->json(['message' => 'Customer not found'], 404);
+            }
+
+            return response()->json([
+                'single_games' => $result['single_games'],
+                'tournament_games' => $result['tournament_games'],
+                'jackpot_games' => $result['jackpot_games'],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Customer Get Recent Played Error: ', ['error' => $e->getMessage()]);
+
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+    }
+
     public function customer_leaderboard(Request $request): JsonResponse
     {
         try {
