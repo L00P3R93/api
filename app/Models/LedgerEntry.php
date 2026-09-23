@@ -20,6 +20,8 @@ class LedgerEntry extends Model
 
     public const WALLET_TYPE_COIN = 'coin_wallet';
 
+    public const WALLET_TYPE_DISPUTE = 'dispute';
+
     protected $fillable = [
         'entry_id',
         'entry_type',

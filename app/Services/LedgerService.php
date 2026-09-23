@@ -6,6 +6,7 @@ use App\Models\Coin;
 use App\Models\CompetitionTransaction;
 use App\Models\CompetitionWallet;
 use App\Models\Deposit;
+use App\Models\DisputedTransaction;
 use App\Models\GameWallet;
 use App\Models\LedgerEntry;
 use App\Models\PendingBalance;
@@ -530,6 +531,51 @@ class LedgerService
     }
 
     /**
+     * Move disputed money from a customer or competition wallet into dispute escrow.
+     *
+     * @return array{0: LedgerEntry, 1: LedgerEntry} [source entry, dispute escrow entry]
+     */
+    public function recordDisputeHold(DisputedTransaction $dispute, Wallet|CompetitionWallet $source, float $amount): array
+    {
+        $sourceBalanceBefore = $source->balance;
+        $disputeBalanceBefore = $dispute->balance;
+
+        $source->balance -= $amount;
+        $source->save();
+
+        $dispute->balance += $amount;
+        $dispute->save();
+
+        $metadata = ['complaint_id' => $dispute->complaint_id, 'disputed_transaction_id' => $dispute->id];
+
+        $sourceEntry = $this->createEntry(
+            entryType: 'dispute_hold',
+            referenceable: $dispute,
+            wallet: $source,
+            customerId: $source instanceof Wallet ? $source->customer_id : null,
+            debit: $amount,
+            credit: 0,
+            balanceBefore: $sourceBalanceBefore,
+            balanceAfter: $source->balance,
+            metadata: $metadata
+        );
+
+        $disputeEntry = $this->createEntry(
+            entryType: 'dispute_hold',
+            referenceable: $dispute,
+            wallet: $dispute,
+            customerId: null,
+            debit: 0,
+            credit: $amount,
+            balanceBefore: $disputeBalanceBefore,
+            balanceAfter: $dispute->balance,
+            metadata: $metadata + ['source_wallet_type' => $dispute->source_wallet_type, 'source_wallet_id' => $dispute->source_wallet_id]
+        );
+
+        return [$sourceEntry, $disputeEntry];
+    }
+
+    /**
      * Work out which wallet table an entry written before `wallet_type` existed points at.
      * Returns null when the entry cannot be classified with confidence.
      */
@@ -577,6 +623,7 @@ class LedgerService
             $wallet instanceof GameWallet => LedgerEntry::WALLET_TYPE_GAME,
             $wallet instanceof CompetitionWallet => LedgerEntry::WALLET_TYPE_COMPETITION,
             $wallet instanceof Coin => LedgerEntry::WALLET_TYPE_COIN,
+            $wallet instanceof DisputedTransaction => LedgerEntry::WALLET_TYPE_DISPUTE,
             default => LedgerEntry::WALLET_TYPE_WALLET,
         };
     }

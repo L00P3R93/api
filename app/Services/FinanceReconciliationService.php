@@ -533,7 +533,7 @@ class FinanceReconciliationService
 
         $owed = $position['customer_wallets_total'] + $position['game_escrow_total'] + $position['competition_escrow_total']
             + $position['stuck_escrow_total'] + $position['coin_liability'] + $position['pending_holds_total']
-            + $position['unmatched_deposits_total'] + $position['excise_duty_payable'];
+            + $position['unmatched_deposits_total'] + $position['excise_duty_payable'] + $position['disputed_funds_total'];
 
         $shortfall = round($owed - $cash, 2);
 

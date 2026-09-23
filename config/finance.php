@@ -242,6 +242,7 @@ return [
         'game_escrow' => ['label' => 'Game wallets (escrow)', 'type' => 'liability'],
         'competition_escrow' => ['label' => 'Competition wallets (escrow)', 'type' => 'liability'],
         'coin_wallets' => ['label' => 'Coin wallets', 'type' => 'liability'],
+        'disputed_funds' => ['label' => 'Disputed funds (complaints)', 'type' => 'liability'],
     ],
 
     'entry_types' => [
@@ -258,6 +259,7 @@ return [
         'wallet_transfer' => 'transfer',
         'escrow_release' => 'escrow_movement',
         'escrow_transfer' => 'escrow_movement',
+        'dispute_hold' => 'escrow_movement',
         'coin_purchase' => 'coin',
         'coin_exchange' => 'coin',
         'coin_transfer' => 'coin',

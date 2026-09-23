@@ -15,6 +15,7 @@ use App\Http\Controllers\api\v1\CompetitionTransactionController;
 use App\Http\Controllers\api\v1\CompetitionWalletController;
 use App\Http\Controllers\api\v1\CompetitionWalletTransferPayoutController;
 use App\Http\Controllers\api\v1\CompetitionWalletWithdrawController;
+use App\Http\Controllers\api\v1\ComplaintController;
 use App\Http\Controllers\api\v1\ConfirmationController;
 use App\Http\Controllers\api\v1\CustomerController;
 use App\Http\Controllers\api\v1\DecryptIdentifierController;
@@ -95,6 +96,10 @@ Route::prefix('/v1')->group(function () {
 
         // Competition Wallet Payout Transaction Route
         Route::post('/competition/payout', CompetitionWalletTransferPayoutController::class)->middleware(['idempotency', 'throttle:write']);
+
+        // Complaints and disputed transactions
+        Route::get('/complaints', [ComplaintController::class, 'index']);
+        Route::post('/complaints', [ComplaintController::class, 'store'])->middleware(['idempotency', 'throttle:write']);
 
         // Get B2C Balance
         Route::get('/b2c/balance', [B2Controller::class, 'index']);
@@ -254,6 +259,9 @@ Route::prefix('/v1')->group(function () {
 
             // Competition Wallet Payout Transaction Route
             Route::post('/competition/withdraw/{encryptedIdentifier}', CompetitionWalletWithdrawController::class)->middleware(['idempotency', 'throttle:write']);
+
+            // Complaint Routes
+            Route::get('/complaints/{encryptedIdentifier}', [ComplaintController::class, 'show']);
 
             // Playground Routes
             Route::get('/playground/{encryptedIdentifier}', [PlaygroundController::class, 'show'])->withoutMiddleware('decrypt.identifier');

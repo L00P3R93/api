@@ -309,7 +309,7 @@ class FinanceReportService
 
             $position = $snapshot->only([
                 'customer_wallets_total', 'house_wallet_balance', 'game_escrow_total', 'competition_escrow_total',
-                'stuck_escrow_total', 'coin_liability', 'pending_holds_total', 'unmatched_deposits_total', 'excise_duty_payable', 'mpesa_balances',
+                'stuck_escrow_total', 'coin_liability', 'pending_holds_total', 'unmatched_deposits_total', 'excise_duty_payable', 'disputed_funds_total', 'mpesa_balances',
             ]);
             $source = 'snapshot';
             $date = $asOf;
@@ -332,6 +332,7 @@ class FinanceReportService
             'pending_holds' => (float) $position['pending_holds_total'],
             'unmatched_deposits' => (float) $position['unmatched_deposits_total'],
             'excise_duty_payable' => (float) $position['excise_duty_payable'],
+            'disputed_funds' => (float) $position['disputed_funds_total'],
         ];
         $totalLiabilities = array_sum($liabilities);
         $house = (float) $position['house_wallet_balance'];
@@ -347,6 +348,7 @@ class FinanceReportService
                 'difference is cash minus everything owed to customers minus the house wallet. It is not zero by design: it also holds gift and emoji sales not yet moved to the house wallet, M-Pesa charges, and timing between the hourly balance fetch and wallet movements.',
                 'Test customers are excluded from customer wallets and coin liability.',
                 'excise_duty_payable is duty taken from deposits and owed to KRA until a remittance is recorded. Snapshots taken before it was tracked show 0.',
+                'disputed_funds is winnings held in dispute escrow while a complaint is pending. It is still owed to a customer, so it is a liability. Snapshots taken before complaints existed show 0.',
             ],
         ]);
     }
