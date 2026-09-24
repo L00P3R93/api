@@ -35,6 +35,8 @@ use App\Http\Controllers\api\v1\GameWalletController;
 use App\Http\Controllers\api\v1\GameWalletWithdrawController;
 use App\Http\Controllers\api\v1\PlaygroundController;
 use App\Http\Controllers\api\v1\PurchaseController;
+use App\Http\Controllers\api\v1\ReferralB2CBalanceController;
+use App\Http\Controllers\api\v1\ReferralB2CBalanceTimeoutController;
 use App\Http\Controllers\api\v1\ReferralB2CResultController;
 use App\Http\Controllers\api\v1\ReferralB2CTimeoutController;
 use App\Http\Controllers\api\v1\ReferralController;
@@ -152,6 +154,9 @@ Route::prefix('/v1')->group(function () {
                 Route::get('/ledger', [FinanceDrilldownController::class, 'ledger']);
                 Route::get('/adjustments', [FinanceDrilldownController::class, 'adjustments']);
                 Route::get('/disputes', [FinanceDrilldownController::class, 'disputes']);
+                Route::get('/referrals', [FinanceDrilldownController::class, 'referrals']);
+                Route::get('/referrals/bonuses', [FinanceDrilldownController::class, 'referralBonuses']);
+                Route::get('/referrals/withdrawals', [FinanceDrilldownController::class, 'referralWithdrawals']);
                 Route::get('/customers/top', [FinanceDrilldownController::class, 'topCustomers']);
                 Route::get('/export/{report}', FinanceExportController::class);
             });
@@ -328,6 +333,8 @@ Route::prefix('/v1')->group(function () {
         // Referral payouts (referral B2C shortcode)
         Route::post('/referral/b2c/result', ReferralB2CResultController::class);
         Route::post('/referral/b2c/timeout', ReferralB2CTimeoutController::class);
+        Route::post('/referral/balance/b2c/result', ReferralB2CBalanceController::class);
+        Route::post('/referral/balance/b2c/timeout', ReferralB2CBalanceTimeoutController::class);
 
         // Kadi Kings
         Route::post('/c2b/confirm', ConfirmationController::class);

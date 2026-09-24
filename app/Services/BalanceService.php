@@ -54,6 +54,46 @@ class BalanceService
         }
     }
 
+    /**
+     * Whether the referral shortcode's balance can be fetched: its payout settings and its own balance
+     * callback URLs are all set.
+     */
+    public function referralB2CBalanceConfigured(): bool
+    {
+        $config = config('mpesa.referral_b2c', []);
+        $app = config('mpesa.apps.referral_b2c', []);
+
+        return filled($app['consumer_key'] ?? null)
+            && filled($app['consumer_secret'] ?? null)
+            && filled($config['initiator_name'] ?? null)
+            && filled($config['security_credential'] ?? null)
+            && filled($config['short_code'] ?? null)
+            && filled($config['balance_result_url'] ?? null)
+            && filled($config['balance_timeout_url'] ?? null);
+    }
+
+    public function fetchAndStoreReferralB2CBalance(): array
+    {
+        try {
+            $data = $this->mpesaService->referralB2cAccountBalance();
+
+            Log::channel('mpesa')->info('MPESA Referral B2C Balance Request Accepted', $data);
+
+            return [
+                'success' => true,
+                'conversation_id' => $data['ConversationID'] ?? null,
+                'message' => 'Balance request accepted. Awaiting callback.',
+            ];
+        } catch (MpesaApiException $e) {
+            Log::channel('mpesa')->error('Referral B2C Balance Request Failed', [
+                'message' => $e->getMessage(),
+                'status' => $e->statusCode,
+            ]);
+
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
     public function processBalanceResult(string $type, array $data): array
     {
         Log::channel('mpesa')->info("MPESA {$type} Balance Result Received", $data);

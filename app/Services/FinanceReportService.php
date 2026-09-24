@@ -24,6 +24,7 @@ class FinanceReportService
         private FinanceSnapshotService $snapshots,
         private FinanceExpenseService $expenses,
         private ExciseDutyReportService $exciseDuty,
+        private FinanceReferralReportService $referrals,
     ) {}
 
     /**
@@ -100,6 +101,7 @@ class FinanceReportService
                     'total' => $revenue['total'],
                 ],
                 'expenses' => $statement['expenses']['total'],
+                'referral_payouts' => $statement['referral_payouts'],
                 'net_income' => $statement['net_income'],
                 'stakes' => $flows['stakes'],
                 'payouts' => $flows['payouts'],
@@ -120,6 +122,7 @@ class FinanceReportService
      * Money in and out through M-Pesa. Cash in comes from incoming payments (what was actually paid),
      * split by what the payment bought; cash out from outgoing payments by disbursement status.
      * Excise duty withheld from deposits is shown apart; only what was paid to KRA leaves net cash.
+     * Referral payouts leave from the referral shortcode and are shown apart from main withdrawals.
      *
      * @return array{totals: array<string, mixed>, series: list<array<string, mixed>>}
      */
@@ -129,6 +132,7 @@ class FinanceReportService
             'cash_in' => array_fill_keys(self::CASH_IN_KINDS, 0.0) + ['total' => 0.0],
             'cash_out' => ['paid' => 0.0, 'pending' => 0.0, 'failed' => 0.0],
             'excise_duty' => ['withheld' => 0.0, 'remitted' => 0.0],
+            'referral_payouts' => ['paid' => 0.0, 'pending' => 0.0, 'failed' => 0.0],
         ];
 
         $series = [];
@@ -165,6 +169,10 @@ class FinanceReportService
             $series[$this->bucket($range, $row->day)]['excise_duty']['remitted'] += (float) $row->amount;
         }
 
+        foreach ($this->referrals->payoutRows($range) as $row) {
+            $series[$this->bucket($range, $row->day)]['referral_payouts'][$row->status] += $row->amount;
+        }
+
         $totals = $template();
         $list = [];
         foreach ($series as $bucket => $figures) {
@@ -177,6 +185,9 @@ class FinanceReportService
             foreach ($figures['excise_duty'] as $key => $value) {
                 $totals['excise_duty'][$key] += $value;
             }
+            foreach ($figures['referral_payouts'] as $key => $value) {
+                $totals['referral_payouts'][$key] += $value;
+            }
 
             $list[] = ['period' => $bucket] + $figures + ['net_cash' => $this->netCash($figures)];
         }
@@ -188,13 +199,13 @@ class FinanceReportService
     }
 
     /**
-     * Cash received less withdrawals paid out and excise duty paid to KRA.
+     * Cash received less withdrawals paid out, excise duty paid to KRA and referral payouts.
      *
-     * @param  array{cash_in: array<string, float>, cash_out: array<string, float>, excise_duty: array<string, float>}  $figures
+     * @param  array{cash_in: array<string, float>, cash_out: array<string, float>, excise_duty: array<string, float>, referral_payouts: array<string, float>}  $figures
      */
     private function netCash(array $figures): float
     {
-        return $figures['cash_in']['total'] - $figures['cash_out']['paid'] - $figures['excise_duty']['remitted'];
+        return $figures['cash_in']['total'] - $figures['cash_out']['paid'] - $figures['excise_duty']['remitted'] - $figures['referral_payouts']['paid'];
     }
 
     /**
@@ -241,13 +252,28 @@ class FinanceReportService
             $giftEmoji[$row->purchase_type] += $amount;
         }
 
+        $referralPayouts = [];
+        foreach ($this->referrals->payoutRows($range) as $row) {
+            if ($row->status === 'paid') {
+                $bucket = $this->bucket($range, $row->day);
+                $referralPayouts[$bucket] = ($referralPayouts[$bucket] ?? 0.0) + $row->amount;
+            }
+        }
+
+        $referralBonuses = ['signup' => 0.0, 'first_deposit' => 0.0, 'total' => 0.0];
+        foreach ($this->referrals->bonusRows($range) as $row) {
+            $referralBonuses[$row->milestone] = ($referralBonuses[$row->milestone] ?? 0.0) + (float) $row->amount;
+            $referralBonuses['total'] += (float) $row->amount;
+        }
+
         $expenses = $this->expenses->totals($range);
         foreach ($series as $bucket => $figures) {
             $series[$bucket]['expenses'] = $expenses['by_bucket'][$bucket] ?? 0.0;
-            $series[$bucket]['net_income'] = $figures['total'] - $series[$bucket]['expenses'];
+            $series[$bucket]['referral_payouts'] = $referralPayouts[$bucket] ?? 0.0;
+            $series[$bucket]['net_income'] = $figures['total'] - $series[$bucket]['expenses'] - $series[$bucket]['referral_payouts'];
         }
 
-        $totals = $template() + ['expenses' => 0.0, 'net_income' => 0.0];
+        $totals = $template() + ['expenses' => 0.0, 'referral_payouts' => 0.0, 'net_income' => 0.0];
         $list = [];
         foreach ($series as $bucket => $figures) {
             foreach ($figures as $key => $value) {
@@ -273,15 +299,19 @@ class FinanceReportService
                 'total' => $totals['total'],
             ],
             'expenses' => ['tracked' => true, 'total' => $totals['expenses'], 'by_category' => $expenses['by_category']],
+            'referral_payouts' => $totals['referral_payouts'],
             'net_income' => $totals['net_income'],
             'memo' => [
                 'load_margin' => $load,
+                'referral_bonuses_earned' => $referralBonuses,
             ],
             'notes' => [
                 'Revenue is house cuts as they are booked in the ledger plus gift and emoji sales at cash received.',
                 'competitions_unattributed are competition cuts booked before they were linked to their transaction, so tournament and jackpot cannot be told apart.',
                 'load_margin is cash received for wallet loads minus the wallet credit given. It is shown for information and is not part of revenue.',
                 'Expenses are the entries recorded through /finance/expenses (voided ones excluded), dated by expense_date. net_income is before tax; see /finance/taxes.',
+                'referral_payouts are referral withdrawals completed in the period (the referral programme expense), dated by completion. net_income is revenue minus expenses minus referral_payouts.',
+                'referral_bonuses_earned is shown for information: bonuses credited to referral wallets are only an expense once they are paid out.',
                 'house cuts cannot always be tied to a player, so exclude_test only removes cuts that are linked to a test customer or game.',
             ],
             'series' => $list,
@@ -309,7 +339,7 @@ class FinanceReportService
 
             $position = $snapshot->only([
                 'customer_wallets_total', 'house_wallet_balance', 'game_escrow_total', 'competition_escrow_total',
-                'stuck_escrow_total', 'coin_liability', 'pending_holds_total', 'unmatched_deposits_total', 'excise_duty_payable', 'disputed_funds_total', 'mpesa_balances',
+                'stuck_escrow_total', 'coin_liability', 'pending_holds_total', 'unmatched_deposits_total', 'excise_duty_payable', 'disputed_funds_total', 'referral_wallets_total', 'mpesa_balances',
             ]);
             $source = 'snapshot';
             $date = $asOf;
@@ -333,6 +363,7 @@ class FinanceReportService
             'unmatched_deposits' => (float) $position['unmatched_deposits_total'],
             'excise_duty_payable' => (float) $position['excise_duty_payable'],
             'disputed_funds' => (float) $position['disputed_funds_total'],
+            'referral_wallets' => (float) $position['referral_wallets_total'],
         ];
         $totalLiabilities = array_sum($liabilities);
         $house = (float) $position['house_wallet_balance'];
@@ -349,6 +380,7 @@ class FinanceReportService
                 'Test customers are excluded from customer wallets and coin liability.',
                 'excise_duty_payable is duty taken from deposits and owed to KRA until a remittance is recorded. Snapshots taken before it was tracked show 0.',
                 'disputed_funds is winnings held in dispute escrow while a complaint is pending. It is still owed to a customer, so it is a liability. Snapshots taken before complaints existed show 0.',
+                'referral_wallets is referral bonuses not yet withdrawn. Customers can withdraw them at any time, so they are a liability. Snapshots taken before referrals existed show 0.',
             ],
         ]);
     }
