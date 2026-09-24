@@ -32,6 +32,12 @@ class SendWalletWebhook extends Command
             return Command::FAILURE;
         }
 
+        if ($this->service->isHouseWallet($wallet->id)) {
+            $this->error('The house wallet never sends wallet webhooks.');
+
+            return Command::FAILURE;
+        }
+
         // Gates on isConfigured(), not isEnabled(), so this works for smoke
         // testing while the feature is still deployed dark.
         if (! $this->service->isConfigured()) {

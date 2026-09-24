@@ -49,13 +49,23 @@ class WalletWebhookService
     }
 
     /**
+     * The house wallet (config wallets.house_wallet_id) is not a player wallet, so the site
+     * never needs its balance.
+     */
+    public function isHouseWallet(int $walletId): bool
+    {
+        return $walletId === (int) config('wallets.house_wallet_id', 1);
+    }
+
+    /**
      * Schedule a debounced webhook send for a wallet whose balance just changed.
      * If a send is already scheduled within the debounce window, this is a no-op —
-     * that pending job will read the latest state when it executes.
+     * that pending job will read the latest state when it executes. The house
+     * wallet is skipped.
      */
     public function scheduleForWallet(int $walletId, int $customerId): void
     {
-        if (! $this->isEnabled()) {
+        if (! $this->isEnabled() || $this->isHouseWallet($walletId)) {
             return;
         }
 
