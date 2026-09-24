@@ -75,7 +75,7 @@ it('lists unmatched deposits with suggested customers', function () {
     expect($data['summary'])->toEqual(['unmatched_count' => 1, 'unmatched_amount' => 100])
         ->and($data['items'][0]['msisdn'])->toBe('2547****5678')
         ->and(collect($data['items'][0]['suggestions'])->pluck('match', 'name')->all())
-        ->toEqual(['Account Owner' => 'account_no', 'Jane Payer' => 'phone']);
+        ->toEqual(['Account Owner' => 'account_no', 'Jane Payer' => 'payer_phone']);
 });
 
 it('gives no phone suggestion when M-Pesa masks the number', function () {

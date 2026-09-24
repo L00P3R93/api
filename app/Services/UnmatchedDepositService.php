@@ -19,35 +19,66 @@ class UnmatchedDepositService
 {
     public const COMMAND_ACTOR = 'command:deposits:match-unmatched';
 
+    /** Suggestion kinds, strongest first. */
+    public const MATCH_KINDS = ['account_no', 'payer_phone', 'bill_ref_phone'];
+
     public function __construct(private WalletDepositService $walletDeposits) {}
 
     /**
-     * Customers an unmatched deposit probably belongs to. `account_no` is the rule C2B uses (bill ref
-     * normalised); `phone` compares the payer's number with customers' phone numbers and only works when
-     * M-Pesa sent the number unmasked. These are hints: an admin still decides.
+     * Customers an unmatched deposit probably belongs to, strongest match first:
      *
-     * @return list<array{customer_id: int, name: string, account_no: ?string, phone_no: ?string, match: string}>
+     * account_no      the bill ref (normalised as C2B does) is the customer's account number
+     * payer_phone     the number M-Pesa says paid (msisdn, sent as a SHA-256 hash) is the customer's phone
+     * bill_ref_phone  the bill ref, read as a phone number, is the customer's phone
+     *
+     * `matches` lists every kind a customer matched; `ambiguous` is true when the matched phone number
+     * belongs to more than one customer. Phone numbers are not verified in the API, so these are hints:
+     * a person always decides.
+     *
+     * @return list<array{customer_id: int, name: string, account_no: ?string, phone_no: ?string, match: string, matches: list<string>, ambiguous: bool}>
      */
     public function suggestionsFor(Deposit $deposit): array
     {
-        $suggestions = collect();
+        /** @var array<int, array{customer: Customer, matches: list<string>, ambiguous: bool}> $found */
+        $found = [];
+        $add = function ($customers, string $kind) use (&$found) {
+            $ambiguous = $customers->count() > 1;
+
+            foreach ($customers as $customer) {
+                $found[$customer->id] ??= ['customer' => $customer, 'matches' => [], 'ambiguous' => false];
+                $found[$customer->id]['matches'][] = $kind;
+                $found[$customer->id]['ambiguous'] = $found[$customer->id]['ambiguous'] || $ambiguous;
+            }
+        };
+
         $accountNo = $this->walletDeposits->accountNoFromBillRef($deposit->bill_ref_no);
 
         if ($accountNo !== '') {
-            Customer::where('account_no', $accountNo)->limit(1)->get()
-                ->each(fn (Customer $customer) => $suggestions->push($this->suggestion($customer, 'account_no')));
+            $add(Customer::where('account_no', $accountNo)->limit(1)->get(), 'account_no');
         }
 
-        $phone = $this->lastNineDigits($deposit->msisdn);
+        $payerHash = $this->payerPhoneHash($deposit->msisdn);
 
-        if ($phone !== null) {
-            Customer::whereRaw("RIGHT(REPLACE(REPLACE(COALESCE(phone_no, ''), '+', ''), ' ', ''), 9) = ?", [$phone])
-                ->limit(5)
-                ->get()
-                ->each(fn (Customer $customer) => $suggestions->push($this->suggestion($customer, 'phone')));
+        if ($payerHash !== null) {
+            $add(Customer::where('phone_hash', $payerHash)->limit(5)->get(), 'payer_phone');
         }
 
-        return $suggestions->unique('customer_id')->values()->all();
+        $billRefHash = Customer::phoneHash(explode('#', (string) $deposit->bill_ref_no)[0]);
+
+        if ($billRefHash !== null) {
+            $add(Customer::where('phone_hash', $billRefHash)->limit(5)->get(), 'bill_ref_phone');
+        }
+
+        $strength = array_flip(self::MATCH_KINDS);
+
+        return collect($found)
+            ->map(fn (array $row) => $this->suggestion($row['customer'], $row['matches'], $row['ambiguous']))
+            ->sortBy([
+                fn (array $a, array $b) => $strength[$a['match']] <=> $strength[$b['match']],
+                fn (array $a, array $b) => count($b['matches']) <=> count($a['matches']),
+            ])
+            ->values()
+            ->all();
     }
 
     /**
@@ -176,30 +207,36 @@ class UnmatchedDepositService
     }
 
     /**
-     * The last nine digits of a phone number, or null when it is masked, hashed or too short.
+     * The payer's number as a phone hash. M-Pesa sends `msisdn` as SHA-256 of the 254 number; an older or
+     * plain number is hashed the same way. Masked numbers (with `*`) give null.
      */
-    private function lastNineDigits(?string $phone): ?string
+    private function payerPhoneHash(?string $msisdn): ?string
     {
-        $digits = preg_replace('/\D/', '', (string) $phone);
+        $msisdn = trim((string) $msisdn);
 
-        if (strlen($digits) < 9 || strlen($digits) > 12 || str_contains((string) $phone, '*')) {
-            return null;
+        if (preg_match('/^[0-9a-f]{64}$/i', $msisdn)) {
+            return strtolower($msisdn);
         }
 
-        return substr($digits, -9);
+        return str_contains($msisdn, '*') ? null : Customer::phoneHash($msisdn);
     }
 
     /**
-     * @return array{customer_id: int, name: string, account_no: ?string, phone_no: ?string, match: string}
+     * @param  list<string>  $matches
+     * @return array{customer_id: int, name: string, account_no: ?string, phone_no: ?string, match: string, matches: list<string>, ambiguous: bool}
      */
-    private function suggestion(Customer $customer, string $match): array
+    private function suggestion(Customer $customer, array $matches, bool $ambiguous): array
     {
+        $matches = array_values(array_intersect(self::MATCH_KINDS, $matches));
+
         return [
             'customer_id' => $customer->id,
             'name' => $customer->name,
             'account_no' => $customer->account_no,
             'phone_no' => app(FinanceMasker::class)->phone($customer->phone_no),
-            'match' => $match,
+            'match' => $matches[0],
+            'matches' => $matches,
+            'ambiguous' => $ambiguous,
         ];
     }
 

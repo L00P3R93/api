@@ -977,7 +977,7 @@ Content-Type: application/json
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span></div>
 <div class="endpoint-section"><h4>Description</h4>
-<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">A C2B payment whose bill ref matches no customer's account number is kept with <code>status</code> 0 and credited to nobody. This lists them oldest first with <code>suggestions</code>: <code>account_no</code> (the bill ref, normalised the way C2B does it, now matches a customer) and <code>phone</code> (the payer's number matches a customer's phone; only when M-Pesa sends the number unmasked). Suggestions are hints. Resolve each deposit with <code>assign</code> or <code>refund</code> below, or run <code>php artisan deposits:match-unmatched</code> to assign exact account-number matches. <code>status=assigned</code> or <code>status=refunded</code> lists resolved ones with their <code>resolution</code>. Deposit statuses: 0 unmatched, 2 completed, 4 refunded.</p></div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">A C2B payment whose bill ref matches no customer's account number is kept with <code>status</code> 0 and credited to nobody. This lists them oldest first with <code>suggestions</code>, strongest first: <code>account_no</code> (the bill ref, normalised the way C2B does it, is a customer's account number), <code>payer_phone</code> (M-Pesa sends the payer's number as a SHA-256 hash in <code>msisdn</code>; it matches the hash of a customer's phone) and <code>bill_ref_phone</code> (the bill ref, read as a phone number, is a customer's phone: payers often type their phone number instead of their <code>KK-</code> account number). <code>match</code> is the strongest kind, <code>matches</code> lists every kind that customer matched, and <code>ambiguous</code> is true when the phone number belongs to more than one customer. Phone numbers are not verified, so phone matches are never assigned automatically: suggestions are hints and a person decides. Resolve each deposit with <code>assign</code> or <code>refund</code> below, or run <code>php artisan deposits:match-unmatched</code> to assign exact account-number matches. <code>status=assigned</code> or <code>status=refunded</code> lists resolved ones with their <code>resolution</code>. Deposit statuses: 0 unmatched, 2 completed, 4 refunded.</p></div>
 <div class="endpoint-section"><h4>Query Parameters</h4>
 <table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
 <tr><td>status</td><td>string</td><td><span class="optional">Optional</span></td><td><code>unmatched</code> (default), <code>assigned</code> or <code>refunded</code></td></tr>
@@ -990,10 +990,9 @@ Content-Type: application/json
     "summary": {"unmatched_count": 3, "unmatched_amount": 150.00},
     "items": [{
       "id": 812, "trans_id": "SIR7XYZ123", "trans_time": "2026-09-24 09:15:00", "amount": 100.00,
-      "bill_ref_no": "0799000111", "msisdn": "2547****5678", "name": "Jane", "status": 0, "created_at": "...",
+      "bill_ref_no": "0705171214", "msisdn": "60da0bd9f1f1f556e423fcebb106409ba5b3c6dcd7ee91beafb4d970b03b936e", "name": "doris", "status": 0, "created_at": "...",
       "suggestions": [
-        {"customer_id": 97, "name": "Account Owner", "account_no": "799000111", "phone_no": "2547****0111", "match": "account_no"},
-        {"customer_id": 42, "name": "Jane Payer", "account_no": "712345678", "phone_no": "2547****5678", "match": "phone"}
+        {"customer_id": 97, "name": "Doris", "account_no": "KK-6AA8B1DAAF392", "phone_no": "+2547****1214", "match": "payer_phone", "matches": ["payer_phone", "bill_ref_phone"], "ambiguous": false}
       ],
       "resolution": null
     }],
@@ -1006,7 +1005,7 @@ Content-Type: application/json
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">30/min</span></div>
 <div class="endpoint-section"><h4>Description</h4>
-<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">The same as <code>php artisan deposits:match-unmatched</code>: every unmatched deposit whose bill ref now exactly matches a customer's account number (the C2B rule) is assigned to that customer. Never matches on phone. <code>dry_run</code> defaults to <code>true</code>: send <code>false</code> to assign. The API key is recorded as <code>resolved_by</code>.</p></div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">The same as <code>php artisan deposits:match-unmatched</code>: every unmatched deposit whose bill ref now exactly matches a customer's account number (the C2B rule, which also corrects typing slips such as <code>kk6aa8b1daaf392</code> for <code>KK-6AA8B1DAAF392</code>) is assigned to that customer. Never matches on phone. <code>dry_run</code> defaults to <code>true</code>: send <code>false</code> to assign. The API key is recorded as <code>resolved_by</code>.</p></div>
 <div class="endpoint-section"><h4>Request Body</h4>
 <table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
 <tr><td>dry_run</td><td>boolean</td><td><span class="optional">Optional</span></td><td>Default <code>true</code></td></tr></table></div>
@@ -1892,7 +1891,7 @@ Content-Type: application/json
 <div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/c2b/confirm</span><span class="endpoint-desc">Provides a test endpoint for C2B confirmation callback</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-rate">100/min</span></div>
-<div class="callback-note">Called by Safaricom when a C2B payment is confirmed. Processes deposit and credits wallet. For a plain wallet deposit, 5% excise duty is taken from the amount when excise duty is on, so the wallet gains 95% (coin loads, gifts and emoji are not charged). The whole callback runs in one database transaction: if anything fails, nothing is saved and Safaricom can retry. See <a href="#" data-section="finance-excise" style="color:var(--accent-blue)">Excise Duty</a>.</div>
+<div class="callback-note">Called by Safaricom when a C2B payment is confirmed. Processes deposit and credits wallet. The bill ref is matched to a customer's account number exactly, correcting typing slips in <code>KK-</code> numbers (spaces, lower case, a missing dash). A payment whose bill ref matches no account (for example a phone number) is kept as an <a href="#" data-section="deposits" style="color:var(--accent-blue)">unmatched deposit</a>. For a plain wallet deposit, 5% excise duty is taken from the amount when excise duty is on, so the wallet gains 95% (coin loads, gifts and emoji are not charged). The whole callback runs in one database transaction: if anything fails, nothing is saved and Safaricom can retry. See <a href="#" data-section="finance-excise" style="color:var(--accent-blue)">Excise Duty</a>.</div>
 <div class="endpoint-section"><h4>Response (200)</h4><pre>{"ResultCode": "0", "ResultDesc": "Accepted"}</pre></div>
 </div></div>
 <div class="endpoint">

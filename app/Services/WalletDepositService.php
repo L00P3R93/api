@@ -21,16 +21,28 @@ class WalletDepositService
     ) {}
 
     /**
-     * The customer account number a bill reference points at: the part before the first `#`, with
-     * 2547XXXXXXXX and 07XXXXXXXX turned into the 7XXXXXXXX form account numbers are stored in.
+     * The customer account number a bill reference points at: the part before the first `#`, normalised
+     * by normalizeAccountNo().
      */
     public function accountNoFromBillRef(?string $billRef): string
     {
         return $this->normalizeAccountNo(explode('#', (string) $billRef)[0]);
     }
 
+    /**
+     * Account numbers are `KK-` plus 13 hex characters (e.g. KK-6AA8B1DAAF392). A payer's typing slips
+     * (spaces, lower case, a missing dash) are corrected: ` kk6aa8b1daaf392 ` becomes KK-6AA8B1DAAF392.
+     * Anything else keeps the older rules: 2547XXXXXXXX and 07XXXXXXXX become 7XXXXXXXX (from when
+     * account numbers were phone numbers), and every other value is returned unchanged.
+     */
     public function normalizeAccountNo(string $rawAccountNo): string
     {
+        $compact = strtoupper(preg_replace('/\s+/', '', $rawAccountNo));
+
+        if (preg_match('/^KK-?([0-9A-F]{13})$/', $compact, $match)) {
+            return 'KK-'.$match[1];
+        }
+
         if (preg_match('/^2547\d{8}$/', $rawAccountNo)) {
             return substr($rawAccountNo, 3);
         }
