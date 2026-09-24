@@ -973,15 +973,81 @@ Content-Type: application/json
 }</pre></div>
 </div></div>
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-put">PUT</span><span class="endpoint-path">/api/v1/deposits/{encryptedIdentifier}</span><span class="endpoint-desc">Update a deposit record</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/deposits/unmatched</span><span class="endpoint-desc">Deposits whose account number matched no customer</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
-<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-rate">30/min</span></div>
+<div class="tags"><span class="tag tag-auth">API Key</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">A C2B payment whose bill ref matches no customer's account number is kept with <code>status</code> 0 and credited to nobody. This lists them oldest first with <code>suggestions</code>: <code>account_no</code> (the bill ref, normalised the way C2B does it, now matches a customer) and <code>phone</code> (the payer's number matches a customer's phone; only when M-Pesa sends the number unmasked). Suggestions are hints. Resolve each deposit with <code>assign</code> or <code>refund</code> below, or run <code>php artisan deposits:match-unmatched</code> to assign exact account-number matches. <code>status=assigned</code> or <code>status=refunded</code> lists resolved ones with their <code>resolution</code>. Deposit statuses: 0 unmatched, 2 completed, 4 refunded.</p></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>status</td><td>string</td><td><span class="optional">Optional</span></td><td><code>unmatched</code> (default), <code>assigned</code> or <code>refunded</code></td></tr>
+<tr><td>from / to</td><td>date</td><td><span class="optional">Optional</span></td><td>Received date range, <code>Y-m-d</code></td></tr>
+<tr><td>per_page / page</td><td>integer</td><td><span class="optional">Optional</span></td><td>1 to 200 (default 50)</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "summary": {"unmatched_count": 3, "unmatched_amount": 150.00},
+    "items": [{
+      "id": 812, "trans_id": "SIR7XYZ123", "trans_time": "2026-09-24 09:15:00", "amount": 100.00,
+      "bill_ref_no": "0799000111", "msisdn": "2547****5678", "name": "Jane", "status": 0, "created_at": "...",
+      "suggestions": [
+        {"customer_id": 97, "name": "Account Owner", "account_no": "799000111", "phone_no": "2547****0111", "match": "account_no"},
+        {"customer_id": 42, "name": "Jane Payer", "account_no": "712345678", "phone_no": "2547****5678", "match": "phone"}
+      ],
+      "resolution": null
+    }],
+    "pagination": {"page": 1, "per_page": 50, "total": 3, "last_page": 1}
+  }
+}</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/deposits/unmatched/match</span><span class="endpoint-desc">Assign unmatched deposits that now match an account number</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">30/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">The same as <code>php artisan deposits:match-unmatched</code>: every unmatched deposit whose bill ref now exactly matches a customer's account number (the C2B rule) is assigned to that customer. Never matches on phone. <code>dry_run</code> defaults to <code>true</code>: send <code>false</code> to assign. The API key is recorded as <code>resolved_by</code>.</p></div>
 <div class="endpoint-section"><h4>Request Body</h4>
 <table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
-<tr><td>status</td><td>integer</td><td><span class="optional">Optional</span></td><td>Deposit status code</td></tr>
-<tr><td>name</td><td>string</td><td><span class="optional">Optional</span></td><td>Depositor name</td></tr></table></div>
+<tr><td>dry_run</td><td>boolean</td><td><span class="optional">Optional</span></td><td>Default <code>true</code></td></tr></table></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
-<pre>{"id": 1, "trans_id": "QHK123ABC", "status": 2, "name": "John Doe"}</pre></div>
+<pre>{"success": true, "data": {"dry_run": false, "matched": 2, "matched_amount": 150.00, "assigned": 2, "assigned_amount": 150.00,
+  "items": [{"deposit_id": 812, "trans_id": "SIR7XYZ123", "amount": 100.00, "bill_ref_no": "0799000111", "customer_id": 97, "account_no": "799000111", "assigned": true, "message": "Deposit credited to the customer"}]}}</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/deposits/{encryptedIdentifier}/assign</span><span class="endpoint-desc">Credit an unmatched deposit to a customer</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">30/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Credits the full amount to the customer's wallet exactly like a plain C2B deposit: ledger <code>deposit</code>, 5% excise duty when it is on, the wallet transaction, the referral first-deposit bonus and the wallet webhook. A bill ref that said load, gift or emoji is still credited as a plain wallet deposit. The deposit becomes <code>status</code> 2; its bill ref, phone and amount are never changed. Only unmatched deposits can be assigned, once.</p></div>
+<div class="endpoint-section"><h4>Request Body</h4>
+<table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>customer_id</td><td>integer</td><td><span class="required">Required</span></td><td>The customer to credit</td></tr>
+<tr><td>note</td><td>string</td><td><span class="required">Required</span></td><td>3 to 255 characters: why this customer</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{"success": true, "message": "Deposit credited to the customer", "data": {"id": 812, "trans_id": "SIR7XYZ123", "amount": 100.00, "bill_ref_no": "0799000111", "status": 2,
+  "resolution": {"action": "assigned", "customer_id": 42, "account_no_used": "712345678", "ledger_entry_id": "uuid", "mpesa_reference": null, "note": "Typo in account number", "resolved_by": "api_key:4", "resolved_at": "..."}}}</pre></div>
+<div class="endpoint-section"><h4>Errors</h4>
+<pre>// 404 - deposit or customer not found
+// 409 - the deposit is not unmatched (already assigned, refunded or a normal deposit)
+// 422 - validation</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/deposits/{encryptedIdentifier}/refund</span><span class="endpoint-desc">Record that an unmatched deposit was sent back to the payer</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">30/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Record-only: reverse the payment on the Kizuka M-Pesa portal first, then record it here with the reversal reference. The API sends nothing to M-Pesa and no wallet changes. The deposit becomes <code>status</code> 4, leaves the balance sheet's <code>unmatched_deposits</code> and appears in the cash flow's <code>deposit_refunds</code>.</p></div>
+<div class="endpoint-section"><h4>Request Body</h4>
+<table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>mpesa_reference</td><td>string</td><td><span class="required">Required</span></td><td>The reversal's M-Pesa reference, 6 to 30 letters or digits, stored upper case. Must not be on another refund</td></tr>
+<tr><td>note</td><td>string</td><td><span class="required">Required</span></td><td>3 to 255 characters</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{"success": true, "message": "Deposit recorded as refunded", "data": {"id": 815, "status": 4, "resolution": {"action": "refunded", "mpesa_reference": "RVX1234567", ...}}}</pre></div>
+<div class="endpoint-section"><h4>Errors</h4>
+<pre>// 404 - deposit not found
+// 409 - the deposit is not unmatched, or the reference is on another refund
+// 422 - validation</pre></div>
 </div></div>
 <div class="endpoint">
 <div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/deposits/{encryptedIdentifier}</span><span class="endpoint-desc">Initiates an STK push to a registered phone number</span><span class="chevron">&#9654;</span></div>
@@ -2130,7 +2196,7 @@ Content-Type: application/json
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
 <div class="endpoint-section"><h4>Description</h4>
-<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Cash in is what customers actually paid (incoming payments), split into <code>wallet_deposit</code>, <code>load</code>, <code>gift</code>, <code>emoji</code> and <code>unmatched</code> (money received from an unknown customer and not credited to anyone; it is included in the total). Cash out is outgoing payments by status: <code>paid</code>, <code>pending</code>, <code>failed</code>. <code>excise_duty.withheld</code> is the excise duty taken from deposits in the period (already inside cash in) and <code>excise_duty.remitted</code> is what was paid to KRA in the period, by payment date. <code>referral_payouts</code> are <a href="#" data-section="referrals" style="color:var(--accent-blue)">referral withdrawals</a> from the referral shortcode: <code>paid</code> by completion date, <code>failed</code> by failure date, <code>pending</code> (still open) by request date. <code>net_cash</code> is cash in minus paid withdrawals minus excise duty remitted minus paid referral payouts. Works for dates before the ledger began.</p></div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Cash in is what customers actually paid (incoming payments), split into <code>wallet_deposit</code>, <code>load</code>, <code>gift</code>, <code>emoji</code> and <code>unmatched</code> (money received from an unknown customer and not credited to anyone; it is included in the total). Cash out is outgoing payments by status: <code>paid</code>, <code>pending</code>, <code>failed</code>. <code>excise_duty.withheld</code> is the excise duty taken from deposits in the period (already inside cash in) and <code>excise_duty.remitted</code> is what was paid to KRA in the period, by payment date. <code>referral_payouts</code> are <a href="#" data-section="referrals" style="color:var(--accent-blue)">referral withdrawals</a> from the referral shortcode: <code>paid</code> by completion date, <code>failed</code> by failure date, <code>pending</code> (still open) by request date. <code>deposit_refunds.refunded</code> is unmatched deposits recorded as sent back to the payer, by the day the refund was recorded (the deposit stays in cash in as <code>unmatched</code>, the day it arrived). <code>net_cash</code> is cash in minus paid withdrawals minus excise duty remitted minus paid referral payouts minus deposit refunds. Works for dates before the ledger began.</p></div>
 <div class="endpoint-section"><h4>Query Parameters</h4>
 <table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
 <tr><td>from, to, group_by, exclude_test</td><td>&nbsp;</td><td><span class="optional">Optional</span></td><td>See common parameters</td></tr></table></div>
@@ -2237,7 +2303,8 @@ Content-Type: application/json
 <tr><td>ledger_arithmetic</td><td>fail</td><td>Every ledger entry adds up: before + credit - debit = after</td></tr>
 <tr><td>ledger_balance</td><td>fail</td><td>Paired ledger entries net to zero (see trial balance)</td></tr>
 <tr><td>unclassified_entries</td><td>warn</td><td>Ledger entries that have no wallet type</td></tr>
-<tr><td>unmatched_deposits</td><td>warn</td><td>Money received from unknown customers and not credited</td></tr>
+<tr><td>unmatched_deposits</td><td>warn</td><td>Money received from unknown customers and not credited (resolve with <a href="#" data-section="deposits" style="color:var(--accent-blue)">assign or refund</a>)</td></tr>
+<tr><td>deposit_resolutions</td><td>fail</td><td>Resolved unmatched deposits agree with their records: assigned ones are completed with a ledger credit, refunded ones have status 4 and a refund record</td></tr>
 <tr><td>deposits_without_ledger</td><td>fail</td><td>Processed deposits that never reached the ledger (gift and emoji purchases are not expected to)</td></tr>
 <tr><td>deposits_without_excise_duty</td><td>fail</td><td>Plain wallet deposits credited in full while excise duty was on (from its start date). Passes with a note when excise duty is off</td></tr>
 <tr><td>excise_duty_amounts</td><td>fail</td><td>Each charge is 5% of the gross rounded to the cent, and gross = excise + net</td></tr>
@@ -2971,7 +3038,7 @@ Idempotency-Key: excise-2026-08
 <tr><td>disputes</td><td>/finance/disputes</td><td>One per complaint</td></tr>
 <tr><td>referral-bonuses</td><td>/finance/referrals/bonuses</td><td>One per bonus</td></tr>
 <tr><td>referral-withdrawals</td><td>/finance/referrals/withdrawals</td><td>One per referral withdrawal</td></tr></table>
-<p style="color:var(--text-secondary);font-size:13px;margin-top:8px;">The <code>cash-flow</code> export has <code>excise_withheld</code> and <code>excise_remitted</code> columns before <code>net_cash</code>, and <code>referral_paid</code>, <code>referral_pending</code> and <code>referral_failed</code> after it. The <code>income-statement</code> export has <code>referral_payouts</code> as its last column.</p>
+<p style="color:var(--text-secondary);font-size:13px;margin-top:8px;">The <code>cash-flow</code> export has <code>excise_withheld</code> and <code>excise_remitted</code> columns before <code>net_cash</code>, and <code>referral_paid</code>, <code>referral_pending</code>, <code>referral_failed</code> and <code>deposit_refunded</code> after it. The <code>income-statement</code> export has <code>referral_payouts</code> as its last column.</p>
 <p style="color:var(--text-secondary);font-size:13px;margin-top:8px;">The customer statement cannot be exported yet.</p></div>
 <div class="endpoint-section"><h4>Request</h4>
 <pre>GET /api/v1/finance/export/deposits?from=2026-09-01&amp;to=2026-09-20&amp;status=2 HTTP/1.1

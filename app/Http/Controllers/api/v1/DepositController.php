@@ -119,7 +119,7 @@ class DepositController extends Controller
      */
     public function show($encryptedIdentifier)
     {
-        $deposit = Deposit::where('id', $encryptedIdentifier)->first();
+        $deposit = Deposit::with('resolution')->where('id', $encryptedIdentifier)->first();
         if (! $deposit) {
             return response()->json(['message' => 'Payment not found'], 404);
         }

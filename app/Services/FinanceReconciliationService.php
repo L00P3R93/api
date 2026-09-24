@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\CompetitionTransaction;
 use App\Models\Complaint;
 use App\Models\Deposit;
+use App\Models\DepositResolution;
 use App\Models\DisputedTransaction;
 use App\Models\GameTransaction;
 use App\Models\LedgerEntry;
@@ -42,6 +43,7 @@ class FinanceReconciliationService
             $this->ledgerIdentity($range),
             $this->unclassifiedEntries(),
             $this->unmatchedDeposits(),
+            $this->depositResolutions(),
             $this->depositsWithoutLedger($range),
             $this->depositsWithoutExciseDuty($range),
             $this->exciseDutyAmounts($range),
@@ -182,6 +184,46 @@ class FinanceReconciliationService
     }
 
     /**
+     * Each resolved unmatched deposit agrees with its resolution: assigned ones are completed (status 2) and
+     * point at a ledger credit, refunded ones are status 4, and no deposit is marked refunded without a record.
+     *
+     * @return array<string, mixed>
+     */
+    private function depositResolutions(): array
+    {
+        $assignedWrong = DB::table('deposit_resolutions as r')
+            ->join('incoming_payments as i', 'i.id', '=', 'r.deposit_id')
+            ->leftJoin('ledger_entries as l', 'l.id', '=', 'r.ledger_entry_id')
+            ->where('r.action', DepositResolution::ACTION_ASSIGNED)
+            ->where(fn ($query) => $query->where('i.status', '!=', Deposit::STATUS_COMPLETED)->orWhereNull('l.id'))
+            ->get(['i.id', 'i.trans_id', 'i.trans_amount', 'i.status', 'r.action']);
+
+        $refundedWrong = DB::table('deposit_resolutions as r')
+            ->join('incoming_payments as i', 'i.id', '=', 'r.deposit_id')
+            ->where('r.action', DepositResolution::ACTION_REFUNDED)
+            ->where('i.status', '!=', Deposit::STATUS_REFUNDED)
+            ->get(['i.id', 'i.trans_id', 'i.trans_amount', 'i.status', 'r.action']);
+
+        $refundedWithoutRecord = DB::table('incoming_payments as i')
+            ->leftJoin('deposit_resolutions as r', 'r.deposit_id', '=', 'i.id')
+            ->where('i.status', Deposit::STATUS_REFUNDED)
+            ->whereNull('r.id')
+            ->get(['i.id', 'i.trans_id', 'i.trans_amount', 'i.status']);
+
+        $rows = $assignedWrong->concat($refundedWrong)->concat($refundedWithoutRecord);
+
+        return $this->result(
+            'deposit_resolutions',
+            'Resolved unmatched deposits agree with their records',
+            'fail',
+            $rows->count(),
+            (float) $rows->sum('trans_amount'),
+            $rows->take(self::SAMPLE_SIZE)->map(fn ($row) => (array) $row)->values()->all(),
+            'An assigned deposit must be completed with a ledger credit; a refunded deposit must have status 4 and a refund record.'
+        );
+    }
+
+    /**
      * Money received from customers that were not found, so it was never credited.
      *
      * @return array<string, mixed>
@@ -197,7 +239,7 @@ class FinanceReconciliationService
             (clone $deposits)->count(),
             (float) (clone $deposits)->sum('trans_amount'),
             (clone $deposits)->latest('id')->limit(self::SAMPLE_SIZE)->get(['id', 'trans_id', 'msisdn', 'bill_ref_no', 'trans_amount', 'created_at'])->map(fn ($row) => (array) $row)->all(),
-            'Cash is held but not credited to anyone. Credit the right customer or refund it.'
+            'Cash is held but not credited to anyone. Assign it to the right customer or record the refund (POST /deposits/{id}/assign or /refund), or run deposits:match-unmatched.'
         );
     }
 

@@ -64,14 +64,14 @@ it('reports every check and passes on a clean ledger', function () {
 
     expect(array_column($report['checks'], 'key'))->toBe([
         'customer_wallet_drift', 'game_wallet_drift', 'competition_wallet_drift', 'dispute_escrow_drift', 'referral_wallet_drift', 'ledger_arithmetic', 'ledger_balance',
-        'unclassified_entries', 'unmatched_deposits', 'deposits_without_ledger', 'deposits_without_excise_duty',
+        'unclassified_entries', 'unmatched_deposits', 'deposit_resolutions', 'deposits_without_ledger', 'deposits_without_excise_duty',
         'excise_duty_amounts', 'excise_duty_ledger', 'overdue_excise_duty', 'stuck_withdrawals',
         'failed_withdrawals_not_reversed', 'stuck_escrow', 'aged_escrow', 'negative_balances',
         'held_on_closed_complaints', 'aged_disputes', 'stuck_referral_withdrawals',
         'failed_referral_withdrawals_not_reversed', 'referral_bonuses_unverified', 'house_cut_rates', 'mpesa_balance_freshness', 'cash_coverage',
     ]);
     expect($report['status'])->toBe('pass');
-    expect($report['counts'])->toBe(['pass' => 27, 'warn' => 0, 'fail' => 0]);
+    expect($report['counts'])->toBe(['pass' => 28, 'warn' => 0, 'fail' => 0]);
     expect($report['meta']['period']['from'])->toBe('2026-08-22');
 });
 
@@ -292,7 +292,7 @@ it('rolls the checks up to an overall status', function () {
 
     $report = reconcile($this);
     expect($report['status'])->toBe('warn');
-    expect($report['counts'])->toBe(['pass' => 26, 'warn' => 1, 'fail' => 0]);
+    expect($report['counts'])->toBe(['pass' => 27, 'warn' => 1, 'fail' => 0]);
 
     $this->alice->update(['balance' => -1]);
     expect(reconcile($this)['status'])->toBe('fail');

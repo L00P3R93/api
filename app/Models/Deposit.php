@@ -14,6 +14,14 @@ class Deposit extends Model
     /** @use HasFactory<DepositFactory> */
     use HasFactory;
 
+    /** The account number matched no customer, so nothing was credited. */
+    public const STATUS_UNMATCHED = 0;
+
+    public const STATUS_COMPLETED = 2;
+
+    /** An unmatched deposit that was sent back to the payer (see DepositResolution). */
+    public const STATUS_REFUNDED = 4;
+
     protected $table = 'incoming_payments';
 
     protected $fillable = [
@@ -42,5 +50,10 @@ class Deposit extends Model
     public function exciseDutyCharge(): HasOne
     {
         return $this->hasOne(ExciseDutyCharge::class);
+    }
+
+    public function resolution(): HasOne
+    {
+        return $this->hasOne(DepositResolution::class);
     }
 }
