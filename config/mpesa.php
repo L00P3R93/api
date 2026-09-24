@@ -18,6 +18,10 @@ return [
             'consumer_key' => env('MPESA_SANDBOX_CONSUMER_KEY'),
             'consumer_secret' => env('MPESA_SANDBOX_CONSUMER_SECRET'),
         ],
+        'referral_b2c' => [
+            'consumer_key' => env('MPESA_REFERRAL_B2C_CONSUMER_KEY'),
+            'consumer_secret' => env('MPESA_REFERRAL_B2C_CONSUMER_SECRET'),
+        ],
     ],
     /* File Cache Location
      * **************************************************************************************************************
@@ -121,5 +125,21 @@ return [
     'account_balance_c2b' => [
         'timeout_url' => env('MPESA_C2B_BALANCE_TIMEOUT_URL'),
         'result_url' => env('MPESA_C2B_BALANCE_RESULT_URL'),
+    ],
+
+    /*
+     * Referral B2C Configuration
+     * *************************************************************************************************************
+     * A second shortcode, separate from the main B2C above, that pays out referral wallet withdrawals.
+     * It has its own app credentials and its own result/timeout URLs, so its results never reach the
+     * main withdrawal handler.
+     */
+    'referral_b2c' => [
+        'initiator_name' => env('MPESA_REFERRAL_B2C_INITIATOR_NAME'),
+        'security_credential' => env('MPESA_REFERRAL_B2C_SECURITY_CREDENTIAL'),
+        'short_code' => env('MPESA_REFERRAL_B2C_SHORTCODE'),
+        'default_command_id' => 'BusinessPayment',
+        'result_url' => env('MPESA_REFERRAL_B2C_RESULT_URL'),
+        'timeout_url' => env('MPESA_REFERRAL_B2C_TIMEOUT_URL'),
     ],
 ];

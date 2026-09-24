@@ -11,6 +11,9 @@ use App\Models\DisputedTransaction;
 use App\Models\GameWallet;
 use App\Models\LedgerEntry;
 use App\Models\PendingBalance;
+use App\Models\Referral;
+use App\Models\ReferralWallet;
+use App\Models\ReferralWithdrawal;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
 use App\Models\Withdraw;
@@ -708,6 +711,77 @@ class LedgerService
     }
 
     /**
+     * Credit a referrer's referral wallet with a milestone bonus. It is single-sided: nothing leaves the
+     * house until a bonus is transferred out of the referral wallet, which is when it becomes an expense.
+     */
+    public function recordReferralBonus(Referral $referral, ReferralWallet $wallet, float $amount, string $milestone): LedgerEntry
+    {
+        $balanceBefore = $wallet->balance;
+        $wallet->balance += $amount;
+        $wallet->save();
+
+        return $this->createEntry(
+            entryType: 'referral_bonus',
+            referenceable: $referral,
+            wallet: $wallet,
+            customerId: $wallet->customer_id,
+            debit: 0,
+            credit: $amount,
+            balanceBefore: $balanceBefore,
+            balanceAfter: $wallet->balance,
+            metadata: ['milestone' => $milestone, 'referral_id' => $referral->id, 'referred_id' => $referral->referred_id]
+        );
+    }
+
+    /**
+     * Debit a referral wallet for a payout to M-Pesa. Single-sided: the cash leaves the referral shortcode.
+     */
+    public function recordReferralWithdrawal(ReferralWithdrawal $withdrawal, ReferralWallet $wallet, float $amount): LedgerEntry
+    {
+        $balanceBefore = $wallet->balance;
+        $wallet->balance -= $amount;
+        $wallet->save();
+
+        return $this->createEntry(
+            entryType: 'referral_withdrawal',
+            referenceable: $withdrawal,
+            wallet: $wallet,
+            customerId: $wallet->customer_id,
+            debit: $amount,
+            credit: 0,
+            balanceBefore: $balanceBefore,
+            balanceAfter: $wallet->balance,
+            metadata: ['referral_withdrawal_id' => $withdrawal->id]
+        );
+    }
+
+    /**
+     * Give a failed referral payout back to the referral wallet.
+     */
+    public function reverseReferralWithdrawal(LedgerEntry $entry, ReferralWallet $wallet): LedgerEntry
+    {
+        $amount = (float) $entry->debit;
+        $balanceBefore = $wallet->balance;
+        $wallet->balance += $amount;
+        $wallet->save();
+
+        $entry->status = 'reversed';
+        $entry->save();
+
+        return $this->createEntry(
+            entryType: 'referral_withdrawal_reversal',
+            referenceable: $entry->referenceable,
+            wallet: $wallet,
+            customerId: $wallet->customer_id,
+            debit: 0,
+            credit: $amount,
+            balanceBefore: $balanceBefore,
+            balanceAfter: $wallet->balance,
+            metadata: ($entry->metadata ?? []) + ['original_entry_id' => $entry->entry_id]
+        );
+    }
+
+    /**
      * Work out which wallet table an entry written before `wallet_type` existed points at.
      * Returns null when the entry cannot be classified with confidence.
      */
@@ -745,6 +819,7 @@ class LedgerService
                 default => null,
             },
             'coin_transfer' => LedgerEntry::WALLET_TYPE_COIN,
+            'referral_bonus', 'referral_withdrawal' => LedgerEntry::WALLET_TYPE_REFERRAL,
             default => str_ends_with($entry->entry_type, '_settled') ? LedgerEntry::WALLET_TYPE_WALLET : null,
         };
     }
@@ -756,6 +831,7 @@ class LedgerService
             $wallet instanceof CompetitionWallet => LedgerEntry::WALLET_TYPE_COMPETITION,
             $wallet instanceof Coin => LedgerEntry::WALLET_TYPE_COIN,
             $wallet instanceof DisputedTransaction => LedgerEntry::WALLET_TYPE_DISPUTE,
+            $wallet instanceof ReferralWallet => LedgerEntry::WALLET_TYPE_REFERRAL,
             default => LedgerEntry::WALLET_TYPE_WALLET,
         };
     }

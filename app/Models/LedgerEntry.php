@@ -22,6 +22,8 @@ class LedgerEntry extends Model
 
     public const WALLET_TYPE_DISPUTE = 'dispute';
 
+    public const WALLET_TYPE_REFERRAL = 'referral';
+
     protected $fillable = [
         'entry_id',
         'entry_type',

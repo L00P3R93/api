@@ -402,7 +402,7 @@ class FinanceReportService
             $totalDebit += (float) $row->debit;
             $totalCredit += (float) $row->credit;
 
-            if (! in_array($category, ['cash_in', 'cash_out', 'adjustment', 'tax_withheld'], true)) {
+            if (! in_array($category, ['cash_in', 'cash_out', 'adjustment', 'tax_withheld', 'referral_bonus', 'referral_payout'], true)) {
                 $net = (float) $row->credit - (float) $row->debit;
                 $internalNet += $net;
                 $internalByCategory[$category] = ($internalByCategory[$category] ?? 0.0) + $net;
@@ -420,7 +420,7 @@ class FinanceReportService
                 'imbalance_by_category' => array_filter($internalByCategory, fn (float $net) => abs($net) > $tolerance),
             ],
             'notes' => [
-                'Deposits, withdrawals, adjustments and excise duty are single-sided in the ledger (the cash side is M-Pesa, and excise duty is owed to KRA). All other entries are paired and must net to zero, which is what check.imbalance measures.',
+                'Deposits, withdrawals, adjustments, excise duty, referral bonuses and referral payouts are single-sided in the ledger (the cash side is M-Pesa, excise duty is owed to KRA, and referral bonuses cost the house nothing until they are paid out from the referral shortcode). All other entries are paired and must net to zero, which is what check.imbalance measures.',
                 'Coin entries are in coins, not KES, and are left out of the totals and the check.',
                 'exclude_test does not apply here: the check only holds over the whole ledger.',
             ],

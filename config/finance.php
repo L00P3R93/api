@@ -235,7 +235,12 @@ return [
     |                in "_reversal" takes the category of the entry it reverses.
     |
     | Categories: cash_in, cash_out, stake, payout, house_revenue, refund,
-    | adjustment, transfer, escrow_movement, coin, tax_withheld.
+    | adjustment, transfer, escrow_movement, coin, tax_withheld,
+    | referral_bonus, referral_payout.
+    |
+    | referral_wallets hold referral bonuses that cannot be spent yet. They are
+    | a contingent amount, not a liability: a bonus becomes an expense only
+    | when it is paid out (referral_payout), from the referral shortcode.
     |
     */
 
@@ -246,6 +251,7 @@ return [
         'competition_escrow' => ['label' => 'Competition wallets (escrow)', 'type' => 'liability'],
         'coin_wallets' => ['label' => 'Coin wallets', 'type' => 'liability'],
         'disputed_funds' => ['label' => 'Disputed funds (complaints)', 'type' => 'liability'],
+        'referral_wallets' => ['label' => 'Referral wallets (unspent bonuses)', 'type' => 'contingent'],
     ],
 
     'entry_types' => [
@@ -268,6 +274,8 @@ return [
         'coin_purchase' => 'coin',
         'coin_exchange' => 'coin',
         'coin_transfer' => 'coin',
+        'referral_bonus' => 'referral_bonus',
+        'referral_withdrawal' => 'referral_payout',
     ],
 
 ];
