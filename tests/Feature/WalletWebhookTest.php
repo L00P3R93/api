@@ -24,7 +24,12 @@ beforeEach(function () {
         'wallet-webhook.url' => 'https://kadi-site.test/api/v1/wallet-webhooks',
         'wallet-webhook.secret' => str_repeat('a', 32),
         'wallet-webhook.debounce_seconds' => 2,
+        'wallets.house_wallet_id' => 1,
     ]);
+
+    // The house wallet takes id 1, so player wallets created by the tests never collide with it.
+    $house = Customer::factory()->create(['id' => 1]);
+    Wallet::forceCreate(['id' => 1, 'customer_id' => $house->id, 'balance' => 0]);
 });
 
 function webhookWallet(float $balance = 100): Wallet
@@ -95,6 +100,50 @@ it('does not dispatch anything when the url or secret is unset', function () {
     app(WalletService::class)->addBalance($wallet->id, 10);
 
     Queue::assertNotPushed(SendWalletWebhookJob::class);
+});
+
+// --- house wallet ---
+
+it('never schedules a webhook for the house wallet', function () {
+    Queue::fake();
+    $player = webhookWallet();
+
+    app(WalletService::class)->addBalance(1, 10);
+    app(WalletService::class)->addBalance($player->id, 10);
+
+    Queue::assertPushed(SendWalletWebhookJob::class, 1);
+    Queue::assertPushed(fn (SendWalletWebhookJob $job) => $job->walletId === $player->id);
+});
+
+it('follows HOUSE_WALLET_ID when deciding which wallet is the house', function () {
+    Queue::fake();
+    $otherHouse = webhookWallet();
+    config(['wallets.house_wallet_id' => $otherHouse->id]);
+
+    app(WalletService::class)->addBalance($otherHouse->id, 10);
+    app(WalletService::class)->addBalance(1, 10);
+
+    Queue::assertPushed(SendWalletWebhookJob::class, 1);
+    Queue::assertPushed(fn (SendWalletWebhookJob $job) => $job->walletId === 1);
+});
+
+it('refuses to smoke-test the house wallet', function () {
+    Http::fake();
+
+    $this->artisan('wallet-webhook:send', ['customer_id' => 1])
+        ->expectsOutputToContain('The house wallet never sends wallet webhooks.')
+        ->assertFailed();
+
+    Http::assertNothingSent();
+});
+
+it('still smoke-tests a player wallet', function () {
+    Http::fake(['*' => Http::response('', 200)]);
+    $player = webhookWallet();
+
+    $this->artisan('wallet-webhook:send', ['customer_id' => $player->customer_id])->assertSuccessful();
+
+    Http::assertSentCount(1);
 });
 
 // --- signing / HTTP wire format ---
