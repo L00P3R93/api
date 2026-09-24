@@ -359,7 +359,7 @@
 </div>
 <div class="auth-box">
 <h3>Encrypted Identifiers</h3>
-<p>All entity IDs in URL paths (<code>{encryptedIdentifier}</code>) are OpenSSL AES-256-CBC encrypted strings. The server decrypts them transparently. Use <a href="#" data-section="utilities" style="color:var(--accent-blue)">POST /api/v1/encrypt</a> to generate encrypted IDs.</p>
+<p>All entity IDs in URL paths (<code>{encryptedIdentifier}</code>) are OpenSSL AES-128-CBC encrypted strings (the cipher is set on the server by <code>OPENSSL_METHOD</code>): a random 16-byte IV followed by the ciphertext, URL-safe base64 encoded. Each call produces a different string for the same id. The server decrypts them transparently. Use <a href="#" data-section="utilities" style="color:var(--accent-blue)">POST /api/v1/encrypt</a> to generate encrypted IDs.</p>
 </div>
 <div class="auth-box">
 <h3>Idempotency</h3>
