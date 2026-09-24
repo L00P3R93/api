@@ -125,7 +125,10 @@ class UnmatchedDepositController extends Controller
     }
 
     /**
-     * @param  array{success: bool, message: string, status_code: int, deposit?: Deposit}  $result
+     * A refused request carries `code` (e.g. `already_resolved`, `reference_used`) and, when a field is at
+     * fault, `errors` shaped like a validation error.
+     *
+     * @param  array{success: bool, message: string, status_code: int, deposit?: Deposit, code?: string, errors?: array<string, list<string>>}  $result
      */
     private function respond(array $result): JsonResponse
     {
@@ -133,7 +136,9 @@ class UnmatchedDepositController extends Controller
 
         return response()->json(array_filter([
             'success' => $result['success'],
+            'code' => $result['code'] ?? null,
             'message' => $result['message'],
+            'errors' => $result['errors'] ?? null,
             'data' => $deposit ? [
                 'id' => $deposit->id,
                 'trans_id' => $deposit->trans_id,
