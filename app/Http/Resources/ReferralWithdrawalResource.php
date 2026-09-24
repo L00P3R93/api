@@ -23,6 +23,8 @@ class ReferralWithdrawalResource extends JsonResource
             'result_code' => $this->result_code,
             'result_desc' => $this->result_desc,
             'ledger_entry_id' => $this->ledgerEntry?->entry_id,
+            'settled_by' => $this->settled_by,
+            'settlement_note' => $this->settlement_note,
             'completed_at' => $this->completed_at?->toIso8601String(),
             'failed_at' => $this->failed_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),

@@ -1710,7 +1710,7 @@ Content-Type: application/json
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span></div>
 <div class="endpoint-section"><h4>Query Parameters</h4>
-<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr><tr><td>status</td><td>string</td><td><span class="optional">Optional</span></td><td><code>pending_verification</code>, <code>verified</code> or <code>deposited</code></td></tr><tr><td>referrer_id</td><td>integer</td><td><span class="optional">Optional</span></td><td>Only this referrer</td></tr><tr><td>from / to</td><td>date</td><td><span class="optional">Optional</span></td><td>Signup date range</td></tr><tr><td>per_page</td><td>integer</td><td><span class="optional">Optional</span></td><td>1 to 200 (default 50)</td></tr></table></div>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr><tr><td>status</td><td>string</td><td><span class="optional">Optional</span></td><td><code>pending_verification</code>, <code>verified</code> or <code>deposited</code></td></tr><tr><td>referrer_id</td><td>integer</td><td><span class="optional">Optional</span></td><td>Only this referrer</td></tr><tr><td>referred_id</td><td>integer</td><td><span class="optional">Optional</span></td><td>Only this referred customer (who referred them)</td></tr><tr><td>from / to</td><td>date</td><td><span class="optional">Optional</span></td><td>Signup date range</td></tr><tr><td>per_page</td><td>integer</td><td><span class="optional">Optional</span></td><td>1 to 200 (default 50)</td></tr></table></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
 <pre>{"data": [{"id": 7, "referrer_id": 42, "referred_id": 97, ...}], "links": {...}, "meta": {...}}</pre></div>
 </div></div>
@@ -1722,6 +1722,31 @@ Content-Type: application/json
 <table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr><tr><td>status</td><td>string</td><td><span class="optional">Optional</span></td><td><code>pending</code>, <code>processing</code>, <code>completed</code> or <code>failed</code></td></tr><tr><td>customer_id</td><td>integer</td><td><span class="optional">Optional</span></td><td>Only this customer</td></tr><tr><td>per_page</td><td>integer</td><td><span class="optional">Optional</span></td><td>1 to 200 (default 50)</td></tr></table></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
 <pre>{"data": [{"id": 5, "customer_id": 42, "amount": 100.00, "status": "processing", ...}], "links": {...}, "meta": {...}}</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/referral-withdrawals/{encryptedIdentifier}</span><span class="endpoint-desc">One referral withdrawal (admin)</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{"success": true, "data": {"id": 5, "customer_id": 42, "amount": 100.00, "phone_no": "2547****5678", "status": "processing", "mpesa_receipt": null, "result_code": null, "result_desc": null, "ledger_entry_id": "uuid", "settled_by": null, "settlement_note": null, "completed_at": null, "failed_at": null, "created_at": "..."}}</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/referral-withdrawals/{encryptedIdentifier}/settle</span><span class="endpoint-desc">Settle a stuck referral withdrawal by hand (admin)</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">30/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">For a withdrawal still <code>pending</code> or <code>processing</code> (flagged by the <code>stuck_referral_withdrawals</code> reconciliation check). Look the payout up on the referral shortcode first. <code>completed</code> records the M-Pesa receipt (the money has left, nothing is refunded); <code>failed</code> credits the referral wallet back (<code>referral_withdrawal_reversal</code>) with <code>result_code</code> <code>manual</code>. The API key and the note are saved as <code>settled_by</code> and <code>settlement_note</code>. A late Safaricom result for a settled withdrawal is ignored.</p></div>
+<div class="endpoint-section"><h4>Request Body</h4>
+<table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>outcome</td><td>string</td><td><span class="required">Required</span></td><td><code>completed</code> or <code>failed</code></td></tr>
+<tr><td>mpesa_receipt</td><td>string</td><td><span class="optional">Required if completed</span></td><td>6 to 30 letters or digits, stored upper case. Must not be on another referral withdrawal</td></tr>
+<tr><td>note</td><td>string</td><td><span class="required">Required</span></td><td>3 to 255 characters: why, and where it was checked</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{"success": true, "message": "Referral withdrawal marked failed and refunded", "data": {"id": 5, "status": "failed", "result_code": "manual", "settled_by": "api_key:4", "settlement_note": "Not on the 4151665 statement", ...}}</pre></div>
+<div class="endpoint-section"><h4>Errors</h4>
+<pre>// 404 - unknown withdrawal
+// 409 - already completed or failed, or the receipt is on another referral withdrawal
+// 422 - validation (outcome, mpesa_receipt, note)</pre></div>
 </div></div>
 <div class="endpoint">
 <div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/stats/referrals</span><span class="endpoint-desc">Programme-wide referral stats</span><span class="chevron">&#9654;</span></div>

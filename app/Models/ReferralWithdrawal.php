@@ -41,6 +41,8 @@ class ReferralWithdrawal extends Model
         'ledger_entry_id',
         'reversal_entry_id',
         'requested_by',
+        'settled_by',
+        'settlement_note',
         'completed_at',
         'failed_at',
     ];

@@ -23,7 +23,7 @@ class ReferralController extends Controller
     public function __construct(private ReferralService $referrals) {}
 
     /**
-     * Every referral, newest first. Filter by status, referrer and signup date.
+     * Every referral, newest first. Filter by status, referrer, referred customer and signup date.
      */
     public function index(ListReferralsRequest $request): AnonymousResourceCollection
     {
@@ -31,6 +31,7 @@ class ReferralController extends Controller
 
         $referrals = $this->filtered(Referral::query(), $filters)
             ->when(isset($filters['referrer_id']), fn (Builder $query) => $query->where('referrer_id', $filters['referrer_id']))
+            ->when(isset($filters['referred_id']), fn (Builder $query) => $query->where('referred_id', $filters['referred_id']))
             ->with(['referred:id,name,phone_no', 'bonuses'])
             ->orderByDesc('id')
             ->paginate((int) ($filters['per_page'] ?? 50))
