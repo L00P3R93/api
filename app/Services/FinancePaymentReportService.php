@@ -299,6 +299,7 @@ class FinancePaymentReportService
         return match ($status) {
             0 => 'unmatched',
             2 => 'processed',
+            4 => 'refunded',
             default => 'pending',
         };
     }

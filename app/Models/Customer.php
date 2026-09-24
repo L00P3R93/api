@@ -27,6 +27,15 @@ class Customer extends Model
         'status',
     ];
 
+    /**
+     * Internal lookup key for matching hashed M-Pesa payer numbers; never part of an API response.
+     *
+     * @var list<string>
+     */
+    protected $hidden = [
+        'phone_hash',
+    ];
+
     protected static function boot(){
         parent::boot();
 
@@ -44,6 +53,34 @@ class Customer extends Model
                 $customer->save(); // Save the updated account number
             }*/
         // });
+
+        static::saving(function (Customer $customer) {
+            if ($customer->isDirty('phone_no') || ! $customer->exists) {
+                $customer->phone_hash = self::phoneHash($customer->phone_no);
+            }
+        });
+    }
+
+    /**
+     * A Kenyan mobile number in the form M-Pesa uses (2547XXXXXXXX or 2541XXXXXXXX), from any of the ways it
+     * is stored or typed (+254..., 254..., 07..., 7...), or null when it is not one.
+     */
+    public static function canonicalPhone(?string $phone): ?string
+    {
+        $digits = preg_replace('/\D/', '', (string) $phone);
+
+        return preg_match('/^(?:254|0)?([17]\d{8})$/', $digits, $match) ? '254'.$match[1] : null;
+    }
+
+    /**
+     * SHA-256 of the canonical phone number: how Safaricom hides the payer's number (`msisdn`) in C2B
+     * confirmations, so a hashed payer can be matched to a customer.
+     */
+    public static function phoneHash(?string $phone): ?string
+    {
+        $canonical = self::canonicalPhone($phone);
+
+        return $canonical === null ? null : hash('sha256', $canonical);
     }
 
     /**
