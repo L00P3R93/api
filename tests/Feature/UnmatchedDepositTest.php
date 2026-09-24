@@ -9,6 +9,7 @@ use App\Models\Referral;
 use App\Models\ReferralBonus;
 use App\Models\Transaction;
 use App\Models\Wallet;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 
@@ -126,8 +127,14 @@ it('assigns or refunds a deposit only once', function () {
     $deposit = unmatchedDeposit(100);
 
     assignDeposit($deposit, ['customer_id' => $this->customer->id, 'note' => 'first'])->assertOk();
-    assignDeposit($deposit, ['customer_id' => $this->customer->id, 'note' => 'again'])->assertStatus(409);
-    refundDeposit($deposit, ['mpesa_reference' => 'RVX1234567', 'note' => 'late refund'])->assertStatus(409);
+    assignDeposit($deposit, ['customer_id' => $this->customer->id, 'note' => 'again'])
+        ->assertStatus(409)
+        ->assertJsonPath('code', 'already_resolved')
+        ->assertJsonMissingPath('errors');
+    refundDeposit($deposit, ['mpesa_reference' => 'RVX1234567', 'note' => 'late refund'])
+        ->assertStatus(409)
+        ->assertJsonPath('code', 'already_resolved')
+        ->assertJsonMissingPath('errors');
 
     expect((float) $this->wallet->fresh()->balance)->toBe(95.0)
         ->and(DepositResolution::count())->toBe(1);
@@ -159,8 +166,23 @@ it('records a refund without touching any wallet', function () {
         ->and(LedgerEntry::count())->toBe(0);
 
     $other = unmatchedDeposit(30, '0799000222', 'UNM0000004');
-    refundDeposit($other, ['mpesa_reference' => 'RVX1234567', 'note' => 'same reference'])->assertStatus(409);
+    refundDeposit($other, ['mpesa_reference' => 'RVX1234567', 'note' => 'same reference'])
+        ->assertStatus(409)
+        ->assertJsonPath('code', 'reference_used')
+        ->assertJsonValidationErrors('mpesa_reference');
     refundDeposit($other, ['note' => 'no reference'])->assertUnprocessable()->assertJsonValidationErrors('mpesa_reference');
+
+    expect((int) $other->fresh()->status)->toBe(Deposit::STATUS_UNMATCHED);
+});
+
+it('allows one refund per M-Pesa reference at the database level', function () {
+    $first = unmatchedDeposit(100);
+    $second = unmatchedDeposit(30, '0799000222', 'UNM0000004');
+
+    DepositResolution::create(['deposit_id' => $first->id, 'action' => DepositResolution::ACTION_REFUNDED, 'mpesa_reference' => 'RVX1234567', 'note' => 'first']);
+
+    expect(fn () => DepositResolution::create(['deposit_id' => $second->id, 'action' => DepositResolution::ACTION_REFUNDED, 'mpesa_reference' => 'RVX1234567', 'note' => 'second']))
+        ->toThrow(UniqueConstraintViolationException::class);
 });
 
 it('shows the resolution on the deposit and lists resolved deposits', function () {

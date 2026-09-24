@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Customer;
 use App\Models\Deposit;
 use App\Models\DepositResolution;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -18,6 +19,13 @@ use Illuminate\Support\Facades\Log;
 class UnmatchedDepositService
 {
     public const COMMAND_ACTOR = 'command:deposits:match-unmatched';
+
+    /** Machine-readable reasons for a 409, so callers do not depend on message wording. */
+    public const CODE_ALREADY_RESOLVED = 'already_resolved';
+
+    public const CODE_REFERENCE_USED = 'reference_used';
+
+    private const REFERENCE_USED_MESSAGE = 'That M-Pesa reference is already on another refund';
 
     /** Suggestion kinds, strongest first. */
     public const MATCH_KINDS = ['account_no', 'payer_phone', 'bill_ref_phone'];
@@ -85,7 +93,7 @@ class UnmatchedDepositService
      * Credit an unmatched deposit to a customer's wallet: ledger `deposit`, excise duty, transaction row,
      * referral first-deposit hook, all as for a C2B payment.
      *
-     * @return array{success: bool, message: string, status_code: int, deposit?: Deposit}
+     * @return array{success: bool, message: string, status_code: int, deposit?: Deposit, code?: string}
      */
     public function assign(int $depositId, int $customerId, string $note, ?string $actor): array
     {
@@ -97,7 +105,7 @@ class UnmatchedDepositService
             }
 
             if ((int) $deposit->status !== Deposit::STATUS_UNMATCHED) {
-                return $this->refused('Only unmatched deposits can be assigned', 409, $deposit);
+                return $this->refused('Only unmatched deposits can be assigned', 409, $deposit, self::CODE_ALREADY_RESOLVED);
             }
 
             $customer = Customer::find($customerId);
@@ -129,9 +137,23 @@ class UnmatchedDepositService
     /**
      * Record that an unmatched deposit was sent back to the payer on the M-Pesa portal. No wallet moves.
      *
-     * @return array{success: bool, message: string, status_code: int, deposit?: Deposit}
+     * A concurrent refund that slips past the reference check hits the unique index and gets the same 409.
+     *
+     * @return array{success: bool, message: string, status_code: int, deposit?: Deposit, code?: string, errors?: array<string, list<string>>}
      */
     public function refund(int $depositId, string $mpesaReference, string $note, ?string $actor): array
+    {
+        try {
+            return $this->recordRefund($depositId, $mpesaReference, $note, $actor);
+        } catch (UniqueConstraintViolationException) {
+            return $this->referenceUsed(Deposit::find($depositId));
+        }
+    }
+
+    /**
+     * @return array{success: bool, message: string, status_code: int, deposit?: Deposit, code?: string, errors?: array<string, list<string>>}
+     */
+    private function recordRefund(int $depositId, string $mpesaReference, string $note, ?string $actor): array
     {
         return DB::transaction(function () use ($depositId, $mpesaReference, $note, $actor) {
             $deposit = Deposit::lockForUpdate()->find($depositId);
@@ -141,11 +163,11 @@ class UnmatchedDepositService
             }
 
             if ((int) $deposit->status !== Deposit::STATUS_UNMATCHED) {
-                return $this->refused('Only unmatched deposits can be refunded', 409, $deposit);
+                return $this->refused('Only unmatched deposits can be refunded', 409, $deposit, self::CODE_ALREADY_RESOLVED);
             }
 
             if (DepositResolution::where('mpesa_reference', $mpesaReference)->exists()) {
-                return $this->refused('That M-Pesa reference is already on another refund', 409, $deposit);
+                return $this->referenceUsed($deposit);
             }
 
             $deposit->update(['status' => Deposit::STATUS_REFUNDED]);
@@ -241,15 +263,28 @@ class UnmatchedDepositService
     }
 
     /**
-     * @return array{success: bool, message: string, status_code: int, deposit?: Deposit}
+     * @param  array<string, list<string>>|null  $errors
+     * @return array{success: bool, message: string, status_code: int, deposit?: Deposit, code?: string, errors?: array<string, list<string>>}
      */
-    private function refused(string $message, int $statusCode, ?Deposit $deposit = null): array
+    private function refused(string $message, int $statusCode, ?Deposit $deposit = null, ?string $code = null, ?array $errors = null): array
     {
         return array_filter([
             'success' => false,
             'message' => $message,
             'status_code' => $statusCode,
             'deposit' => $deposit,
+            'code' => $code,
+            'errors' => $errors,
         ], fn ($value) => $value !== null);
+    }
+
+    /**
+     * The 409 for a reference already on another refund, with a field error shaped like a 422's.
+     *
+     * @return array{success: bool, message: string, status_code: int, deposit?: Deposit, code: string, errors: array<string, list<string>>}
+     */
+    private function referenceUsed(?Deposit $deposit): array
+    {
+        return $this->refused(self::REFERENCE_USED_MESSAGE, 409, $deposit, self::CODE_REFERENCE_USED, ['mpesa_reference' => [self::REFERENCE_USED_MESSAGE]]);
     }
 }
