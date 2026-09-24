@@ -9,6 +9,7 @@ use App\Models\DisputedTransaction;
 use App\Models\GameTransaction;
 use App\Models\LedgerEntry;
 use App\Models\MpesaBalance;
+use App\Models\ReferralWithdrawal;
 use App\Models\Withdraw;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -36,6 +37,7 @@ class FinanceReconciliationService
             $this->ledgerDrift('game_wallet_drift', 'Game wallet balances match the ledger', 'game_wallets', LedgerEntry::WALLET_TYPE_GAME, true),
             $this->ledgerDrift('competition_wallet_drift', 'Competition wallet balances match the ledger', 'competition_wallets', LedgerEntry::WALLET_TYPE_COMPETITION, true),
             $this->ledgerDrift('dispute_escrow_drift', 'Dispute escrow balances match the ledger', 'disputed_transactions', LedgerEntry::WALLET_TYPE_DISPUTE, false),
+            $this->ledgerDrift('referral_wallet_drift', 'Referral wallet balances match the ledger', 'referral_wallets', LedgerEntry::WALLET_TYPE_REFERRAL, false),
             $this->ledgerChain($range),
             $this->ledgerIdentity($range),
             $this->unclassifiedEntries(),
@@ -52,6 +54,9 @@ class FinanceReconciliationService
             $this->negativeBalances(),
             $this->heldOnClosedComplaints(),
             $this->agedDisputes(),
+            $this->stuckReferralWithdrawals(),
+            $this->failedReferralWithdrawalsNotReversed(),
+            $this->referralBonusesWithoutVerification(),
             $this->houseCutRates($range),
             $this->mpesaBalanceFreshness(),
             $this->cashCoverage(),
@@ -437,7 +442,7 @@ class FinanceReconciliationService
      */
     private function negativeBalances(): array
     {
-        $rows = collect(['wallets' => 'customer', 'game_wallets' => 'game', 'competition_wallets' => 'competition'])
+        $rows = collect(['wallets' => 'customer', 'game_wallets' => 'game', 'competition_wallets' => 'competition', 'referral_wallets' => 'referral'])
             ->flatMap(fn (string $kind, string $table) => DB::table($table)
                 ->where('balance', '<', 0)
                 ->get(['id', 'balance'])
@@ -510,6 +515,68 @@ class FinanceReconciliationService
                 'filed_at' => $complaint->created_at->toIso8601String(),
             ])->all(),
             'Resolve, reject or cancel them so the held money reaches the right players.'
+        );
+    }
+
+    /**
+     * Referral withdrawals still pending or waiting for Safaricom's result. They are never refunded
+     * automatically, because Safaricom may still have paid them: check the payout on the referral shortcode.
+     *
+     * @return array<string, mixed>
+     */
+    private function stuckReferralWithdrawals(): array
+    {
+        $hours = (int) config('finance.reconciliation.stuck_withdrawal_hours');
+        $stuck = ReferralWithdrawal::open()->where('created_at', '<=', now()->subHours($hours));
+
+        return $this->result(
+            'stuck_referral_withdrawals',
+            "Referral withdrawals open over {$hours} hours",
+            'warn',
+            (clone $stuck)->count(),
+            (float) (clone $stuck)->sum('amount'),
+            (clone $stuck)->oldest('id')->limit(self::SAMPLE_SIZE)->get(['id', 'customer_id', 'amount', 'status', 'conversation_id', 'created_at'])->toArray(),
+            'Look the payout up on the referral shortcode (M-Pesa org portal) before doing anything: a missing result does not mean it was not paid.'
+        );
+    }
+
+    /**
+     * A failed referral withdrawal whose referral wallet debit was never given back.
+     *
+     * @return array<string, mixed>
+     */
+    private function failedReferralWithdrawalsNotReversed(): array
+    {
+        $rows = ReferralWithdrawal::where('status', ReferralWithdrawal::STATUS_FAILED)->whereNull('reversal_entry_id');
+
+        return $this->result(
+            'failed_referral_withdrawals_not_reversed',
+            'Failed referral withdrawals were refunded to the referral wallet',
+            'fail',
+            (clone $rows)->count(),
+            (float) (clone $rows)->sum('amount'),
+            (clone $rows)->limit(self::SAMPLE_SIZE)->get(['id', 'customer_id', 'amount', 'failed_at'])->toArray()
+        );
+    }
+
+    /**
+     * Bonuses are only paid for verified referrals; a bonus on an unverified referral means the rule was bypassed.
+     *
+     * @return array<string, mixed>
+     */
+    private function referralBonusesWithoutVerification(): array
+    {
+        $rows = DB::table('referral_bonuses as b')
+            ->join('referrals as r', 'r.id', '=', 'b.referral_id')
+            ->whereNull('r.verified_at');
+
+        return $this->result(
+            'referral_bonuses_unverified',
+            'Referral bonuses were only paid for verified referrals',
+            'fail',
+            (clone $rows)->count(),
+            (float) (clone $rows)->sum('b.amount'),
+            (clone $rows)->limit(self::SAMPLE_SIZE)->get(['b.id', 'b.referral_id', 'b.customer_id', 'b.milestone', 'b.amount'])->map(fn ($row) => (array) $row)->all()
         );
     }
 
@@ -598,7 +665,8 @@ class FinanceReconciliationService
 
         $owed = $position['customer_wallets_total'] + $position['game_escrow_total'] + $position['competition_escrow_total']
             + $position['stuck_escrow_total'] + $position['coin_liability'] + $position['pending_holds_total']
-            + $position['unmatched_deposits_total'] + $position['excise_duty_payable'] + $position['disputed_funds_total'];
+            + $position['unmatched_deposits_total'] + $position['excise_duty_payable'] + $position['disputed_funds_total']
+            + $position['referral_wallets_total'];
 
         $shortfall = round($owed - $cash, 2);
 

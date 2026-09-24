@@ -38,6 +38,21 @@ class FetchMpesaBalances extends Command
             $this->error('C2B balance failed: '.$c2bResult['message']);
         }
 
-        return ($b2cResult['success'] && $c2bResult['success']) ? Command::SUCCESS : Command::FAILURE;
+        $referralSuccess = true;
+
+        if ($this->balanceService->referralB2CBalanceConfigured()) {
+            $this->info('Fetching referral B2C balance...');
+
+            $referralResult = $this->balanceService->fetchAndStoreReferralB2CBalance();
+            $referralSuccess = $referralResult['success'];
+
+            if ($referralSuccess) {
+                $this->info('Referral B2C balance request accepted (ConversationID: '.($referralResult['conversation_id'] ?? 'N/A').').');
+            } else {
+                $this->error('Referral B2C balance failed: '.$referralResult['message']);
+            }
+        }
+
+        return ($b2cResult['success'] && $c2bResult['success'] && $referralSuccess) ? Command::SUCCESS : Command::FAILURE;
     }
 }

@@ -12,6 +12,7 @@ use App\Services\FinanceGameReportService;
 use App\Services\FinanceLedgerReportService;
 use App\Services\FinanceListing;
 use App\Services\FinancePaymentReportService;
+use App\Services\FinanceReferralReportService;
 use App\Services\FinanceReportService;
 use Illuminate\Http\JsonResponse;
 
@@ -28,6 +29,7 @@ class FinanceDrilldownController extends Controller
         private CustomerService $customers,
         private FinanceExpenseService $expenses,
         private FinanceDisputeReportService $disputes,
+        private FinanceReferralReportService $referrals,
     ) {}
 
     public function deposits(FinanceListRequest $request): JsonResponse
@@ -73,6 +75,26 @@ class FinanceDrilldownController extends Controller
     public function disputes(FinanceListRequest $request): JsonResponse
     {
         return $this->paged($request, $this->disputes->listing($request->dateRange(), $request->filters()));
+    }
+
+    /**
+     * Referral programme totals for the range (bonuses earned, payouts) and the current position.
+     */
+    public function referrals(FinanceListRequest $request): JsonResponse
+    {
+        $range = $request->dateRange();
+
+        return $this->respond($range, $this->referrals->summary($range));
+    }
+
+    public function referralBonuses(FinanceListRequest $request): JsonResponse
+    {
+        return $this->paged($request, $this->referrals->bonuses($request->dateRange(), $request->filters()));
+    }
+
+    public function referralWithdrawals(FinanceListRequest $request): JsonResponse
+    {
+        return $this->paged($request, $this->referrals->withdrawals($request->dateRange(), $request->filters()));
     }
 
     public function topCustomers(FinanceListRequest $request): JsonResponse

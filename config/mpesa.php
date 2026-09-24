@@ -141,5 +141,7 @@ return [
         'default_command_id' => 'BusinessPayment',
         'result_url' => env('MPESA_REFERRAL_B2C_RESULT_URL'),
         'timeout_url' => env('MPESA_REFERRAL_B2C_TIMEOUT_URL'),
+        'balance_result_url' => env('MPESA_REFERRAL_B2C_BALANCE_RESULT_URL'),
+        'balance_timeout_url' => env('MPESA_REFERRAL_B2C_BALANCE_TIMEOUT_URL'),
     ],
 ];

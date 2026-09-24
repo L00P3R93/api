@@ -149,6 +149,30 @@ class MpesaService
     }
 
     /**
+     * Query the referral shortcode's account balance. The result arrives on its own callback URL, so it
+     * is stored apart from the main B2C balance.
+     *
+     * @throws MpesaApiException
+     */
+    public function referralB2cAccountBalance(): array
+    {
+        $config = config('mpesa.referral_b2c');
+
+        $payload = [
+            'Initiator' => $config['initiator_name'],
+            'SecurityCredential' => $this->securityCredential($config['security_credential']),
+            'CommandID' => 'AccountBalance',
+            'PartyA' => $config['short_code'],
+            'IdentifierType' => '4',
+            'Remarks' => 'Account Balance Query',
+            'QueueTimeOutURL' => $config['balance_timeout_url'],
+            'ResultURL' => $config['balance_result_url'],
+        ];
+
+        return $this->request('/mpesa/accountbalance/v1/query', $payload, 'referral_b2c');
+    }
+
+    /**
      * Query the status of a B2C transaction.
      *
      * @param  array{TransactionID: string}  $params

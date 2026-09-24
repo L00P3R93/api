@@ -313,6 +313,7 @@
             <li><a href="#" data-section="comp-wallets"><span class="nav-icon">&#127942;</span> <span>Competition Wallets</span></a></li>
             <li><a href="#" data-section="comp-txns"><span class="nav-icon">&#128176;</span> <span>Competition Txns</span></a></li>
             <li><a href="#" data-section="complaints"><span class="nav-icon">&#9878;</span> <span>Complaints</span></a></li>
+            <li><a href="#" data-section="referrals"><span class="nav-icon">&#129309;</span> <span>Referrals</span></a></li>
         </ul>
         <div class="nav-section">Finance &amp; Payments</div>
         <ul>
@@ -460,7 +461,7 @@ X-API-KEY: your-api-key-here</pre></div>
 <tr><td>name</td><td>string</td><td><span class="required">Required</span></td><td>Customer full name</td></tr>
 <tr><td>email</td><td>string</td><td><span class="required">Required</span></td><td>Valid unique email</td></tr>
 <tr><td>google_id</td><td>string</td><td><span class="optional">Optional</span></td><td>Google OAuth ID</td></tr>
-<tr><td>referral_code</td><td>string</td><td><span class="optional">Optional</span></td><td>Referral code</td></tr>
+<tr><td>referral_code</td><td>string</td><td><span class="optional">Optional</span></td><td>The code the customer signed up with. When it is another customer's <a href="#" data-section="referrals" style="color:var(--accent-blue)">referral code</a> (any case), this customer becomes their referral. Agent codes are stored as before</td></tr>
 <tr><td>id_no</td><td>string</td><td><span class="optional">Optional</span></td><td>National ID number</td></tr>
 <tr><td>phone_no</td><td>string</td><td><span class="optional">Optional</span></td><td>Phone number</td></tr>
 </table></div>
@@ -1560,6 +1561,184 @@ Content-Type: application/json
 </div></div>
 </div>
 
+<!-- REFERRALS SECTION -->
+<div class="doc-section" data-section="referrals">
+<button class="expand-all" onclick="toggleAll('referrals')">Expand / Collapse All</button>
+<div class="callback-note">A customer shares their own referral code (the client generates the code, link and QR code). A new customer who signs up with it (<code>referral_code</code> on <a href="#" data-section="customers" style="color:var(--accent-blue)">POST /customers</a>) becomes their referral. The referrer earns <strong>KES 10</strong> when the client reports the referral verified (email and phone), and <strong>KES 10</strong> on the referral's first wallet deposit of any amount, paid once they are verified. Coin loads, gifts and emoji are not deposits. Each milestone pays once. Bonuses go to a separate <strong>referral wallet</strong>, which the customer can withdraw to M-Pesa (minimum KES 50, whole shillings) from the referral shortcode. Only signups on or after <code>REFERRALS_EFFECTIVE_FROM</code> count. Codes that belong to no customer (agent codes) are stored on the customer as before and create no referral.</div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-put">PUT</span><span class="endpoint-path">/api/v1/customers/{encryptedIdentifier}/referral-code</span><span class="endpoint-desc">Set or change the customer's referral code, link and QR code</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-rate">30/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">The client generates all three. The code is stored upper case and must be unique (case-insensitive). Changing it keeps every earlier referral and earning; the old code stops matching new signups.</p></div>
+<div class="endpoint-section"><h4>Request Body</h4>
+<table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr><tr><td>code</td><td>string</td><td><span class="required">Required</span></td><td>4 to 20 letters or digits</td></tr><tr><td>link</td><td>string</td><td><span class="optional">Optional</span></td><td>Referral link (URL, up to 2048 characters)</td></tr><tr><td>qr_code</td><td>string</td><td><span class="optional">Optional</span></td><td>QR code as an image URL or a data URI (up to 500,000 characters)</td></tr></table></div>
+<div class="endpoint-section"><h4>Request</h4>
+<pre>PUT /api/v1/customers/{encryptedIdentifier}/referral-code HTTP/1.1
+Host: api.kadi-kings.co.ke
+X-API-KEY: your-api-key-here
+Content-Type: application/json
+
+{"code": "kadi2026", "link": "https://kadikings.co.ke/r/KADI2026", "qr_code": "data:image/png;base64,iVBORw0..."}</pre></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{"success": true, "data": {"customer_id": 42, "code": "KADI2026", "link": "https://kadikings.co.ke/r/KADI2026", "qr_code": "data:image/png;base64,iVBORw0...", "created_at": "...", "updated_at": "..."}}</pre></div>
+<div class="endpoint-section"><h4>Errors</h4>
+<pre>// 409 - another customer has this code
+{"success": false, "message": "Referral code is already taken"}
+// 422 - {"errors": {"code": ["The code must be 4 to 20 letters or digits."]}}</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/customers/{encryptedIdentifier}/referral-code</span><span class="endpoint-desc">The customer's referral code, link and QR code</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{"success": true, "data": {"customer_id": 42, "code": "KADI2026", "link": "...", "qr_code": "...", "created_at": "...", "updated_at": "..."}}</pre></div>
+<div class="endpoint-section"><h4>Errors</h4>
+<pre>// 404 - {"success": false, "message": "Customer has no referral code"}</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/referrals/lookup</span><span class="endpoint-desc">Who owns a code (for "Invited by ..." on signup)</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr><tr><td>code</td><td>string</td><td><span class="required">Required</span></td><td>The code, any case</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{"success": true, "data": {"code": "KADI2026", "customer_id": 42, "name": "Jane Doe"}}</pre></div>
+<div class="endpoint-section"><h4>Errors</h4>
+<pre>// 404 - {"success": false, "message": "Referral code not found"}</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/customers/{encryptedIdentifier}/referral/verified</span><span class="endpoint-desc">Report that a customer verified their email and phone</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-rate">30/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Call this for the <strong>referred</strong> customer once the client has verified both their email and phone. It pays the referrer the signup bonus, and the first-deposit bonus too if the customer has already deposited. Safe to call more than once: each milestone pays once. For a customer who was not referred it returns <code>referred: false</code> and pays nothing.</p></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "referred": true,
+  "data": {
+    "id": 7, "referrer_id": 42, "referred_id": 97, "referred_name": "New Player", "referred_phone": "2547****5678",
+    "code_used": "KADI2026", "status": "verified", "verified_at": "2026-09-24T10:00:00+03:00", "first_deposited_at": null,
+    "earned": 10.00, "bonuses": [{"milestone": "signup", "amount": 10.00, "paid_at": "2026-09-24T10:00:00+03:00"}],
+    "created_at": "2026-09-24T09:55:00+03:00"
+  }
+}</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/customers/{encryptedIdentifier}/referrals</span><span class="endpoint-desc">The customers this customer referred</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Newest first, 20 per page. <code>status</code> is <code>pending_verification</code>, <code>verified</code> or <code>deposited</code> (verified and made a first deposit). <code>earned</code> is what that referral paid the referrer. Phone numbers are masked.</p></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr><tr><td>status</td><td>string</td><td><span class="optional">Optional</span></td><td><code>pending_verification</code>, <code>verified</code> or <code>deposited</code></td></tr><tr><td>from / to</td><td>date</td><td><span class="optional">Optional</span></td><td>Signup date range, <code>Y-m-d</code></td></tr><tr><td>per_page</td><td>integer</td><td><span class="optional">Optional</span></td><td>1 to 200 (default 20)</td></tr><tr><td>page</td><td>integer</td><td><span class="optional">Optional</span></td><td>Page number</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{"data": [{"id": 7, "referred_name": "New Player", "referred_phone": "2547****5678", "status": "deposited", "earned": 20.00, "bonuses": [...], ...}], "links": {...}, "meta": {"current_page": 1, "total": 12, ...}}</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/customers/{encryptedIdentifier}/referrals/stats</span><span class="endpoint-desc">A referrer's counts, earnings and referral wallet balance</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;"><code>referrals.deposited</code> counts referrals that made a first deposit, verified or not. <code>earned.total</code> is everything ever credited to the referral wallet; <code>wallet_balance</code> is what is left after withdrawals.</p></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "code": "KADI2026",
+    "referrals": {"total": 12, "verified": 9, "deposited": 6, "pending_verification": 3, "today": 1, "this_week": 4, "this_month": 12},
+    "earned": {"total": 150.00, "signup": 90.00, "first_deposit": 60.00, "this_month": 150.00},
+    "wallet_balance": 100.00
+  }
+}</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/customers/{encryptedIdentifier}/referral-wallet</span><span class="endpoint-desc">Referral wallet balance and bonus history</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr><tr><td>per_page</td><td>integer</td><td><span class="optional">Optional</span></td><td>1 to 200 (default 20)</td></tr><tr><td>page</td><td>integer</td><td><span class="optional">Optional</span></td><td>Page number</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "customer_id": 42, "balance": 100.00, "total_earned": 150.00, "withdrawable": true, "minimum_withdrawal": 50,
+    "bonuses": [{"id": 31, "referral_id": 7, "referred_id": 97, "referred_name": "New Player", "milestone": "first_deposit", "amount": 10.00, "ledger_entry_id": "uuid", "created_at": "..."}]
+  },
+  "pagination": {"page": 1, "per_page": 20, "total": 15, "last_page": 1}
+}</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/customers/{encryptedIdentifier}/referral-wallet/withdraw</span><span class="endpoint-desc">Withdraw referral earnings to M-Pesa</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">5/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Pays the amount to the customer's phone number from the <strong>referral shortcode</strong> (not the main B2C shortcode). The referral wallet is debited straight away (ledger entry <code>referral_withdrawal</code>) and the B2C request is sent. <code>processing</code> means Safaricom accepted it; the result callback then marks it <code>completed</code>, or <code>failed</code> and credits the wallet back (<code>referral_withdrawal_reversal</code>). If Safaricom rejects the request outright the money is returned at once (<code>502</code>). If the outcome is unknown (network error) the withdrawal stays <code>pending</code> and is not refunded automatically, because it may still be paid; finance reconciles it. The house pays the B2C fee.</p></div>
+<div class="endpoint-section"><h4>Request Body</h4>
+<table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr><tr><td>amount</td><td>integer</td><td><span class="required">Required</span></td><td>Whole shillings, at least 50 and no more than the referral wallet balance</td></tr></table></div>
+<div class="endpoint-section"><h4>Request</h4>
+<pre>POST /api/v1/customers/{encryptedIdentifier}/referral-wallet/withdraw HTTP/1.1
+Host: api.kadi-kings.co.ke
+X-API-KEY: your-api-key-here
+Idempotency-Key: 6f1c...
+Content-Type: application/json
+
+{"amount": 100}</pre></div>
+<div class="endpoint-section"><h4>Response (201)</h4>
+<pre>{"success": true, "message": "Referral payout sent", "data": {"id": 5, "customer_id": 42, "amount": 100.00, "phone_no": "2547****5678", "status": "processing", "mpesa_receipt": null, "result_code": null, "result_desc": null, "ledger_entry_id": "uuid", "completed_at": null, "failed_at": null, "created_at": "..."}}</pre></div>
+<div class="endpoint-section"><h4>Errors</h4>
+<pre>// 400 - insufficient referral wallet balance, or no valid M-Pesa phone number
+// 403 - referral withdrawals are switched off
+// 422 - below the minimum: {"success": false, "message": "The minimum referral withdrawal is KES 50"}
+// 502 - Safaricom rejected the payout; the money is back in the referral wallet (data.status "failed")
+// 202 - outcome unknown; kept pending for review (data.status "pending")
+// 503 - the referral shortcode is not configured on the server</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/customers/{encryptedIdentifier}/referral-wallet/withdrawals</span><span class="endpoint-desc">The customer's referral withdrawals</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Newest first, 20 per page. Status is <code>pending</code>, <code>processing</code>, <code>completed</code> or <code>failed</code>.</p></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{"data": [{"id": 5, "amount": 100.00, "status": "completed", "mpesa_receipt": "RKA1B2C3D4", ...}], "links": {...}, "meta": {...}}</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/referrals</span><span class="endpoint-desc">All referrals (admin)</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr><tr><td>status</td><td>string</td><td><span class="optional">Optional</span></td><td><code>pending_verification</code>, <code>verified</code> or <code>deposited</code></td></tr><tr><td>referrer_id</td><td>integer</td><td><span class="optional">Optional</span></td><td>Only this referrer</td></tr><tr><td>from / to</td><td>date</td><td><span class="optional">Optional</span></td><td>Signup date range</td></tr><tr><td>per_page</td><td>integer</td><td><span class="optional">Optional</span></td><td>1 to 200 (default 50)</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{"data": [{"id": 7, "referrer_id": 42, "referred_id": 97, ...}], "links": {...}, "meta": {...}}</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/referral-withdrawals</span><span class="endpoint-desc">All referral withdrawals (admin)</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr><tr><td>status</td><td>string</td><td><span class="optional">Optional</span></td><td><code>pending</code>, <code>processing</code>, <code>completed</code> or <code>failed</code></td></tr><tr><td>customer_id</td><td>integer</td><td><span class="optional">Optional</span></td><td>Only this customer</td></tr><tr><td>per_page</td><td>integer</td><td><span class="optional">Optional</span></td><td>1 to 200 (default 50)</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{"data": [{"id": 5, "customer_id": 42, "amount": 100.00, "status": "processing", ...}], "links": {...}, "meta": {...}}</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/stats/referrals</span><span class="endpoint-desc">Programme-wide referral stats</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "referrals": {"total": 120, "verified": 90, "deposited": 60, "today": 4, "this_week": 20, "this_month": 120},
+    "bonuses": {"total": 1500.00, "signup": 900.00, "first_deposit": 600.00, "this_month": 1500.00},
+    "unspent_balance": 800.00, "referrers": 35,
+    "top_referrers": [{"customer_id": 42, "name": "Jane Doe", "referrals": 12, "earned": 150.00}]
+  }
+}</pre></div>
+</div></div>
+</div>
 <!-- FINANCIAL SECTION -->
 <div class="doc-section" data-section="financial">
 <div class="endpoint">
@@ -1649,6 +1828,33 @@ Content-Type: application/json
 <div class="tags"><span class="tag tag-rate">100/min</span></div>
 <div class="endpoint-section"><h4>Response</h4><pre>// Updates B2C balance record</pre></div>
 </div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/referral/b2c/result</span><span class="endpoint-desc">B2C result for a referral payout (referral shortcode)</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-rate">100/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Set as <code>MPESA_REFERRAL_B2C_RESULT_URL</code>. Matches the withdrawal by <code>ConversationID</code> (Safaricom's nested <code>{"Result": {...}}</code> body and a flat body both work). <code>ResultCode</code> 0 completes it and stores the <code>TransactionID</code> as the receipt; anything else fails it and credits the referral wallet back. Unknown or already settled conversations are ignored, so a repeated callback changes nothing. Main withdrawals are never touched.</p></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{"ResultCode": 0, "ResultDesc": "Accepted"}</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/referral/b2c/timeout</span><span class="endpoint-desc">B2C timeout for a referral payout</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-rate">100/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Set as <code>MPESA_REFERRAL_B2C_TIMEOUT_URL</code>. Logged only: a timeout does not mean the payout failed, so the withdrawal is left as it is.</p></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{"ResultCode": 0, "ResultDesc": "Accepted"}</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/referral/balance/b2c/result</span><span class="endpoint-desc">Account balance result for the referral shortcode</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-rate">100/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Set as <code>MPESA_REFERRAL_B2C_BALANCE_RESULT_URL</code> (and <code>/api/v1/referral/balance/b2c/timeout</code> as <code>MPESA_REFERRAL_B2C_BALANCE_TIMEOUT_URL</code>). Stored as M-Pesa balance type <code>referral_b2c</code>, so it appears on the balance sheet as cash. The hourly <code>mpesa:fetch-balances</code> only asks for it when both URLs are set.</p></div>
+<div class="endpoint-section"><h4>Response</h4>
+<pre>// Processes silently</pre></div>
+</div></div>
 </div>
 <!-- STATS SECTION -->
 <div class="doc-section" data-section="stats">
@@ -1737,7 +1943,7 @@ Content-Type: application/json
 <table class="params-table">
 <tr><th>Group</th><th>Endpoints</th></tr>
 <tr><td><a href="#" data-section="finance-statements" style="color:var(--accent-blue)">Financial Statements</a></td><td>summary, income-statement, cash-flow, balance-sheet, trial-balance, reconciliation, taxes</td></tr>
-<tr><td><a href="#" data-section="finance-reports" style="color:var(--accent-blue)">Drill-downs</a></td><td>deposits, withdrawals, purchases, games, competitions, ledger, adjustments, disputes, customers/top, customer statement</td></tr>
+<tr><td><a href="#" data-section="finance-reports" style="color:var(--accent-blue)">Drill-downs</a></td><td>deposits, withdrawals, purchases, games, competitions, ledger, adjustments, disputes, referrals (summary, bonuses, withdrawals), customers/top, customer statement</td></tr>
 <tr><td><a href="#" data-section="finance-expenses" style="color:var(--accent-blue)">Expenses</a></td><td>record, void and list expenses</td></tr>
 <tr><td><a href="#" data-section="finance-excise" style="color:var(--accent-blue)">Excise Duty</a></td><td>excise-duty, excise-duty/charges, excise-duty/returns, excise-duty/remittances (list, record, void)</td></tr>
 <tr><td><a href="#" data-section="finance-export" style="color:var(--accent-blue)">CSV Export</a></td><td>any report as a CSV download</td></tr>
@@ -1863,7 +2069,7 @@ Content-Type: application/json
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
 <div class="endpoint-section"><h4>Description</h4>
-<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Revenue is house cuts as they are booked in the ledger, plus gift and emoji sales at the cash received. Tournament and jackpot cuts are split by rounds where the cut is linked to its competition entry; older cuts appear as <code>competitions_unattributed</code>. <code>expenses</code> are the active entries recorded through <a href="#" data-section="finance-expenses" style="color:var(--accent-blue)">/finance/expenses</a>, dated by their expense date. <code>net_income</code> is revenue minus expenses, before tax (see <a href="#" data-section="finance-statements" style="color:var(--accent-blue)">/finance/taxes</a>). <code>memo.load_margin</code> is cash received for wallet loads minus the wallet credit given; it is shown for information and is not part of revenue. House cuts reversed when a <a href="#" data-section="complaints" style="color:var(--accent-blue)">complaint</a> is resolved reduce the same revenue line on the day they are reversed.</p></div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Revenue is house cuts as they are booked in the ledger, plus gift and emoji sales at the cash received. Tournament and jackpot cuts are split by rounds where the cut is linked to its competition entry; older cuts appear as <code>competitions_unattributed</code>. <code>expenses</code> are the active entries recorded through <a href="#" data-section="finance-expenses" style="color:var(--accent-blue)">/finance/expenses</a>, dated by their expense date. <code>referral_payouts</code> are referral withdrawals completed in the period: the referral programme expense (earned bonuses cost nothing until they are paid out; they are shown in <code>memo.referral_bonuses_earned</code>). <code>net_income</code> is revenue minus expenses minus referral payouts, before tax (see <a href="#" data-section="finance-statements" style="color:var(--accent-blue)">/finance/taxes</a>). <code>memo.load_margin</code> is cash received for wallet loads minus the wallet credit given; it is shown for information and is not part of revenue. House cuts reversed when a <a href="#" data-section="complaints" style="color:var(--accent-blue)">complaint</a> is resolved reduce the same revenue line on the day they are reversed.</p></div>
 <div class="endpoint-section"><h4>Query Parameters</h4>
 <table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
 <tr><td>from, to, group_by, exclude_test</td><td>&nbsp;</td><td><span class="optional">Optional</span></td><td>See common parameters</td></tr></table></div>
@@ -1899,7 +2105,7 @@ Content-Type: application/json
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
 <div class="endpoint-section"><h4>Description</h4>
-<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Cash in is what customers actually paid (incoming payments), split into <code>wallet_deposit</code>, <code>load</code>, <code>gift</code>, <code>emoji</code> and <code>unmatched</code> (money received from an unknown customer and not credited to anyone; it is included in the total). Cash out is outgoing payments by status: <code>paid</code>, <code>pending</code>, <code>failed</code>. <code>excise_duty.withheld</code> is the excise duty taken from deposits in the period (already inside cash in) and <code>excise_duty.remitted</code> is what was paid to KRA in the period, by payment date. <code>net_cash</code> is cash in minus paid withdrawals minus excise duty remitted. Works for dates before the ledger began.</p></div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Cash in is what customers actually paid (incoming payments), split into <code>wallet_deposit</code>, <code>load</code>, <code>gift</code>, <code>emoji</code> and <code>unmatched</code> (money received from an unknown customer and not credited to anyone; it is included in the total). Cash out is outgoing payments by status: <code>paid</code>, <code>pending</code>, <code>failed</code>. <code>excise_duty.withheld</code> is the excise duty taken from deposits in the period (already inside cash in) and <code>excise_duty.remitted</code> is what was paid to KRA in the period, by payment date. <code>referral_payouts</code> are <a href="#" data-section="referrals" style="color:var(--accent-blue)">referral withdrawals</a> from the referral shortcode: <code>paid</code> by completion date, <code>failed</code> by failure date, <code>pending</code> (still open) by request date. <code>net_cash</code> is cash in minus paid withdrawals minus excise duty remitted minus paid referral payouts. Works for dates before the ledger began.</p></div>
 <div class="endpoint-section"><h4>Query Parameters</h4>
 <table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
 <tr><td>from, to, group_by, exclude_test</td><td>&nbsp;</td><td><span class="optional">Optional</span></td><td>See common parameters</td></tr></table></div>
@@ -1927,7 +2133,7 @@ Content-Type: application/json
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
 <div class="endpoint-section"><h4>Description</h4>
-<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Assets are the latest balance of every M-Pesa account (from the hourly balance fetch), listed individually. Liabilities are what is owed: customer wallets (test customers and the house wallet excluded), open game and competition wallets, <code>stuck_escrow</code> (money left in finished wallets), coin liability, pending holds, <code>unmatched_deposits</code> and <code>excise_duty_payable</code> (excise duty taken from deposits and not yet in a recorded <a href="#" data-section="finance-excise" style="color:var(--accent-blue)">KRA remittance</a>; snapshots from before it was tracked show 0) and <code>disputed_funds</code> (winnings held while a <a href="#" data-section="complaints" style="color:var(--accent-blue)">complaint</a> is pending; still owed to a customer, snapshots from before complaints existed show 0). <code>house_wallet</code> is shown separately. <code>difference</code> is cash minus liabilities minus the house wallet. It is not expected to be zero: it also holds gift and emoji sales not yet moved to the house wallet, M-Pesa charges, and timing between the hourly balance fetch and wallet movements. A daily snapshot is taken at 23:59 Nairobi time; <code>as_of</code> reads that day's snapshot.</p></div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Assets are the latest balance of every M-Pesa account (from the hourly balance fetch), listed individually. Liabilities are what is owed: customer wallets (test customers and the house wallet excluded), open game and competition wallets, <code>stuck_escrow</code> (money left in finished wallets), coin liability, pending holds, <code>unmatched_deposits</code> and <code>excise_duty_payable</code> (excise duty taken from deposits and not yet in a recorded <a href="#" data-section="finance-excise" style="color:var(--accent-blue)">KRA remittance</a>; snapshots from before it was tracked show 0) and <code>disputed_funds</code> (winnings held while a <a href="#" data-section="complaints" style="color:var(--accent-blue)">complaint</a> is pending; still owed to a customer, snapshots from before complaints existed show 0) and <code>referral_wallets</code> (referral bonuses not yet withdrawn; customers can withdraw them at any time, snapshots from before referrals existed show 0). The referral shortcode's balance is listed among the M-Pesa accounts as type <code>referral_b2c</code> once its balance URLs are set. <code>house_wallet</code> is shown separately. <code>difference</code> is cash minus liabilities minus the house wallet. It is not expected to be zero: it also holds gift and emoji sales not yet moved to the house wallet, M-Pesa charges, and timing between the hourly balance fetch and wallet movements. A daily snapshot is taken at 23:59 Nairobi time; <code>as_of</code> reads that day's snapshot.</p></div>
 <div class="endpoint-section"><h4>Query Parameters</h4>
 <table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
 <tr><td>as_of</td><td>date (Y-m-d)</td><td><span class="optional">Optional</span></td><td>Not in the future. Returns that day's snapshot. <code>404</code> if there is none. Omit for the live position</td></tr></table></div>
@@ -2016,12 +2222,15 @@ Content-Type: application/json
 <tr><td>failed_withdrawals_not_reversed</td><td>fail</td><td>A payout failed but the customer was not refunded</td></tr>
 <tr><td>stuck_escrow</td><td>warn</td><td>Money left in game or competition wallets that are no longer open</td></tr>
 <tr><td>aged_escrow</td><td>warn</td><td>Open game or competition wallets holding money, untouched for over 24 hours</td></tr>
-<tr><td>negative_balances</td><td>fail</td><td>Any wallet with a negative balance</td></tr>
+<tr><td>negative_balances</td><td>fail</td><td>Any wallet (customer, game, competition or referral) with a negative balance</td></tr>
 <tr><td>held_on_closed_complaints</td><td>fail</td><td>Money still in dispute escrow for a complaint that is resolved, rejected or cancelled</td></tr>
 <tr><td>aged_disputes</td><td>warn</td><td>Complaints still pending after 3 days (<code>FINANCE_AGED_DISPUTE_DAYS</code>), with the money they hold</td></tr>
+<tr><td>stuck_referral_withdrawals</td><td>warn</td><td>Referral withdrawals still pending or processing after 24 hours. Check the payout on the referral shortcode before doing anything: a missing result does not mean it was not paid</td></tr>
+<tr><td>failed_referral_withdrawals_not_reversed</td><td>fail</td><td>A referral payout failed but the referral wallet was not credited back</td></tr>
+<tr><td>referral_bonuses_unverified</td><td>fail</td><td>Referral bonuses paid for referrals that are not verified</td></tr>
 <tr><td>house_cut_rates</td><td>warn</td><td>House cuts that differ from the fee schedule (only cuts linked to their transaction can be checked)</td></tr>
 <tr><td>mpesa_balance_freshness</td><td>warn</td><td>M-Pesa balances fetched in the last 3 hours</td></tr>
-<tr><td>cash_coverage</td><td>fail</td><td>M-Pesa cash covers everything owed to customers and the excise duty owed to KRA</td></tr></table></div>
+<tr><td>cash_coverage</td><td>fail</td><td>M-Pesa cash covers everything owed to customers (including unspent referral balances) and the excise duty owed to KRA</td></tr></table></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
 <pre>{
   "success": true,
@@ -2229,7 +2438,7 @@ Content-Type: application/json
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
 <div class="endpoint-section"><h4>Description</h4>
-<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">The full audit trail of money movements, newest first. Entries for the house customer stay visible when <code>exclude_test</code> is on, because house cuts are real money. <code>category</code> is one of <code>cash_in</code>, <code>cash_out</code>, <code>stake</code>, <code>payout</code>, <code>house_revenue</code>, <code>refund</code>, <code>adjustment</code>, <code>transfer</code>, <code>escrow_movement</code>, <code>coin</code>, <code>tax_withheld</code> (excise duty), and includes each type's reversals.</p></div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">The full audit trail of money movements, newest first. Entries for the house customer stay visible when <code>exclude_test</code> is on, because house cuts are real money. <code>category</code> is one of <code>cash_in</code>, <code>cash_out</code>, <code>stake</code>, <code>payout</code>, <code>house_revenue</code>, <code>refund</code>, <code>adjustment</code>, <code>transfer</code>, <code>escrow_movement</code>, <code>coin</code>, <code>tax_withheld</code> (excise duty), <code>referral_bonus</code>, <code>referral_payout</code>, and includes each type's reversals.</p></div>
 <div class="endpoint-section"><h4>Query Parameters</h4>
 <table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
 <tr><td>entry_type</td><td>string</td><td><span class="optional">Optional</span></td><td>e.g. <code>deposit</code>, <code>game_bet</code>, <code>house_cut</code>, <code>adjustment</code></td></tr>
@@ -2316,6 +2525,44 @@ Content-Type: application/json
     "pagination": {"page": 1, "per_page": 50, "total": 2, "last_page": 1}
   }
 }</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/referrals</span><span class="endpoint-desc">Referral programme totals and position</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">For the range: bonuses earned (credited to referral wallets; no cash moves) and referral payouts (<code>paid</code> is the expense). <code>position</code> is now: unspent referral balances (a liability), open withdrawals, and lifetime totals.</p></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "generated_at": "...", "meta": {},
+    "bonuses_earned": {"signup": 90.00, "first_deposit": 60.00, "total": 150.00, "count": 15},
+    "payouts": {"paid": 100.00, "pending": 50.00, "failed": 0.00},
+    "position": {"unspent_balances": 800.00, "open_withdrawals": {"count": 1, "amount": 50.00}, "lifetime_bonuses": 1500.00, "lifetime_paid_out": 650.00},
+    "notes": ["..."]
+  }
+}</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/referrals/bonuses</span><span class="endpoint-desc">Referral bonuses paid into referral wallets</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr><tr><td>type</td><td>string</td><td><span class="optional">Optional</span></td><td><code>signup</code> or <code>first_deposit</code></td></tr><tr><td>customer_id</td><td>integer</td><td><span class="optional">Optional</span></td><td>The referrer</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{"success": true, "data": {"summary": {"by_milestone": {"signup": {"bonuses": 9, "amount": 90.00}, "first_deposit": {"bonuses": 6, "amount": 60.00}}, "total": 150.00}, "items": [{"id": 31, "paid_at": "...", "referral_id": 7, "customer_id": 42, "referrer_name": "Jane Doe", "referred_id": 97, "referred_name": "New Player", "milestone": "signup", "amount": 10.00, "ledger_entry_id": "uuid"}], "pagination": {...}}}</pre></div>
+</div></div>
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/referrals/withdrawals</span><span class="endpoint-desc">Referral withdrawals to M-Pesa</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="endpoint-section"><h4>Description</h4>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Withdrawals requested in the range, newest first. Phone numbers are masked.</p></div>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr><tr><td>status</td><td>string</td><td><span class="optional">Optional</span></td><td><code>pending</code>, <code>processing</code>, <code>completed</code> or <code>failed</code></td></tr><tr><td>customer_id</td><td>integer</td><td><span class="optional">Optional</span></td><td>The customer</td></tr></table></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{"success": true, "data": {"summary": {"by_status": {"completed": {"withdrawals": 4, "amount": 400.00}, ...}}, "items": [{"id": 5, "requested_at": "...", "customer_id": 42, "customer_name": "Jane Doe", "phone_no": "2547****5678", "amount": 100.00, "status": "completed", "mpesa_receipt": "RKA1B2C3D4", "result_code": "0", "result_desc": "...", "completed_at": "...", "failed_at": null}], "pagination": {...}}}</pre></div>
 </div></div>
 
 <div class="endpoint">
@@ -2696,8 +2943,10 @@ Idempotency-Key: excise-2026-08
 <tr><td>excise-duty-charges</td><td>/finance/excise-duty/charges</td><td>One per charged deposit</td></tr>
 <tr><td>excise-duty-returns</td><td>/finance/excise-duty/returns</td><td>One per month</td></tr>
 <tr><td>excise-duty-remittances</td><td>/finance/excise-duty/remittances</td><td>One per KRA payment</td></tr>
-<tr><td>disputes</td><td>/finance/disputes</td><td>One per complaint</td></tr></table>
-<p style="color:var(--text-secondary);font-size:13px;margin-top:8px;">The <code>cash-flow</code> export has <code>excise_withheld</code> and <code>excise_remitted</code> columns before <code>net_cash</code>.</p>
+<tr><td>disputes</td><td>/finance/disputes</td><td>One per complaint</td></tr>
+<tr><td>referral-bonuses</td><td>/finance/referrals/bonuses</td><td>One per bonus</td></tr>
+<tr><td>referral-withdrawals</td><td>/finance/referrals/withdrawals</td><td>One per referral withdrawal</td></tr></table>
+<p style="color:var(--text-secondary);font-size:13px;margin-top:8px;">The <code>cash-flow</code> export has <code>excise_withheld</code> and <code>excise_remitted</code> columns before <code>net_cash</code>, and <code>referral_paid</code>, <code>referral_pending</code> and <code>referral_failed</code> after it. The <code>income-statement</code> export has <code>referral_payouts</code> as its last column.</p>
 <p style="color:var(--text-secondary);font-size:13px;margin-top:8px;">The customer statement cannot be exported yet.</p></div>
 <div class="endpoint-section"><h4>Request</h4>
 <pre>GET /api/v1/finance/export/deposits?from=2026-09-01&amp;to=2026-09-20&amp;status=2 HTTP/1.1

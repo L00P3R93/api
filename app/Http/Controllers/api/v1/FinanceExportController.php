@@ -12,6 +12,7 @@ use App\Services\FinanceGameReportService;
 use App\Services\FinanceLedgerReportService;
 use App\Services\FinanceListing;
 use App\Services\FinancePaymentReportService;
+use App\Services\FinanceReferralReportService;
 use App\Services\FinanceReportService;
 use App\Services\FinanceTaxService;
 use Generator;
@@ -24,6 +25,7 @@ class FinanceExportController extends Controller
         'ledger', 'deposits', 'withdrawals', 'purchases', 'adjustments', 'games', 'competitions',
         'customers-top', 'cash-flow', 'income-statement', 'trial-balance', 'expenses', 'taxes',
         'excise-duty', 'excise-duty-charges', 'excise-duty-returns', 'excise-duty-remittances', 'disputes',
+        'referral-bonuses', 'referral-withdrawals',
     ];
 
     /** Days the top customers report covers when no range is given. */
@@ -38,6 +40,7 @@ class FinanceExportController extends Controller
         private FinanceTaxService $taxes,
         private ExciseDutyReportService $exciseDuty,
         private FinanceDisputeReportService $disputes,
+        private FinanceReferralReportService $referrals,
     ) {}
 
     /**
@@ -72,6 +75,8 @@ class FinanceExportController extends Controller
             'excise-duty-returns' => $this->exciseDutyReturnRows($range),
             'excise-duty-remittances' => $this->fromListing($this->exciseDuty->remittances($range, $filters)),
             'disputes' => $this->fromListing($this->disputes->listing($range, $filters)),
+            'referral-bonuses' => $this->fromListing($this->referrals->bonuses($range, $filters)),
+            'referral-withdrawals' => $this->fromListing($this->referrals->withdrawals($range, $filters)),
         };
 
         $filename = "finance-{$report}-{$range->from->toDateString()}-{$range->to->toDateString()}.csv";
@@ -102,7 +107,7 @@ class FinanceExportController extends Controller
      */
     private function cashFlowRows(FinanceDateRange $range): array
     {
-        $columns = ['period', 'wallet_deposit', 'load', 'gift', 'emoji', 'unmatched', 'other', 'cash_in_total', 'paid', 'pending', 'failed', 'excise_withheld', 'excise_remitted', 'net_cash'];
+        $columns = ['period', 'wallet_deposit', 'load', 'gift', 'emoji', 'unmatched', 'other', 'cash_in_total', 'paid', 'pending', 'failed', 'excise_withheld', 'excise_remitted', 'net_cash', 'referral_paid', 'referral_pending', 'referral_failed'];
 
         $rows = (function () use ($range) {
             foreach ($this->reports->cashFlow($range)['series'] as $row) {
@@ -111,7 +116,8 @@ class FinanceExportController extends Controller
                     + ['cash_in_total' => $row['cash_in']['total']]
                     + $row['cash_out']
                     + ['excise_withheld' => $row['excise_duty']['withheld'], 'excise_remitted' => $row['excise_duty']['remitted']]
-                    + ['net_cash' => $row['net_cash']];
+                    + ['net_cash' => $row['net_cash']]
+                    + ['referral_paid' => $row['referral_payouts']['paid'], 'referral_pending' => $row['referral_payouts']['pending'], 'referral_failed' => $row['referral_payouts']['failed']];
             }
         })();
 
@@ -123,7 +129,7 @@ class FinanceExportController extends Controller
      */
     private function incomeStatementRows(FinanceDateRange $range): array
     {
-        $columns = ['period', 'games', 'tournaments', 'jackpots', 'competitions_unattributed', 'gift_emoji_sales', 'other', 'total', 'expenses', 'net_income'];
+        $columns = ['period', 'games', 'tournaments', 'jackpots', 'competitions_unattributed', 'gift_emoji_sales', 'other', 'total', 'expenses', 'net_income', 'referral_payouts'];
 
         $rows = (function () use ($range) {
             yield from $this->reports->incomeStatement($range)['series'];
