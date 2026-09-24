@@ -61,6 +61,44 @@ class ReferralWithdrawalController extends Controller
         ], fn ($value) => $value !== null), $result['status_code']);
     }
 
+    public function show(string $encryptedIdentifier): JsonResponse
+    {
+        $withdrawal = ReferralWithdrawal::with('ledgerEntry:id,entry_id')->find($encryptedIdentifier);
+
+        if (! $withdrawal) {
+            return response()->json(['success' => false, 'message' => 'Referral withdrawal not found'], 404);
+        }
+
+        return response()->json(['success' => true, 'data' => ReferralWithdrawalResource::make($withdrawal)]);
+    }
+
+    /**
+     * Settle a pending or processing withdrawal by hand (admin), after checking the payout on the referral
+     * shortcode: `completed` with the M-Pesa receipt, or `failed` to refund the referral wallet.
+     */
+    public function settle(Request $request, string $encryptedIdentifier): JsonResponse
+    {
+        $validated = $request->validate([
+            'outcome' => ['required', Rule::in([ReferralWithdrawal::STATUS_COMPLETED, ReferralWithdrawal::STATUS_FAILED])],
+            'mpesa_receipt' => ['required_if:outcome,completed', 'nullable', 'string', 'regex:/^[A-Za-z0-9]{6,30}$/'],
+            'note' => ['required', 'string', 'min:3', 'max:255'],
+        ]);
+
+        $result = $this->withdrawals->settle(
+            (int) $encryptedIdentifier,
+            $validated['outcome'],
+            isset($validated['mpesa_receipt']) ? strtoupper($validated['mpesa_receipt']) : null,
+            $validated['note'],
+            $this->actorFor($request)
+        );
+
+        return response()->json(array_filter([
+            'success' => $result['success'],
+            'message' => $result['message'],
+            'data' => isset($result['withdrawal']) ? ReferralWithdrawalResource::make($result['withdrawal']) : null,
+        ], fn ($value) => $value !== null), $result['status_code']);
+    }
+
     /**
      * The customer's referral withdrawals, newest first.
      */

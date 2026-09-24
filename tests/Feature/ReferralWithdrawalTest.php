@@ -286,3 +286,82 @@ it('keeps referral payouts out of the trial balance paired check', function () {
         ->and($line['account'])->toBe('referral_wallets')
         ->and($line['category'])->toBe('referral_payout');
 });
+
+// manual settlement (GMS admin)
+
+function settleReferralWithdrawal(ReferralWithdrawal $withdrawal, array $payload)
+{
+    return test()->postJson('/api/v1/referral-withdrawals/'.encryptId($withdrawal->id).'/settle', $payload, test()->headers);
+}
+
+it('marks a stuck withdrawal completed with the M-Pesa receipt', function () {
+    mockReferralB2c(['ResponseCode' => '0', 'ConversationID' => 'AG_STUCK_1']);
+    requestReferralWithdrawal($this->customer, 100);
+    $withdrawal = ReferralWithdrawal::sole();
+
+    settleReferralWithdrawal($withdrawal, ['outcome' => 'completed', 'mpesa_receipt' => 'rka1b2c3d4', 'note' => 'Found on the 4151665 statement'])
+        ->assertOk()
+        ->assertJsonPath('data.status', 'completed')
+        ->assertJsonPath('data.mpesa_receipt', 'RKA1B2C3D4')
+        ->assertJsonPath('data.settled_by', 'api_key:'.$this->apiKey->id)
+        ->assertJsonPath('data.settlement_note', 'Found on the 4151665 statement');
+
+    expect((float) $this->referralWallet->fresh()->balance)->toBe(20.0)
+        ->and($withdrawal->fresh()->completed_at)->not->toBeNull();
+
+    // a late Safaricom result for it changes nothing
+    $this->postJson('/api/v1/referral/b2c/result', referralB2cResult('AG_STUCK_1', 2001))->assertOk();
+    expect($withdrawal->fresh()->status)->toBe('completed');
+});
+
+it('marks a stuck withdrawal failed and refunds the referral wallet once', function () {
+    mockReferralB2c(new ConnectionException('timed out'));
+    requestReferralWithdrawal($this->customer, 100)->assertStatus(202);
+    $withdrawal = ReferralWithdrawal::sole();
+
+    settleReferralWithdrawal($withdrawal, ['outcome' => 'failed', 'note' => 'Not on the statement'])
+        ->assertOk()
+        ->assertJsonPath('data.status', 'failed')
+        ->assertJsonPath('data.result_code', 'manual');
+
+    settleReferralWithdrawal($withdrawal, ['outcome' => 'failed', 'note' => 'Again'])->assertStatus(409);
+
+    expect((float) $this->referralWallet->fresh()->balance)->toBe(120.0)
+        ->and(LedgerEntry::where('entry_type', 'referral_withdrawal_reversal')->count())->toBe(1);
+});
+
+it('validates a manual settlement', function () {
+    mockReferralB2c(['ResponseCode' => '0', 'ConversationID' => 'AG_STUCK_2']);
+    requestReferralWithdrawal($this->customer, 100);
+    $withdrawal = ReferralWithdrawal::sole();
+
+    settleReferralWithdrawal($withdrawal, ['outcome' => 'completed', 'note' => 'no receipt'])->assertUnprocessable()->assertJsonValidationErrors('mpesa_receipt');
+    settleReferralWithdrawal($withdrawal, ['outcome' => 'reversed', 'note' => 'bad outcome'])->assertUnprocessable()->assertJsonValidationErrors('outcome');
+    settleReferralWithdrawal($withdrawal, ['outcome' => 'failed'])->assertUnprocessable()->assertJsonValidationErrors('note');
+
+    $this->postJson('/api/v1/referral-withdrawals/'.encryptId(99999).'/settle', ['outcome' => 'failed', 'note' => 'missing'], $this->headers)->assertNotFound();
+});
+
+it('refuses a receipt already used by another referral withdrawal', function () {
+    mockReferralB2c(['ResponseCode' => '0', 'ConversationID' => 'AG_STUCK_3']);
+    requestReferralWithdrawal($this->customer, 100);
+    $stuck = ReferralWithdrawal::sole();
+    $other = ReferralWithdrawal::create([
+        'customer_id' => $this->customer->id, 'referral_wallet_id' => $this->referralWallet->id, 'amount' => 10,
+        'phone_no' => '254712345678', 'status' => 'completed', 'mpesa_receipt' => 'RKDUPLICATE',
+    ]);
+
+    settleReferralWithdrawal($stuck, ['outcome' => 'completed', 'mpesa_receipt' => 'RKDUPLICATE', 'note' => 'typo'])->assertStatus(409);
+
+    expect($stuck->fresh()->status)->toBe('processing');
+});
+
+it('shows one referral withdrawal', function () {
+    mockReferralB2c(['ResponseCode' => '0', 'ConversationID' => 'AG_SHOW_1']);
+    requestReferralWithdrawal($this->customer, 100);
+
+    $this->getJson('/api/v1/referral-withdrawals/'.encryptId(ReferralWithdrawal::sole()->id), $this->headers)
+        ->assertOk()
+        ->assertJsonPath('data.status', 'processing')
+        ->assertJsonPath('data.settled_by', null);
+});

@@ -180,12 +180,58 @@ class ReferralWithdrawalService
     }
 
     /**
+     * Settle a withdrawal left pending or processing, by hand, once finance has looked the payout up on the
+     * referral shortcode. `completed` needs the M-Pesa receipt; `failed` gives the money back to the
+     * referral wallet. Settled withdrawals cannot be changed.
+     *
+     * @return array{success: bool, message: string, status_code: int, withdrawal?: ReferralWithdrawal}
+     */
+    public function settle(int $withdrawalId, string $outcome, ?string $receipt, string $note, ?string $actor): array
+    {
+        return DB::transaction(function () use ($withdrawalId, $outcome, $receipt, $note, $actor) {
+            $withdrawal = ReferralWithdrawal::lockForUpdate()->find($withdrawalId);
+
+            if (! $withdrawal) {
+                return $this->refused('Referral withdrawal not found', 404);
+            }
+
+            if (! in_array($withdrawal->status, [ReferralWithdrawal::STATUS_PENDING, ReferralWithdrawal::STATUS_PROCESSING], true)) {
+                return $this->refused("The withdrawal is already {$withdrawal->status}", 409, $withdrawal);
+            }
+
+            $settlement = ['settled_by' => $actor, 'settlement_note' => $note];
+
+            if ($outcome === ReferralWithdrawal::STATUS_COMPLETED) {
+                $receiptTaken = ReferralWithdrawal::where('mpesa_receipt', $receipt)->whereKeyNot($withdrawal->id)->exists();
+
+                if ($receiptTaken) {
+                    return $this->refused('That M-Pesa receipt is already on another referral withdrawal', 409, $withdrawal);
+                }
+
+                $withdrawal->update([
+                    'status' => ReferralWithdrawal::STATUS_COMPLETED,
+                    'mpesa_receipt' => $receipt,
+                    'completed_at' => now(),
+                ] + $settlement);
+
+                return ['success' => true, 'message' => 'Referral withdrawal marked completed', 'status_code' => 200, 'withdrawal' => $withdrawal->fresh()];
+            }
+
+            $this->fail($withdrawal, 'manual', $note, $settlement);
+
+            return ['success' => true, 'message' => 'Referral withdrawal marked failed and refunded', 'status_code' => 200, 'withdrawal' => $withdrawal->fresh()];
+        });
+    }
+
+    /**
      * Mark a withdrawal failed and give the money back to the referral wallet. Does nothing if it is
      * already completed or failed.
+     *
+     * @param  array<string, mixed>  $extra  more columns to save with the failure
      */
-    private function fail(ReferralWithdrawal $withdrawal, string $resultCode, string $resultDesc): void
+    private function fail(ReferralWithdrawal $withdrawal, string $resultCode, string $resultDesc, array $extra = []): void
     {
-        DB::transaction(function () use ($withdrawal, $resultCode, $resultDesc) {
+        DB::transaction(function () use ($withdrawal, $resultCode, $resultDesc, $extra) {
             $withdrawal = ReferralWithdrawal::lockForUpdate()->find($withdrawal->id);
 
             if (! in_array($withdrawal->status, [ReferralWithdrawal::STATUS_PENDING, ReferralWithdrawal::STATUS_PROCESSING], true)) {
@@ -201,7 +247,7 @@ class ReferralWithdrawalService
                 'result_desc' => mb_substr($resultDesc, 0, 255),
                 'reversal_entry_id' => $reversal->id,
                 'failed_at' => now(),
-            ]);
+            ] + $extra);
         });
     }
 

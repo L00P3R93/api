@@ -5,42 +5,64 @@ namespace App\Services;
 use App\Models\B2C;
 use App\Models\Transaction;
 use App\Models\Withdraw;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class B2CService
 {
     public function __construct(private LedgerService $ledgerService) {}
 
+    /**
+     * Apply a B2C result callback. Safaricom nests the result under "Result"
+     * (`{"Result": {"ConversationID": ..., "ResultCode": ..., "TransactionID": ...}}`); a flat body is
+     * still accepted. A result without a ResultCode changes nothing, and a repeated callback finds no
+     * transaction because its payment_ref has already been replaced by the receipt.
+     */
     public function processB2CResult(array $data): array
     {
         Log::channel('mpesa')->info('MPESA B2C Response: ', $data);
 
-        $transaction = Transaction::where('payment_ref', $data['ConversationID'] ?? '')->first();
+        $result = is_array($data['Result'] ?? null) && isset($data['Result']['ConversationID'])
+            ? $data['Result']
+            : $data;
 
-        if (! $transaction) {
-            Log::channel('mpesa')->info('MPESA B2C Transaction Not Found: ', $data);
+        $conversationId = (string) ($result['ConversationID'] ?? '');
 
-            return ['status' => 'not_found'];
+        if ($conversationId === '' || ! isset($result['ResultCode'])) {
+            Log::channel('mpesa')->warning('MPESA B2C Result Unreadable: ', $data);
+
+            return ['status' => 'invalid'];
         }
 
-        $status = ($data['ResultCode'] ?? 0) == 0 ? 2 : 3;
-        $receipt = ($data['ResultCode'] ?? 0) == 0 ? ($data['TransactionID'] ?? '') : ($data['ResultDesc'] ?? '');
+        return DB::transaction(function () use ($data, $result, $conversationId) {
+            $transaction = Transaction::where('payment_ref', $conversationId)->lockForUpdate()->first();
 
-        $transaction->update([
-            'payment_ref' => $receipt,
-            'status' => $status,
-        ]);
+            if (! $transaction) {
+                Log::channel('mpesa')->info('MPESA B2C Transaction Not Found: ', $data);
 
-        if ($status === 3 && $transaction->payment_type === Withdraw::class && $transaction->payment_id) {
-            $withdraw = Withdraw::find($transaction->payment_id);
-
-            if ($withdraw) {
-                $this->ledgerService->reverseWithdrawal($withdraw);
-                $withdraw->update(['disburse' => 3, 'error_message' => $receipt]);
+                return ['status' => 'not_found'];
             }
-        }
 
-        return ['status' => 'success', 'transaction_id' => $transaction->id];
+            $succeeded = (string) $result['ResultCode'] === '0';
+            $status = $succeeded ? 2 : 3;
+            $receipt = $succeeded ? ($result['TransactionID'] ?? '') : ($result['ResultDesc'] ?? '');
+
+            $transaction->update([
+                'payment_ref' => $receipt,
+                'status' => $status,
+            ]);
+
+            if ($status === 3 && $transaction->payment_type === Withdraw::class && $transaction->payment_id) {
+                $withdraw = Withdraw::find($transaction->payment_id);
+
+                if ($withdraw) {
+                    $this->ledgerService->reverseWithdrawal($withdraw);
+                    $withdraw->update(['disburse' => 3, 'error_message' => $receipt]);
+                }
+            }
+
+            return ['status' => 'success', 'transaction_id' => $transaction->id];
+        });
     }
 
     public function processB2CBalance(array $data): array

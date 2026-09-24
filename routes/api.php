@@ -192,6 +192,9 @@ Route::prefix('/v1')->group(function () {
             Route::get('/customers/{encryptedIdentifier}/referral-wallet', [ReferralController::class, 'wallet']);
             Route::get('/customers/{encryptedIdentifier}/referral-wallet/withdrawals', [ReferralWithdrawalController::class, 'customerWithdrawals']);
             Route::post('/customers/{encryptedIdentifier}/referral-wallet/withdraw', [ReferralWithdrawalController::class, 'store'])->middleware(['throttle:financial', 'idempotency']);
+            // Referral withdrawal admin (GMS)
+            Route::get('/referral-withdrawals/{encryptedIdentifier}', [ReferralWithdrawalController::class, 'show']);
+            Route::post('/referral-withdrawals/{encryptedIdentifier}/settle', [ReferralWithdrawalController::class, 'settle'])->middleware(['idempotency', 'throttle:write']);
             // Customer Purchases Routes
             Route::get('/customers/purchases/{encryptedIdentifier}', [CustomerController::class, 'customer_purchases']);
             // Finance: one customer's wallet statement

@@ -357,3 +357,13 @@ it('keeps referral bonuses out of the trial balance paired check', function () {
         ->and($line['category'])->toBe('referral_bonus')
         ->and($line['credit'])->toEqual(10);
 });
+
+it('filters the referral list by referred customer', function () {
+    $referred = Customer::find(signUpWithReferral('KADI2026', '711111111')->json('customer_id'));
+    signUpWithReferral('KADI2026', '722222222');
+
+    $this->getJson('/api/v1/referrals?referred_id='.$referred->id, $this->headers)
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.referrer_id', $this->referrer->id);
+});
