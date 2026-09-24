@@ -144,6 +144,25 @@ it('filters deposits and leaves out test customers unless asked', function () {
     expect(drillGet($this, 'deposits?customer_id=900')['items'])->toHaveCount(1);
 });
 
+it('filters refunded deposits and refuses a status label', function () {
+    drillDeposit('DR1', 40, Deposit::STATUS_UNMATCHED);
+    drillDeposit('DR2', 70, Deposit::STATUS_REFUNDED);
+
+    $data = drillGet($this, 'deposits?status=4');
+
+    expect($data['items'])->toHaveCount(1)
+        ->and($data['items'][0])->toMatchArray(['trans_id' => 'DR2', 'status' => 'refunded'])
+        ->and($data['summary']['by_status'])->toHaveKey('refunded');
+
+    $this->getJson('/api/v1/finance/deposits?status=refunded', $this->headers)
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('status');
+});
+
+it('still accepts text statuses on the other lists', function () {
+    $this->getJson('/api/v1/finance/withdrawals?status=paid', $this->headers)->assertOk();
+});
+
 it('pages the results', function () {
     foreach (range(1, 5) as $n) {
         $deposit = drillDeposit("DP{$n}", 10);

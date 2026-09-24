@@ -15,6 +15,7 @@ class DepositResolutionResource extends JsonResource
         return [
             'action' => $this->action,
             'customer_id' => $this->customer_id,
+            'customer_name' => $this->customer?->name,
             'account_no_used' => $this->account_no_used,
             'ledger_entry_id' => $this->ledgerEntry?->entry_id,
             'mpesa_reference' => $this->mpesa_reference,

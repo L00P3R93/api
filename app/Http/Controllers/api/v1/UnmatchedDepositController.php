@@ -31,7 +31,7 @@ class UnmatchedDepositController extends Controller
         $status = $filters['status'] ?? 'unmatched';
 
         $deposits = Deposit::query()
-            ->with('resolution')
+            ->with(['resolution.customer', 'resolution.ledgerEntry'])
             ->when($status === 'unmatched', fn (Builder $query) => $query->where('status', Deposit::STATUS_UNMATCHED)->orderBy('id'))
             ->when($status !== 'unmatched', fn (Builder $query) => $query->whereHas('resolution', fn (Builder $resolution) => $resolution->where('action', $status))->orderByDesc('id'))
             ->when(isset($filters['from']), fn (Builder $query) => $query->where('created_at', '>=', $filters['from'].' 00:00:00'))
