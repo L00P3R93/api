@@ -35,6 +35,10 @@ use App\Http\Controllers\api\v1\GameWalletController;
 use App\Http\Controllers\api\v1\GameWalletWithdrawController;
 use App\Http\Controllers\api\v1\PlaygroundController;
 use App\Http\Controllers\api\v1\PurchaseController;
+use App\Http\Controllers\api\v1\ReferralB2CResultController;
+use App\Http\Controllers\api\v1\ReferralB2CTimeoutController;
+use App\Http\Controllers\api\v1\ReferralController;
+use App\Http\Controllers\api\v1\ReferralWithdrawalController;
 use App\Http\Controllers\api\v1\RegisterC2BUrlsController;
 use App\Http\Controllers\api\v1\StatsController;
 use App\Http\Controllers\api\v1\StkCallbackController;
@@ -97,6 +101,11 @@ Route::prefix('/v1')->group(function () {
         // Competition Wallet Payout Transaction Route
         Route::post('/competition/payout', CompetitionWalletTransferPayoutController::class)->middleware(['idempotency', 'throttle:write']);
 
+        // Customer referrals
+        Route::get('/referrals', [ReferralController::class, 'index']);
+        Route::get('/referrals/lookup', [ReferralController::class, 'lookup']);
+        Route::get('/referral-withdrawals', [ReferralWithdrawalController::class, 'index']);
+
         // Complaints and disputed transactions
         Route::get('/complaints', [ComplaintController::class, 'index']);
         Route::post('/complaints', [ComplaintController::class, 'store'])->middleware(['idempotency', 'throttle:write']);
@@ -115,6 +124,7 @@ Route::prefix('/v1')->group(function () {
             Route::post('/stats/purchases/referrals', [StatsController::class, 'purchaseReferralsStats']);
             Route::post('/stats/customers/referrals', [StatsController::class, 'customerReferralStats']);
             Route::post('/stats/customers/played', [StatsController::class, 'playedByPlayerStats']);
+            Route::get('/stats/referrals', [ReferralController::class, 'programStats']);
 
             // Finance reports
             Route::prefix('/finance')->group(function () {
@@ -168,6 +178,15 @@ Route::prefix('/v1')->group(function () {
             Route::get('/customers/played/{encryptedIdentifier}', [CustomerController::class, 'customer_played']);
             // Customer latest 10 games, tournaments and jackpots (for filing complaints)
             Route::get('/customers/played/recent/{encryptedIdentifier}', [CustomerController::class, 'customer_recent_played']);
+            // Customer Referral Routes
+            Route::get('/customers/{encryptedIdentifier}/referral-code', [ReferralController::class, 'showCode']);
+            Route::put('/customers/{encryptedIdentifier}/referral-code', [ReferralController::class, 'saveCode'])->middleware('throttle:write');
+            Route::post('/customers/{encryptedIdentifier}/referral/verified', [ReferralController::class, 'verified'])->middleware('throttle:write');
+            Route::get('/customers/{encryptedIdentifier}/referrals', [ReferralController::class, 'customerReferrals']);
+            Route::get('/customers/{encryptedIdentifier}/referrals/stats', [ReferralController::class, 'customerStats']);
+            Route::get('/customers/{encryptedIdentifier}/referral-wallet', [ReferralController::class, 'wallet']);
+            Route::get('/customers/{encryptedIdentifier}/referral-wallet/withdrawals', [ReferralWithdrawalController::class, 'customerWithdrawals']);
+            Route::post('/customers/{encryptedIdentifier}/referral-wallet/withdraw', [ReferralWithdrawalController::class, 'store'])->middleware(['throttle:financial', 'idempotency']);
             // Customer Purchases Routes
             Route::get('/customers/purchases/{encryptedIdentifier}', [CustomerController::class, 'customer_purchases']);
             // Finance: one customer's wallet statement
@@ -305,6 +324,10 @@ Route::prefix('/v1')->group(function () {
         Route::post('/balance/b2c/timeout', B2CBalanceTimeoutController::class);
         Route::post('/balance/c2b/result', C2BBalanceResultController::class);
         Route::post('/balance/c2b/timeout', C2BBalanceTimeoutController::class);
+
+        // Referral payouts (referral B2C shortcode)
+        Route::post('/referral/b2c/result', ReferralB2CResultController::class);
+        Route::post('/referral/b2c/timeout', ReferralB2CTimeoutController::class);
 
         // Kadi Kings
         Route::post('/c2b/confirm', ConfirmationController::class);

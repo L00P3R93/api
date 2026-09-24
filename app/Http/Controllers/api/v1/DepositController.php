@@ -10,6 +10,7 @@ use App\Models\Deposit;
 use App\Models\Wallet;
 use App\Services\ExciseDutyService;
 use App\Services\LedgerService;
+use App\Services\ReferralService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
@@ -18,6 +19,7 @@ class DepositController extends Controller
     public function __construct(
         private LedgerService $ledgerService,
         private ExciseDutyService $exciseDutyService,
+        private ReferralService $referralService,
     ) {}
 
     /**
@@ -98,6 +100,8 @@ class DepositController extends Controller
 
             // Update deposit status to Completed
             $deposit->update(['status' => '2']);
+
+            $this->referralService->recordDeposit($deposit, $customer->id);
 
             return [$wallet, $transaction, $ledgerEntry];
         });

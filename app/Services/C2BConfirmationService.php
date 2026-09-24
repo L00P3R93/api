@@ -13,6 +13,7 @@ class C2BConfirmationService
     public function __construct(
         private LedgerService $ledgerService,
         private ExciseDutyService $exciseDutyService,
+        private ReferralService $referralService,
     ) {}
 
     public function processCallback(array $depositData): array
@@ -170,5 +171,7 @@ class C2BConfirmationService
             'balance_before' => $ledgerEntry->balance_before,
             'balance_after' => $wallet->balance,
         ]);
+
+        $this->referralService->recordDeposit($deposit, $customer->id);
     }
 }

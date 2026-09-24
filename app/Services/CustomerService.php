@@ -17,7 +17,10 @@ use Illuminate\Support\Str;
 
 class CustomerService
 {
-    public function __construct(private LedgerService $ledgerService) {}
+    public function __construct(
+        private LedgerService $ledgerService,
+        private ReferralService $referralService,
+    ) {}
 
     public function listActiveCustomers(): Collection
     {
@@ -55,12 +58,20 @@ class CustomerService
             ->get();
     }
 
+    /**
+     * Create the customer and their wallet. A `referral_code` that belongs to another customer makes
+     * this customer that customer's referral.
+     */
     public function createCustomer(array $data): Customer
     {
-        $customer = Customer::create($data);
-        Wallet::create(['customer_id' => $customer->id, 'balance' => 0]);
+        return DB::transaction(function () use ($data) {
+            $customer = Customer::create($data);
+            Wallet::create(['customer_id' => $customer->id, 'balance' => 0]);
 
-        return $customer;
+            $this->referralService->attachAtSignup($customer, $data['referral_code'] ?? null);
+
+            return $customer;
+        });
     }
 
     public function getCustomer($identifier): ?Customer

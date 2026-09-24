@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Customer extends Model
 {
@@ -20,6 +21,7 @@ class Customer extends Model
         'name',
         'id_no',
         'phone_no',
+        'referral_code',
         'email',
         'email_verified_at',
         'status',
@@ -93,6 +95,35 @@ class Customer extends Model
 
     public function purchases(): HasMany {
         return $this->hasMany(Purchase::class);
+    }
+
+    /**
+     * The customer's own code, shared to invite others.
+     */
+    public function referralCode(): HasOne
+    {
+        return $this->hasOne(ReferralCode::class);
+    }
+
+    public function referralWallet(): HasOne
+    {
+        return $this->hasOne(ReferralWallet::class);
+    }
+
+    /**
+     * Customers who signed up with this customer's code.
+     */
+    public function referrals(): HasMany
+    {
+        return $this->hasMany(Referral::class, 'referrer_id');
+    }
+
+    /**
+     * How this customer was referred, if they signed up with another customer's code.
+     */
+    public function referredBy(): HasOne
+    {
+        return $this->hasOne(Referral::class, 'referred_id');
     }
 
     /**

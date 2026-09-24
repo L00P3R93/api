@@ -125,6 +125,30 @@ class MpesaService
     }
 
     /**
+     * Initiate a B2C payment from the referral shortcode (referral wallet withdrawals). Uses its own app
+     * credentials, initiator and result/timeout URLs from `mpesa.referral_b2c`; the main b2c() is untouched.
+     *
+     * @param  array{Amount: int, PartyB: string, Remarks?: string, Occasion?: string}  $params
+     *
+     * @throws MpesaApiException
+     */
+    public function referralB2c(array $params): array
+    {
+        $config = config('mpesa.referral_b2c');
+
+        $payload = array_merge([
+            'InitiatorName' => $config['initiator_name'],
+            'SecurityCredential' => $this->securityCredential($config['security_credential']),
+            'CommandID' => $config['default_command_id'],
+            'PartyA' => $config['short_code'],
+            'QueueTimeOutURL' => $config['timeout_url'],
+            'ResultURL' => $config['result_url'],
+        ], $params);
+
+        return $this->request('/mpesa/b2c/v1/paymentrequest', $payload, 'referral_b2c');
+    }
+
+    /**
      * Query the status of a B2C transaction.
      *
      * @param  array{TransactionID: string}  $params
