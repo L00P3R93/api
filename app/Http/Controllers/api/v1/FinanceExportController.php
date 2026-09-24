@@ -107,7 +107,7 @@ class FinanceExportController extends Controller
      */
     private function cashFlowRows(FinanceDateRange $range): array
     {
-        $columns = ['period', 'wallet_deposit', 'load', 'gift', 'emoji', 'unmatched', 'other', 'cash_in_total', 'paid', 'pending', 'failed', 'excise_withheld', 'excise_remitted', 'net_cash', 'referral_paid', 'referral_pending', 'referral_failed'];
+        $columns = ['period', 'wallet_deposit', 'load', 'gift', 'emoji', 'unmatched', 'other', 'cash_in_total', 'paid', 'pending', 'failed', 'excise_withheld', 'excise_remitted', 'net_cash', 'referral_paid', 'referral_pending', 'referral_failed', 'deposit_refunded'];
 
         $rows = (function () use ($range) {
             foreach ($this->reports->cashFlow($range)['series'] as $row) {
@@ -117,7 +117,8 @@ class FinanceExportController extends Controller
                     + $row['cash_out']
                     + ['excise_withheld' => $row['excise_duty']['withheld'], 'excise_remitted' => $row['excise_duty']['remitted']]
                     + ['net_cash' => $row['net_cash']]
-                    + ['referral_paid' => $row['referral_payouts']['paid'], 'referral_pending' => $row['referral_payouts']['pending'], 'referral_failed' => $row['referral_payouts']['failed']];
+                    + ['referral_paid' => $row['referral_payouts']['paid'], 'referral_pending' => $row['referral_payouts']['pending'], 'referral_failed' => $row['referral_payouts']['failed']]
+                    + ['deposit_refunded' => $row['deposit_refunds']['refunded']];
             }
         })();
 

@@ -12,8 +12,7 @@ class C2BConfirmationService
 {
     public function __construct(
         private LedgerService $ledgerService,
-        private ExciseDutyService $exciseDutyService,
-        private ReferralService $referralService,
+        private WalletDepositService $walletDepositService,
     ) {}
 
     public function processCallback(array $depositData): array
@@ -41,7 +40,7 @@ class C2BConfirmationService
             $type = $billRefParts[2] ?? null;
             $referralCode = $billRefParts[3] ?? null;
 
-            $normalizedAccountNo = $this->normalizeAccountNo($rawAccountNo);
+            $normalizedAccountNo = $this->walletDepositService->normalizeAccountNo($rawAccountNo);
 
             $customer = Customer::where('account_no', $normalizedAccountNo)->first();
 
@@ -66,19 +65,6 @@ class C2BConfirmationService
                 'status' => 201,
             ];
         });
-    }
-
-    private function normalizeAccountNo(string $rawAccountNo): string
-    {
-        if (preg_match('/^2547\d{8}$/', $rawAccountNo)) {
-            return substr($rawAccountNo, 3);
-        }
-
-        if (preg_match('/^07\d{8}$/', $rawAccountNo)) {
-            return substr($rawAccountNo, 1);
-        }
-
-        return $rawAccountNo;
     }
 
     private function processByType(
@@ -151,27 +137,6 @@ class C2BConfirmationService
 
     private function processDefault(Deposit $deposit, Customer $customer): void
     {
-        $wallet = Wallet::firstOrCreate(
-            ['customer_id' => $customer->id],
-            ['balance' => 0]
-        );
-
-        $wallet = Wallet::lockForUpdate()->find($wallet->id);
-
-        $ledgerEntry = $this->ledgerService->recordDeposit($deposit, $wallet, (float) $deposit->trans_amount);
-
-        $exciseDutyCharge = $this->exciseDutyService->chargeIfApplicable($deposit, $wallet, ExciseDutyService::KIND_WALLET_DEPOSIT);
-
-        $wallet->transactions()->create([
-            'payment_id' => $deposit->id,
-            'payment_ref' => $deposit->trans_id,
-            'payment_type' => Deposit::class,
-            'amount' => $exciseDutyCharge?->net_amount ?? $deposit->trans_amount,
-            'status' => 2,
-            'balance_before' => $ledgerEntry->balance_before,
-            'balance_after' => $wallet->balance,
-        ]);
-
-        $this->referralService->recordDeposit($deposit, $customer->id);
+        $this->walletDepositService->credit($deposit, $customer);
     }
 }

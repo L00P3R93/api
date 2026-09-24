@@ -48,6 +48,7 @@ use App\Http\Controllers\api\v1\StkDepositController;
 use App\Http\Controllers\api\v1\StkLoadController;
 use App\Http\Controllers\api\v1\TestController;
 use App\Http\Controllers\api\v1\TransactionController;
+use App\Http\Controllers\api\v1\UnmatchedDepositController;
 use App\Http\Controllers\api\v1\ValidationController;
 use App\Http\Controllers\api\v1\WalletController;
 use App\Http\Controllers\api\v1\WalletTransactionController;
@@ -79,6 +80,9 @@ Route::prefix('/v1')->group(function () {
 
         Route::get('/deposits', [DepositController::class, 'index']);
         Route::post('/deposits', [DepositController::class, 'store'])->middleware(['idempotency', 'throttle:write']);
+        // Unmatched deposits (account number matched no customer)
+        Route::get('/deposits/unmatched', [UnmatchedDepositController::class, 'index']);
+        Route::post('/deposits/unmatched/match', [UnmatchedDepositController::class, 'match'])->middleware(['idempotency', 'throttle:write']);
 
         Route::get('/withdraws', [WithdrawController::class, 'index']);
 
@@ -228,7 +232,8 @@ Route::prefix('/v1')->group(function () {
 
             // Deposit/Payment Routes
             Route::get('/deposits/{encryptedIdentifier}', [DepositController::class, 'show']);
-            Route::put('/deposits/{encryptedIdentifier}', [DepositController::class, 'update']);
+            Route::post('/deposits/{encryptedIdentifier}/assign', [UnmatchedDepositController::class, 'assign'])->middleware(['idempotency', 'throttle:write']);
+            Route::post('/deposits/{encryptedIdentifier}/refund', [UnmatchedDepositController::class, 'refund'])->middleware(['idempotency', 'throttle:write']);
 
             // Wallet Transfer Routes
             Route::post('/wallets/transfer/{encryptedIdentifier}', WalletTransferController::class)->middleware(['idempotency', 'throttle:write']);

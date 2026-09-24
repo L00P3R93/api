@@ -28,6 +28,7 @@ class DepositResource extends JsonResource
             'excise_amount' => $this->exciseDutyCharge?->excise_amount,
             'net_amount' => $this->exciseDutyCharge?->net_amount,
             'created_at' => $this->created_at,
+            'resolution' => $this->whenLoaded('resolution', fn () => $this->resolution ? DepositResolutionResource::make($this->resolution) : null),
         ];
         // Eager load the related transactions and wallet data to avoid multiple queries
         $transaction = $this->transactions()->first(); // Get the first transaction

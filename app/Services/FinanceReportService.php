@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\CompetitionTransaction;
 use App\Models\Deposit;
+use App\Models\DepositResolution;
 use App\Models\ExciseDutyCharge;
 use App\Models\FinancialSnapshot;
 use App\Models\GameTransaction;
@@ -123,6 +124,7 @@ class FinanceReportService
      * split by what the payment bought; cash out from outgoing payments by disbursement status.
      * Excise duty withheld from deposits is shown apart; only what was paid to KRA leaves net cash.
      * Referral payouts leave from the referral shortcode and are shown apart from main withdrawals.
+     * deposit_refunds are unmatched deposits sent back to the payer, by the day the refund was recorded.
      *
      * @return array{totals: array<string, mixed>, series: list<array<string, mixed>>}
      */
@@ -133,6 +135,7 @@ class FinanceReportService
             'cash_out' => ['paid' => 0.0, 'pending' => 0.0, 'failed' => 0.0],
             'excise_duty' => ['withheld' => 0.0, 'remitted' => 0.0],
             'referral_payouts' => ['paid' => 0.0, 'pending' => 0.0, 'failed' => 0.0],
+            'deposit_refunds' => ['refunded' => 0.0],
         ];
 
         $series = [];
@@ -173,6 +176,10 @@ class FinanceReportService
             $series[$this->bucket($range, $row->day)]['referral_payouts'][$row->status] += $row->amount;
         }
 
+        foreach ($this->depositRefundRows($range) as $row) {
+            $series[$this->bucket($range, $row->day)]['deposit_refunds']['refunded'] += (float) $row->amount;
+        }
+
         $totals = $template();
         $list = [];
         foreach ($series as $bucket => $figures) {
@@ -188,6 +195,9 @@ class FinanceReportService
             foreach ($figures['referral_payouts'] as $key => $value) {
                 $totals['referral_payouts'][$key] += $value;
             }
+            foreach ($figures['deposit_refunds'] as $key => $value) {
+                $totals['deposit_refunds'][$key] += $value;
+            }
 
             $list[] = ['period' => $bucket] + $figures + ['net_cash' => $this->netCash($figures)];
         }
@@ -199,13 +209,31 @@ class FinanceReportService
     }
 
     /**
-     * Cash received less withdrawals paid out, excise duty paid to KRA and referral payouts.
+     * Cash received less withdrawals paid out, excise duty paid to KRA, referral payouts and unmatched
+     * deposits refunded to the payer.
      *
-     * @param  array{cash_in: array<string, float>, cash_out: array<string, float>, excise_duty: array<string, float>, referral_payouts: array<string, float>}  $figures
+     * @param  array{cash_in: array<string, float>, cash_out: array<string, float>, excise_duty: array<string, float>, referral_payouts: array<string, float>, deposit_refunds: array<string, float>}  $figures
      */
     private function netCash(array $figures): float
     {
-        return $figures['cash_in']['total'] - $figures['cash_out']['paid'] - $figures['excise_duty']['remitted'] - $figures['referral_payouts']['paid'];
+        return $figures['cash_in']['total'] - $figures['cash_out']['paid'] - $figures['excise_duty']['remitted']
+            - $figures['referral_payouts']['paid'] - $figures['deposit_refunds']['refunded'];
+    }
+
+    /**
+     * Unmatched deposits recorded as refunded to the payer, per refund day.
+     *
+     * @return Collection<int, object{day: string, amount: string}>
+     */
+    private function depositRefundRows(FinanceDateRange $range)
+    {
+        return DB::table('deposit_resolutions as r')
+            ->join('incoming_payments as i', 'i.id', '=', 'r.deposit_id')
+            ->where('r.action', DepositResolution::ACTION_REFUNDED)
+            ->whereBetween('r.created_at', [$range->from, $range->to])
+            ->selectRaw('DATE(r.created_at) as day, SUM(i.trans_amount) as amount')
+            ->groupByRaw('DATE(r.created_at)')
+            ->get();
     }
 
     /**
@@ -516,7 +544,7 @@ class FinanceReportService
                 "({$customer} IS NULL OR {$customer} NOT IN (".$this->placeholders($excluded).'))',
                 $excluded
             ))
-            ->selectRaw("DATE(i.created_at) as day, CASE WHEN i.status = 0 THEN 'unmatched' WHEN p.purchase_type IS NOT NULL THEN p.purchase_type ELSE 'wallet_deposit' END as kind, SUM(i.trans_amount) as amount")
+            ->selectRaw("DATE(i.created_at) as day, CASE WHEN i.status IN (0, 4) THEN 'unmatched' WHEN p.purchase_type IS NOT NULL THEN p.purchase_type ELSE 'wallet_deposit' END as kind, SUM(i.trans_amount) as amount")
             ->groupBy('day', 'kind')
             ->get();
     }

@@ -15,7 +15,7 @@ class FinancePaymentReportService
 {
     use BuildsFinanceQueries;
 
-    private const DEPOSIT_KIND = "CASE WHEN i.status = 0 THEN 'unmatched' WHEN p.purchase_type IS NOT NULL THEN p.purchase_type ELSE 'wallet_deposit' END";
+    private const DEPOSIT_KIND = "CASE WHEN i.status IN (0, 4) THEN 'unmatched' WHEN p.purchase_type IS NOT NULL THEN p.purchase_type ELSE 'wallet_deposit' END";
 
     private const DEPOSIT_CUSTOMER = 'COALESCE(p.customer_id, l.customer_id)';
 
