@@ -26,7 +26,7 @@ class FinancePaymentReportService
     /**
      * Payments received, with who they were for and what they bought.
      *
-     * Filters: status (0 unmatched, 1 pending, 2 processed), kind, customer_id.
+     * Filters: status (0 unmatched, 1 pending, 2 processed, 4 refunded), kind, customer_id.
      *
      * @param  array<string, string>  $filters
      */

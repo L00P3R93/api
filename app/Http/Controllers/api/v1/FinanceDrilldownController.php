@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\api\v1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\FinanceDepositListRequest;
 use App\Http\Requests\FinanceListRequest;
 use App\Services\CustomerService;
 use App\Services\FinanceDateRange;
@@ -32,7 +33,7 @@ class FinanceDrilldownController extends Controller
         private FinanceReferralReportService $referrals,
     ) {}
 
-    public function deposits(FinanceListRequest $request): JsonResponse
+    public function deposits(FinanceDepositListRequest $request): JsonResponse
     {
         return $this->paged($request, $this->payments->deposits($request->dateRange(), $request->filters()));
     }

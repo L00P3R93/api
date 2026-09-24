@@ -12,6 +12,7 @@ use App\Models\Wallet;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -97,6 +98,7 @@ it('credits an assigned deposit exactly like a C2B wallet deposit', function () 
         ->assertJsonPath('data.status', 2)
         ->assertJsonPath('data.resolution.action', 'assigned')
         ->assertJsonPath('data.resolution.customer_id', $this->customer->id)
+        ->assertJsonPath('data.resolution.customer_name', $this->customer->name)
         ->assertJsonPath('data.resolution.resolved_by', 'api_key:'.$this->apiKey->id);
 
     expect((float) $this->wallet->fresh()->balance)->toBe(95.0)
@@ -196,7 +198,22 @@ it('shows the resolution on the deposit and lists resolved deposits', function (
     $data = $this->getJson('/api/v1/deposits/unmatched?status=refunded', $this->headers)->assertOk()->json('data');
     expect($data['items'])->toHaveCount(1)
         ->and($data['items'][0]['resolution']['mpesa_reference'])->toBe('RVX7654321')
+        ->and($data['items'][0]['resolution']['customer_name'])->toBeNull()
         ->and($data['summary']['unmatched_count'])->toBe(0);
+});
+
+it('names the credited customer on assigned deposits', function () {
+    foreach (['UNM0000011', 'UNM0000012'] as $billRef) {
+        assignDeposit(unmatchedDeposit(100, '0799000111', $billRef), ['customer_id' => $this->customer->id, 'note' => 'Wrong account'])->assertOk();
+    }
+
+    DB::enableQueryLog();
+    $items = $this->getJson('/api/v1/deposits/unmatched?status=assigned', $this->headers)->assertOk()->json('data.items');
+    $customerQueries = collect(DB::getQueryLog())->filter(fn (array $query) => str_contains($query['query'], 'from `customers`'));
+
+    expect($items)->toHaveCount(2)
+        ->and(array_column(array_column($items, 'resolution'), 'customer_name'))->toBe([$this->customer->name, $this->customer->name])
+        ->and($customerQueries)->toHaveCount(1);
 });
 
 it('no longer has the broken PUT deposit route', function () {
