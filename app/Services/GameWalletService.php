@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\GameTransaction;
 use App\Models\GameWallet;
 use App\Models\Wallet;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -51,37 +52,165 @@ class GameWalletService
             ->toArray();
     }
 
+    /**
+     * Payment types that pay out a game's winners (a normal win, or a split after a dropped connection).
+     */
+    private const GAME_PAYOUT_TYPES = ['payout', 'payout|dropped'];
+
+    /**
+     * Payment types that decide a game's outcome, so the game belongs in the results.
+     */
+    private const GAME_SETTLED_TYPES = ['payout', 'payout|dropped', 'refund|full'];
+
+    private const GAME_REFUND_TYPES = ['refund|full', 'refund|dropped'];
+
+    /**
+     * The house's share of a game is recorded as a transaction of customer 1.
+     */
+    private const HOUSE_CUSTOMER_ID = 1;
+
+    /**
+     * Every decided game, oldest first, each with its players and whether they won or lost.
+     *
+     * @return list<array<string, mixed>>
+     */
     public function getGameResults(): array
     {
-        $rawResults = DB::table('game_wallets as GW')
-            ->join('game_transactions AS GT', 'GT.game_wallet_id', '=', 'GW.id')
-            ->join('customers AS C', 'GT.customer_id', '=', 'C.id')
-            ->where('GT.payment_type', 'payout')
-            ->select(
-                'GW.id', 'GW.game_id', 'GT.customer_id', 'C.name', 'GT.amount', 'GT.created_at',
-                DB::raw("(SELECT COUNT(*) FROM game_transactions WHERE payment_type = 'deposit' AND game_wallet_id = GW.id) AS players"),
-                DB::raw("(SELECT SUM(amount) FROM game_transactions WHERE payment_type = 'deposit' AND game_wallet_id = GW.id) AS total_bet")
-            )
-            ->get();
+        $games = $this->settledGamesQuery()->orderBy('GW.id')->get();
 
-        $grouped = $rawResults->groupBy('id')->map(function ($items) {
-            $first = $items->first();
-            $winner = $items->firstWhere('customer_id', '!=', 1);
+        return $this->buildGameResults($games, $this->gameResultTransactions());
+    }
+
+    /**
+     * One page of decided games, newest first.
+     *
+     * @return array{items: list<array<string, mixed>>, pagination: array{page: int, per_page: int, total: int, last_page: int}}
+     */
+    public function paginateGameResults(int $perPage, int $page = 1): array
+    {
+        $paginator = $this->settledGamesQuery()->orderByDesc('GW.id')->paginate($perPage, ['*'], 'page', $page);
+        $games = collect($paginator->items());
+
+        return [
+            'items' => $this->buildGameResults($games, $this->gameResultTransactions($games->pluck('id')->all())),
+            'pagination' => [
+                'page' => $paginator->currentPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'last_page' => $paginator->lastPage(),
+            ],
+        ];
+    }
+
+    private function settledGamesQuery(): Builder
+    {
+        return DB::table('game_wallets as GW')
+            ->select('GW.id', 'GW.game_id')
+            ->whereExists(function ($query) {
+                $query->from('game_transactions')
+                    ->whereColumn('game_wallet_id', 'GW.id')
+                    ->whereIn('payment_type', self::GAME_SETTLED_TYPES);
+            });
+    }
+
+    /**
+     * The stakes, payouts and refunds of the given games (all games when null), grouped by game.
+     *
+     * @param  list<int>|null  $gameWalletIds
+     * @return Collection<int|string, Collection<int, object>>
+     */
+    private function gameResultTransactions(?array $gameWalletIds = null): Collection
+    {
+        return DB::table('game_transactions as GT')
+            ->leftJoin('customers as C', 'C.id', '=', 'GT.customer_id')
+            ->when($gameWalletIds !== null, fn ($query) => $query->whereIn('GT.game_wallet_id', $gameWalletIds))
+            ->whereIn('GT.payment_type', ['deposit', ...self::GAME_PAYOUT_TYPES, ...self::GAME_REFUND_TYPES])
+            ->select('GT.game_wallet_id', 'GT.customer_id', 'C.name', 'GT.amount', 'GT.payment_type', 'GT.created_at')
+            ->orderBy('GT.id')
+            ->get()
+            ->groupBy('game_wallet_id');
+    }
+
+    /**
+     * @param  Collection<int, object>  $games
+     * @param  Collection<int|string, Collection<int, object>>  $transactionsByGame
+     * @return list<array<string, mixed>>
+     */
+    private function buildGameResults(Collection $games, Collection $transactionsByGame): array
+    {
+        $houseId = self::HOUSE_CUSTOMER_ID;
+
+        return $games->map(function (object $game) use ($transactionsByGame, $houseId) {
+            $transactions = $transactionsByGame->get($game->id, collect());
+            $deposits = $transactions->where('payment_type', 'deposit');
+            $payouts = $transactions->whereIn('payment_type', self::GAME_PAYOUT_TYPES);
+            $playerPayouts = $payouts->where('customer_id', '!=', $houseId);
+            $winner = $playerPayouts->first();
+            $settledAt = $transactions->whereIn('payment_type', self::GAME_SETTLED_TYPES)->first();
 
             return [
-                'id' => $first->id,
-                'game_id' => $first->game_id,
-                'players' => (int) $first->players,
-                'total_bet' => (float) $first->total_bet,
+                'id' => $game->id,
+                'game_id' => $game->game_id,
+                'players' => $deposits->count(),
+                'total_bet' => (float) $deposits->sum('amount'),
                 'customer_id' => $winner?->customer_id,
                 'name' => $winner?->name,
-                'amount' => $items->where('customer_id', '!=', 1)->sum('amount'),
-                'income' => $items->where('customer_id', 1)->sum('amount'),
-                'created_at' => $first->created_at,
+                'amount' => (float) $playerPayouts->sum('amount'),
+                'income' => (float) $payouts->where('customer_id', $houseId)->sum('amount'),
+                'settlement' => $this->gameSettlement($transactions),
+                'participants' => $this->gameParticipants($transactions, $houseId),
+                'created_at' => $settledAt?->created_at,
             ];
-        });
+        })->values()->all();
+    }
 
-        return $grouped->values()->toArray();
+    /**
+     * How the game ended: a normal payout, a split after a dropped connection, or a full refund.
+     *
+     * @param  Collection<int, object>  $transactions
+     */
+    private function gameSettlement(Collection $transactions): string
+    {
+        return match (true) {
+            $transactions->contains('payment_type', 'payout') => 'payout',
+            $transactions->contains('payment_type', 'payout|dropped') => 'dropped',
+            default => 'refunded',
+        };
+    }
+
+    /**
+     * Each staking player (the house left out) with their result: win when they were paid out,
+     * refunded when they only got their stake back, loss otherwise.
+     *
+     * @param  Collection<int, object>  $transactions
+     * @return list<array{customer_id: int, name: string|null, stake: float, amount_won: float, amount_refunded: float, result: string}>
+     */
+    private function gameParticipants(Collection $transactions, int $houseId): array
+    {
+        return $transactions
+            ->where('payment_type', 'deposit')
+            ->where('customer_id', '!=', $houseId)
+            ->groupBy('customer_id')
+            ->map(function (Collection $stakes, int|string $customerId) use ($transactions) {
+                $own = $transactions->where('customer_id', $customerId);
+                $won = (float) $own->whereIn('payment_type', self::GAME_PAYOUT_TYPES)->sum('amount');
+                $refunded = (float) $own->whereIn('payment_type', self::GAME_REFUND_TYPES)->sum('amount');
+
+                return [
+                    'customer_id' => (int) $customerId,
+                    'name' => $stakes->first()->name,
+                    'stake' => (float) $stakes->sum('amount'),
+                    'amount_won' => $won,
+                    'amount_refunded' => $refunded,
+                    'result' => match (true) {
+                        $won > 0 => 'win',
+                        $refunded > 0 => 'refunded',
+                        default => 'loss',
+                    },
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     public function updateGameWallet($id, array $data): ?GameWallet

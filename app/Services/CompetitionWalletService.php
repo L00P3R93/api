@@ -50,29 +50,41 @@ class CompetitionWalletService
             ->toArray();
     }
 
+    /**
+     * Every round result of a game type's competitions: win or loss per round, and payout when the
+     * customer won the competition. `level` is the level at that transaction; `current_level` is the
+     * wallet's level now. `income` is the house share taken from the competition wallet (c2w).
+     */
     public function getCompetitionResults(string $gameType): array
     {
+        $houseIncome = DB::table('wallet_transactions')
+            ->where('transaction_type', 'c2w')
+            ->groupBy('sender_id')
+            ->select('sender_id', DB::raw('SUM(amount) as income'));
+
         return DB::table('competition_wallets as CW')
             ->join('competition_transactions as CT', 'CT.competition_wallet_id', '=', 'CW.id')
-            ->join('wallet_transactions as WT', 'WT.sender_id', '=', 'CW.id')
-            ->join('customers as C', 'CW.customer_id', '=', 'C.id')
+            ->leftJoinSub($houseIncome, 'WT', 'WT.sender_id', '=', 'CW.id')
+            ->leftJoin('customers as C', 'CW.customer_id', '=', 'C.id')
             ->where('CW.game_type', $gameType)
             ->where('CW.jp_rounds', '>', 0)
-            ->whereIn('CT.payment_type', ['win', 'loss'])
+            ->whereIn('CT.payment_type', ['win', 'loss', 'payout'])
             ->select(
                 'CW.id',
                 'CW.competition_id',
                 'CW.cmp_uid',
                 'CW.customer_id',
                 'C.name',
-                'CW.level',
+                'CT.level',
+                'CW.level as current_level',
                 'CW.jp_rounds',
                 'CW.status',
                 'CT.payment_type',
                 'CT.amount',
-                'WT.amount as income',
+                DB::raw('COALESCE(WT.income, 0) as income'),
                 'CT.created_at'
             )
+            ->orderBy('CT.id')
             ->get()
             ->toArray();
     }
