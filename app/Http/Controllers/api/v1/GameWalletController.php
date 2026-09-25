@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\api\v1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ListGameResultsRequest;
 use App\Http\Requests\StoreGameWalletRequest;
 use App\Http\Requests\UpdateGameWalletRequest;
 use App\Http\Resources\GameWalletResource;
@@ -57,11 +58,21 @@ class GameWalletController extends Controller
         return response()->json(['status' => 'Success', 'data' => $incomes]);
     }
 
-    public function game_results(): JsonResponse
+    /**
+     * Decided games with each player's result. Paged (newest first) only when per_page is sent.
+     */
+    public function game_results(ListGameResultsRequest $request): JsonResponse
     {
-        $results = $this->gameWalletService->getGameResults();
+        if (! $request->filled('per_page')) {
+            return response()->json(['status' => 'Success', 'data' => $this->gameWalletService->getGameResults()]);
+        }
 
-        return response()->json(['status' => 'Success', 'data' => $results]);
+        $results = $this->gameWalletService->paginateGameResults(
+            $request->integer('per_page'),
+            $request->integer('page', 1)
+        );
+
+        return response()->json(['status' => 'Success', 'data' => $results['items'], 'pagination' => $results['pagination']]);
     }
 
     /**
