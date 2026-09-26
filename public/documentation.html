@@ -5011,82 +5011,307 @@ Accept: application/json</pre></div>
 
 
 <!-- STATS SECTION -->
+
 <div class="doc-section" data-section="stats">
-<div class="callback-note">All stats endpoints are rate-limited to 20 requests/minute. Customer counts (<code>/stats/customers</code> and the referral variant) leave out test customers. There are none by default; they can be listed on the server with <code>FINANCE_TEST_CUSTOMER_IDS</code>. Days follow Nairobi time. For full financial reporting (income statement, cash flow, balance sheet, reconciliation, expenses and CSV export) see <a href="#" data-section="finance-overview" style="color:var(--accent-blue)">Finance Reporting</a>; the income figures here only cover today and the last 30 days.</div>
+
+<div class="callback-note">Quick operational figures for dashboards. All days follow Nairobi time. Games are counted by how many players staked (2 to 4), tournaments by 3, 4 or 5 rounds and jackpots by 13, 17 or 21 rounds; <strong>other sizes and round counts are left out</strong>. Income here is only part of the house revenue (see each endpoint); for complete, reconciled figures use <a href="#" data-section="finance-statements" style="color:var(--accent-blue)">Finance Reporting</a>.</div>
+
+<button class="expand-all" onclick="toggleAll('stats')">Expand / Collapse All</button>
+
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/stats/customers</span><span class="endpoint-desc">Lists all customers in the system</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)">
+<span class="method method-get">GET</span>
+<span class="endpoint-path">/api/v1/stats/customers</span>
+<span class="endpoint-desc">New customers today, this week, month and year</span>
+<span class="chevron">&#9654;</span>
+</div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="response-list" style="margin-top:10px"><span class="status-code status-200">200 OK</span></div>
+<p class="endpoint-note">Counts signups, leaving out test customers (<code>FINANCE_TEST_CUSTOMER_IDS</code>). Weeks start on Monday.</p>
+<div class="endpoint-section"><h4>Example Request</h4>
+<pre>GET /api/v1/stats/customers HTTP/1.1
+Host: api.kadi-kings.co.ke
+X-API-KEY: your-api-key-here
+Accept: application/json</pre></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
-<pre>{"success": true, "data": {"total_customers": 1250, "active_customers": 980, "new_this_month": 45}}</pre></div>
+<pre>{
+  "success": true,
+  "data": {
+    "today": 14,
+    "this_week": 80,
+    "this_month": 312,
+    "this_year": 2410
+  }
+}</pre></div>
+<p class="endpoint-note">Also returns 401 (API key), 429 (rate limit): see <a href="#" data-section="errors" style="color:var(--accent-blue)">Error Responses</a>.</p>
 </div></div>
+
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/stats/income</span><span class="endpoint-desc">Lists all wallets and their details</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)">
+<span class="method method-post">POST</span>
+<span class="endpoint-path">/api/v1/stats/customers/referrals</span>
+<span class="endpoint-desc">New customers who signed up with given agent codes</span>
+<span class="chevron">&#9654;</span>
+</div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
-<div class="endpoint-section"><h4>Response (200)</h4>
-<pre>{"success": true, "data": {"total_deposits": 500000.00, "total_withdrawals": 200000.00, "net_income": 300000.00}}</pre></div>
-</div></div>
-<div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/stats/income/daily-30-days</span><span class="endpoint-desc">Daily income for last 30 days</span><span class="chevron">&#9654;</span></div>
-<div class="endpoint-body">
-<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
-<div class="endpoint-section"><h4>Response (200)</h4>
-<pre>{"success": true, "data": [{"date": "2025-08-01", "deposits": 15000.00, "withdrawals": 5000.00}]}</pre></div>
-</div></div>
-<div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/stats/purchases</span><span class="endpoint-desc">Lists all coins and their details</span><span class="chevron">&#9654;</span></div>
-<div class="endpoint-body">
-<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
-<div class="endpoint-section"><h4>Response (200)</h4>
-<pre>{"success": true, "data": {"total_purchases": 850, "total_amount": 42500.00, "by_type": {"load": 600, "gift": 150, "emoji": 100}}}</pre></div>
-</div></div>
-<div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/stats/played</span><span class="endpoint-desc">Retrieves details for a specific customer</span><span class="chevron">&#9654;</span></div>
-<div class="endpoint-body">
-<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
-<div class="endpoint-section"><h4>Response (200)</h4>
-<pre>{"success": true, "data": {"total_games_played": 3200, "single_games": 2100, "competition_games": 1100}}</pre></div>
-</div></div>
-<div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/stats/retention</span><span class="endpoint-desc">Retrieves customer retention rates</span><span class="chevron">&#9654;</span></div>
-<div class="endpoint-body">
-<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
-<div class="endpoint-section"><h4>Response (200)</h4>
-<pre>{"success": true, "data": {"daily_retention": 45.2, "weekly_retention": 32.1, "monthly_retention": 18.5}}</pre></div>
-</div></div>
-<div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/stats/purchases/referrals</span><span class="endpoint-desc">Purchase stats by referral code</span><span class="chevron">&#9654;</span></div>
-<div class="endpoint-body">
-<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="response-list" style="margin-top:10px"><span class="status-code status-200">200 OK</span></div>
+<p class="endpoint-note">The same counts, for customers whose stored <code>referral_code</code> is one of the codes (agent codes). A missing <code>referral_code</code> returns <code>500</code>.</p>
 <div class="endpoint-section"><h4>Request Body</h4>
-<table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
-<tr><td>referral_code</td><td>string</td><td><span class="required">Required</span></td><td>Referral code</td></tr></table></div>
+<table class="params-table">
+<tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>referral_code</td><td>string</td><td><span class="required">Required</span></td><td>One code, or several separated by commas (exact match)</td></tr>
+</table></div>
+<div class="endpoint-section"><h4>Example Request</h4>
+<pre>POST /api/v1/stats/customers/referrals HTTP/1.1
+Host: api.kadi-kings.co.ke
+X-API-KEY: your-api-key-here
+Accept: application/json
+Content-Type: application/json
+
+{
+  "referral_code": "AGENT01,AGENT02"
+}</pre></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
-<pre>{"success": true, "data": {"total_purchases": 45, "total_amount": 2250.00}}</pre></div>
+<pre>{
+  "success": true,
+  "data": {
+    "today": 2,
+    "this_week": 9,
+    "this_month": 31,
+    "this_year": 140
+  }
+}</pre></div>
+<p class="endpoint-note">Also returns 401 (API key), 429 (rate limit): see <a href="#" data-section="errors" style="color:var(--accent-blue)">Error Responses</a>.</p>
 </div></div>
+
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/stats/customers/referrals</span><span class="endpoint-desc">Customer stats by referral code</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)">
+<span class="method method-get">GET</span>
+<span class="endpoint-path">/api/v1/stats/income</span>
+<span class="endpoint-desc">Today's house income by game size and rounds</span>
+<span class="chevron">&#9654;</span>
+</div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
-<div class="endpoint-section"><h4>Request Body</h4>
-<table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
-<tr><td>referral_code</td><td>string</td><td><span class="required">Required</span></td><td>Referral code</td></tr></table></div>
+<div class="response-list" style="margin-top:10px"><span class="status-code status-200">200 OK</span></div>
+<p class="endpoint-note">Games: the house share taken when games were paid out at <code>/game/withdraw</code> today (not the 5% taken at the stake, nor drop-connection shares). Tournaments and jackpots: house shares from competition wallets <strong>created</strong> today. Sums are numbers or numeric strings.</p>
+<div class="endpoint-section"><h4>Example Request</h4>
+<pre>GET /api/v1/stats/income HTTP/1.1
+Host: api.kadi-kings.co.ke
+X-API-KEY: your-api-key-here
+Accept: application/json</pre></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
-<pre>{"success": true, "data": {"total_referred": 25, "active_referred": 18}}</pre></div>
+<pre>{
+  "success": true,
+  "data": {
+    "total_income": 215,
+    "games": {
+      "total": 60,
+      "2_players": 45,
+      "3_players": 10,
+      "4_players": 5
+    },
+    "tournaments": {
+      "total": 55,
+      "3_rounds": 10,
+      "4_rounds": 45,
+      "5_rounds": 0
+    },
+    "jackpots": {
+      "total": 100,
+      "13_rounds": 100,
+      "17_rounds": 0,
+      "21_rounds": 0
+    }
+  }
+}</pre></div>
+<p class="endpoint-note">Also returns 401 (API key), 429 (rate limit): see <a href="#" data-section="errors" style="color:var(--accent-blue)">Error Responses</a>.</p>
 </div></div>
+
 <div class="endpoint">
-<div class="endpoint-header" onclick="toggle(this)"><span class="method method-post">POST</span><span class="endpoint-path">/api/v1/stats/customers/played</span><span class="endpoint-desc">Played stats by player and date range</span><span class="chevron">&#9654;</span></div>
+<div class="endpoint-header" onclick="toggle(this)">
+<span class="method method-get">GET</span>
+<span class="endpoint-path">/api/v1/stats/income/daily-30-days</span>
+<span class="endpoint-desc">The same income for each of the last 30 days</span>
+<span class="chevron">&#9654;</span>
+</div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
-<div class="endpoint-section"><h4>Request Body</h4>
-<table class="params-table"><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
-<tr><td>customer_id</td><td>integer</td><td><span class="required">Required</span></td><td>Customer ID</td></tr>
-<tr><td>start_date</td><td>date</td><td><span class="required">Required</span></td><td>Start date (Y-m-d)</td></tr>
-<tr><td>end_date</td><td>date</td><td><span class="required">Required</span></td><td>End date (Y-m-d)</td></tr></table></div>
+<div class="response-list" style="margin-top:10px"><span class="status-code status-200">200 OK</span></div>
+<p class="endpoint-note">30 days ending today, oldest first, keyed by date. Same rules as <code>/stats/income</code>. Slow: it runs the queries for each day.</p>
+<div class="endpoint-section"><h4>Example Request</h4>
+<pre>GET /api/v1/stats/income/daily-30-days HTTP/1.1
+Host: api.kadi-kings.co.ke
+X-API-KEY: your-api-key-here
+Accept: application/json</pre></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
-<pre>{"success": true, "data": {"games_played": 15, "total_spent": 750.00}}</pre></div>
+<pre>{
+  "success": true,
+  "data": {
+    "start_date": "2026-08-28",
+    "end_date": "2026-09-26",
+    "daily_stats": {
+      "2026-08-28": {
+        "single_games": 40,
+        "tournaments": 20,
+        "jackpots": 0,
+        "total": 60
+      },
+      "2026-09-26": {
+        "single_games": 60,
+        "tournaments": 55,
+        "jackpots": 100,
+        "total": 215
+      }
+    }
+  }
+}</pre></div>
+<p class="endpoint-note">Also returns 401 (API key), 429 (rate limit): see <a href="#" data-section="errors" style="color:var(--accent-blue)">Error Responses</a>.</p>
 </div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)">
+<span class="method method-get">GET</span>
+<span class="endpoint-path">/api/v1/stats/played</span>
+<span class="endpoint-desc">Games, tournaments and jackpots played today</span>
+<span class="chevron">&#9654;</span>
+</div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="response-list" style="margin-top:10px"><span class="status-code status-200">200 OK</span></div>
+<p class="endpoint-note">Games: game wallets with stakes today, by number of players. Tournaments and jackpots: competition wallets with an entry or round today. Note the key is <code>tournament</code> (singular) here.</p>
+<div class="endpoint-section"><h4>Example Request</h4>
+<pre>GET /api/v1/stats/played HTTP/1.1
+Host: api.kadi-kings.co.ke
+X-API-KEY: your-api-key-here
+Accept: application/json</pre></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "total": 17,
+    "games": {
+      "total": 12,
+      "2_players": 9,
+      "3_players": 2,
+      "4_players": 1
+    },
+    "tournament": {
+      "total": 4,
+      "3_rounds": 1,
+      "4_rounds": 3,
+      "5_rounds": 0
+    },
+    "jackpots": {
+      "total": 1,
+      "13_rounds": 1,
+      "17_rounds": 0,
+      "21_rounds": 0
+    }
+  }
+}</pre></div>
+<p class="endpoint-note">Also returns 401 (API key), 429 (rate limit): see <a href="#" data-section="errors" style="color:var(--accent-blue)">Error Responses</a>.</p>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)">
+<span class="method method-post">POST</span>
+<span class="endpoint-path">/api/v1/stats/customers/played</span>
+<span class="endpoint-desc">What one customer played in a date range</span>
+<span class="chevron">&#9654;</span>
+</div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="response-list" style="margin-top:10px"><span class="status-code status-200">200 OK</span> <span class="status-code status-422">422 Unprocessable</span></div>
+<p class="endpoint-note">Games the customer staked in, by number of players, and competition wallets they had entries or rounds in, between the dates (inclusive).</p>
+<div class="endpoint-section"><h4>Request Body</h4>
+<table class="params-table">
+<tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>customer_id</td><td>integer</td><td><span class="required">Required</span></td><td>Plain customer id</td></tr>
+<tr><td>start_date</td><td>string</td><td><span class="required">Required</span></td><td>e.g. <code>2026-09-01</code></td></tr>
+<tr><td>end_date</td><td>string</td><td><span class="required">Required</span></td><td>e.g. <code>2026-09-30</code></td></tr>
+</table></div>
+<div class="endpoint-section"><h4>Example Request</h4>
+<pre>POST /api/v1/stats/customers/played HTTP/1.1
+Host: api.kadi-kings.co.ke
+X-API-KEY: your-api-key-here
+Accept: application/json
+Content-Type: application/json
+
+{
+  "customer_id": 42,
+  "start_date": "2026-09-01",
+  "end_date": "2026-09-30"
+}</pre></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "total": 17,
+    "games": {
+      "total": 12,
+      "2_players": 9,
+      "3_players": 2,
+      "4_players": 1
+    },
+    "tournament": {
+      "total": 4,
+      "3_rounds": 1,
+      "4_rounds": 3,
+      "5_rounds": 0
+    },
+    "jackpots": {
+      "total": 1,
+      "13_rounds": 1,
+      "17_rounds": 0,
+      "21_rounds": 0
+    }
+  }
+}</pre></div>
+<div class="endpoint-section"><h4>Response (422: validation failed)</h4>
+<pre>{
+  "message": "The selected customer id is invalid.",
+  "errors": {
+    "customer_id": [
+      "The selected customer id is invalid."
+    ]
+  }
+}</pre></div>
+<p class="endpoint-note">Also returns 401 (API key), 429 (rate limit): see <a href="#" data-section="errors" style="color:var(--accent-blue)">Error Responses</a>.</p>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)">
+<span class="method method-get">GET</span>
+<span class="endpoint-path">/api/v1/stats/retention</span>
+<span class="endpoint-desc">Returning players today, this week, month and year</span>
+<span class="chevron">&#9654;</span>
+</div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="response-list" style="margin-top:10px"><span class="status-code status-200">200 OK</span></div>
+<p class="endpoint-note"><code>total_players</code> is everyone who played before today. Each period counts how many of them played again in it (a count, not a percentage: divide by <code>total_players</code> for a rate). Test customers are included.</p>
+<div class="endpoint-section"><h4>Example Request</h4>
+<pre>GET /api/v1/stats/retention HTTP/1.1
+Host: api.kadi-kings.co.ke
+X-API-KEY: your-api-key-here
+Accept: application/json</pre></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "today": 35,
+    "week": 120,
+    "month": 260,
+    "year": 410,
+    "total_players": 520
+  }
+}</pre></div>
+<p class="endpoint-note">Also returns 401 (API key), 429 (rate limit): see <a href="#" data-section="errors" style="color:var(--accent-blue)">Error Responses</a>.</p>
+</div></div>
+
 </div>
 
 <!-- FINANCE OVERVIEW SECTION -->
@@ -5208,12 +5433,12 @@ Accept: application/json</pre></div>
         "from": "2026-09-20",
         "cash_in": 1100.00, "cash_out": 150.00, "net_cash": 950.00,
         "revenue": {"games": 10.00, "tournaments": 5.00, "jackpots": 20.00, "gift_emoji_sales": 100.00, "total": 135.00},
-        "expenses": 40.00, "net_income": 95.00,
+        "expenses": 40.00, "referral_payouts": 0.00, "promotions": 21.05, "net_income": 73.95,
         "stakes": 250.00, "payouts": 90.00, "refunds": 0.00, "adjustments": 0.00
       },
       "week": {}, "month": {}, "year": {}, "all_time": {}
     },
-    "position": {"as_of": "2026-09-20", "source": "live", "assets": {}, "liabilities": {}, "house_wallet": 300.00, "difference": 1085.00}
+    "position": {"as_of": "2026-09-20", "source": "live", "assets": {"cash": {"accounts": [], "total": 0.00}, "total": 0.00}, "liabilities": {"...": "as in /finance/balance-sheet"}, "house_wallet": 300.00, "difference": 1085.00, "notes": []}
   }
 }</pre></div>
 </div></div>
@@ -5223,7 +5448,7 @@ Accept: application/json</pre></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
 <div class="endpoint-section"><h4>Description</h4>
-<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Revenue is house cuts as they are booked in the ledger, plus gift and emoji sales at the cash received. Tournament and jackpot cuts are split by rounds where the cut is linked to its competition entry; older cuts appear as <code>competitions_unattributed</code>. <code>expenses</code> are the active entries recorded through <a href="#" data-section="finance-expenses" style="color:var(--accent-blue)">/finance/expenses</a>, dated by their expense date. <code>referral_payouts</code> are referral withdrawals completed in the period: the referral programme expense (earned bonuses cost nothing until they are paid out; they are shown in <code>memo.referral_bonuses_earned</code>). <code>net_income</code> is revenue minus expenses minus referral payouts, before tax (see <a href="#" data-section="finance-statements" style="color:var(--accent-blue)">/finance/taxes</a>). <code>memo.load_margin</code> is cash received for wallet loads minus the wallet credit given; it is shown for information and is not part of revenue. House cuts reversed when a <a href="#" data-section="complaints" style="color:var(--accent-blue)">complaint</a> is resolved reduce the same revenue line on the day they are reversed.</p></div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Revenue is house cuts as they are booked in the ledger, plus gift and emoji sales at the cash received. Tournament and jackpot cuts are split by rounds where the cut is linked to its competition entry; older cuts appear as <code>competitions_unattributed</code>. <code>expenses</code> are the active entries recorded through <a href="#" data-section="finance-expenses" style="color:var(--accent-blue)">/finance/expenses</a>, dated by their expense date. <code>referral_payouts</code> are referral withdrawals completed in the period: the referral programme expense (earned bonuses cost nothing until they are paid out; they are shown in <code>memo.referral_bonuses_earned</code>). <code>promotions</code> is the gross cost of <a href="#" data-section="promotions" style="color:var(--accent-blue)">signup bonuses</a> granted in the period: what the house wallet paid, including the excise duty owed on it. <code>net_income</code> is revenue minus expenses, referral payouts and promotions, before tax (see <a href="#" data-section="finance-statements" style="color:var(--accent-blue)">/finance/taxes</a>). <code>memo.load_margin</code> is cash received for wallet loads minus the wallet credit given; it is shown for information and is not part of revenue. House cuts reversed when a <a href="#" data-section="complaints" style="color:var(--accent-blue)">complaint</a> is resolved reduce the same revenue line on the day they are reversed.</p></div>
 <div class="endpoint-section"><h4>Query Parameters</h4>
 <table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
 <tr><td>from, to, group_by, exclude_test</td><td>&nbsp;</td><td><span class="optional">Optional</span></td><td>See common parameters</td></tr></table></div>
@@ -5244,11 +5469,16 @@ Accept: application/json</pre></div>
       "total": 135.00
     },
     "expenses": {"tracked": true, "total": 40.00, "by_category": {"hosting": 40.00}},
-    "net_income": 95.00,
-    "memo": {"load_margin": {"cash_received": 300.00, "wallet_credited": 280.00, "margin": 20.00}},
+    "referral_payouts": 0.00,
+    "promotions": 21.05,
+    "net_income": 73.95,
+    "memo": {
+      "load_margin": {"cash_received": 300.00, "wallet_credited": 280.00, "margin": 20.00},
+      "referral_bonuses_earned": {"signup": 10.00, "first_deposit": 0.00, "total": 10.00}
+    },
     "notes": ["Revenue is house cuts as they are booked in the ledger plus gift and emoji sales at cash received."],
     "series": [
-      {"period": "2026-09-20", "games": 10.00, "tournaments": 5.00, "jackpots": 20.00, "competitions_unattributed": 0.00, "gift_emoji_sales": 100.00, "other": 0.00, "total": 135.00, "expenses": 40.00, "net_income": 95.00}
+      {"period": "2026-09-20", "games": 10.00, "tournaments": 5.00, "jackpots": 20.00, "competitions_unattributed": 0.00, "gift_emoji_sales": 100.00, "other": 0.00, "total": 135.00, "expenses": 40.00, "referral_payouts": 0.00, "promotions": 21.05, "net_income": 73.95}
     ]
   }
 }</pre></div>
@@ -5259,7 +5489,7 @@ Accept: application/json</pre></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
 <div class="endpoint-section"><h4>Description</h4>
-<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Cash in is what customers actually paid (incoming payments), split into <code>wallet_deposit</code>, <code>load</code>, <code>gift</code>, <code>emoji</code> and <code>unmatched</code> (money received from an unknown customer and not credited to anyone; it is included in the total). Cash out is outgoing payments by status: <code>paid</code>, <code>pending</code>, <code>failed</code>. <code>excise_duty.withheld</code> is the excise duty taken from deposits in the period (already inside cash in) and <code>excise_duty.remitted</code> is what was paid to KRA in the period, by payment date. <code>referral_payouts</code> are <a href="#" data-section="referrals" style="color:var(--accent-blue)">referral withdrawals</a> from the referral shortcode: <code>paid</code> by completion date, <code>failed</code> by failure date, <code>pending</code> (still open) by request date. <code>deposit_refunds.refunded</code> is unmatched deposits recorded as sent back to the payer, by the day the refund was recorded (the deposit stays in cash in as <code>unmatched</code>, the day it arrived). <code>net_cash</code> is cash in minus paid withdrawals minus excise duty remitted minus paid referral payouts minus deposit refunds. Works for dates before the ledger began.</p></div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Cash in is what customers actually paid (incoming payments), split into <code>wallet_deposit</code>, <code>load</code>, <code>gift</code>, <code>emoji</code> and <code>unmatched</code> (money received from an unknown customer and not credited to anyone; it is included in the total). Cash out is outgoing payments by status: <code>paid</code>, <code>pending</code>, <code>failed</code>. <code>excise_duty.withheld</code> is the excise duty charged in the period: taken from deposits (already inside cash in) and owed on signup bonuses and <code>excise_duty.remitted</code> is what was paid to KRA in the period, by payment date. <code>referral_payouts</code> are <a href="#" data-section="referrals" style="color:var(--accent-blue)">referral withdrawals</a> from the referral shortcode: <code>paid</code> by completion date, <code>failed</code> by failure date, <code>pending</code> (still open) by request date. <code>deposit_refunds.refunded</code> is unmatched deposits recorded as sent back to the payer, by the day the refund was recorded (the deposit stays in cash in as <code>unmatched</code>, the day it arrived). <code>net_cash</code> is cash in minus paid withdrawals minus excise duty remitted minus paid referral payouts minus deposit refunds. Works for dates before the ledger began.</p></div>
 <div class="endpoint-section"><h4>Query Parameters</h4>
 <table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
 <tr><td>from, to, group_by, exclude_test</td><td>&nbsp;</td><td><span class="optional">Optional</span></td><td>See common parameters</td></tr></table></div>
@@ -5273,10 +5503,12 @@ Accept: application/json</pre></div>
       "cash_in": {"wallet_deposit": 500.00, "load": 300.00, "gift": 100.00, "emoji": 0.00, "unmatched": 200.00, "other": 0.00, "total": 1100.00},
       "cash_out": {"paid": 150.00, "pending": 40.00, "failed": 60.00},
       "excise_duty": {"withheld": 25.00, "remitted": 0.00},
+      "referral_payouts": {"paid": 0.00, "pending": 0.00, "failed": 0.00},
+      "deposit_refunds": {"refunded": 0.00},
       "net_cash": 950.00
     },
     "series": [
-      {"period": "2026-09-20", "cash_in": {"wallet_deposit": 500.00, "load": 300.00, "gift": 100.00, "emoji": 0.00, "unmatched": 200.00, "other": 0.00, "total": 1100.00}, "cash_out": {"paid": 150.00, "pending": 40.00, "failed": 60.00}, "excise_duty": {"withheld": 25.00, "remitted": 0.00}, "net_cash": 950.00}
+      {"period": "2026-09-20", "cash_in": {"wallet_deposit": 500.00, "load": 300.00, "gift": 100.00, "emoji": 0.00, "unmatched": 200.00, "other": 0.00, "total": 1100.00}, "cash_out": {"paid": 150.00, "pending": 40.00, "failed": 60.00}, "excise_duty": {"withheld": 25.00, "remitted": 0.00}, "referral_payouts": {"paid": 0.00, "pending": 0.00, "failed": 0.00}, "deposit_refunds": {"refunded": 0.00}, "net_cash": 950.00}
     ]
   }
 }</pre></div>
@@ -5327,7 +5559,7 @@ Accept: application/json</pre></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
 <div class="endpoint-section"><h4>Description</h4>
-<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Debits and credits per account and entry type. Deposits, withdrawals, manual adjustments and excise duty (category <code>tax_withheld</code>, owed to KRA) are single-sided in the ledger (the cash side is M-Pesa); every other entry is paired and must net to zero. <code>check.balanced</code> says whether it does, <code>check.imbalance</code> is the amount left over, and <code>imbalance_by_category</code> shows where it comes from. Coin entries are in coins, not KES, and are left out. <code>exclude_test</code> does not apply, because the check only holds over the whole ledger.</p></div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Debits and credits per account and entry type. Deposits, withdrawals, manual adjustments, excise duty (category <code>tax_withheld</code>, owed to KRA), referral bonuses and referral payouts are single-sided in the ledger (the cash side is M-Pesa or the referral shortcode); every other entry is paired and must net to zero. Signup bonuses (<code>promo_credit</code>, category <code>promotion</code>) are paired: the house wallet pays what the customer wallet receives. <code>check.balanced</code> says whether it does, <code>check.imbalance</code> is the amount left over, and <code>imbalance_by_category</code> shows where it comes from. Coin entries are in coins, not KES, and are left out. <code>exclude_test</code> does not apply, because the check only holds over the whole ledger.</p></div>
 <div class="endpoint-section"><h4>Query Parameters</h4>
 <table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
 <tr><td>from, to</td><td>date</td><td><span class="optional">Optional</span></td><td>See common parameters</td></tr></table></div>
@@ -5363,6 +5595,7 @@ Accept: application/json</pre></div>
 <tr><td>game_wallet_drift</td><td>fail</td><td>Same for game wallets (from the day escrow releases were ledgered)</td></tr>
 <tr><td>competition_wallet_drift</td><td>fail</td><td>Same for competition wallets</td></tr>
 <tr><td>dispute_escrow_drift</td><td>fail</td><td>Same for money held in dispute escrow by complaints</td></tr>
+<tr><td>referral_wallet_drift</td><td>fail</td><td>Same for referral wallets</td></tr>
 <tr><td>ledger_arithmetic</td><td>fail</td><td>Every ledger entry adds up: before + credit - debit = after</td></tr>
 <tr><td>ledger_balance</td><td>fail</td><td>Paired ledger entries net to zero (see trial balance)</td></tr>
 <tr><td>unclassified_entries</td><td>warn</td><td>Ledger entries that have no wallet type</td></tr>
@@ -5383,6 +5616,7 @@ Accept: application/json</pre></div>
 <tr><td>stuck_referral_withdrawals</td><td>warn</td><td>Referral withdrawals still pending or processing after 24 hours. Check the payout on the referral shortcode before doing anything: a missing result does not mean it was not paid</td></tr>
 <tr><td>failed_referral_withdrawals_not_reversed</td><td>fail</td><td>A referral payout failed but the referral wallet was not credited back</td></tr>
 <tr><td>referral_bonuses_unverified</td><td>fail</td><td>Referral bonuses paid for referrals that are not verified</td></tr>
+<tr><td>promotion_credits_ledger</td><td>fail</td><td>Each signup bonus has its customer credit and house debit in the ledger for the gross amount, and its excise duty charge when duty was taken</td></tr>
 <tr><td>house_cut_rates</td><td>warn</td><td>House cuts that differ from the fee schedule (only cuts linked to their transaction can be checked)</td></tr>
 <tr><td>mpesa_balance_freshness</td><td>warn</td><td>M-Pesa balances fetched in the last 3 hours</td></tr>
 <tr><td>cash_coverage</td><td>fail</td><td>M-Pesa cash covers everything owed to customers (including unspent referral balances) and the excise duty owed to KRA</td></tr></table></div>
@@ -5451,7 +5685,7 @@ Accept: application/json</pre></div>
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
 <div class="endpoint-section"><h4>Query Parameters</h4>
 <table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
-<tr><td>status</td><td>integer</td><td><span class="optional">Optional</span></td><td><code>0</code> unmatched, <code>1</code> pending, <code>2</code> processed</td></tr>
+<tr><td>status</td><td>integer</td><td><span class="optional">Optional</span></td><td><code>0</code> unmatched, <code>1</code> pending, <code>2</code> processed, <code>4</code> refunded. Anything else (for example <code>refunded</code>) returns <code>422</code></td></tr>
 <tr><td>kind</td><td>string</td><td><span class="optional">Optional</span></td><td><code>wallet_deposit</code>, <code>load</code>, <code>gift</code>, <code>emoji</code>, <code>unmatched</code></td></tr>
 <tr><td>customer_id</td><td>integer</td><td><span class="optional">Optional</span></td><td>Only this customer's payments</td></tr></table></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
@@ -5706,7 +5940,7 @@ Accept: application/json</pre></div>
 <div class="endpoint-section"><h4>Query Parameters</h4>
 <table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr><tr><td>type</td><td>string</td><td><span class="optional">Optional</span></td><td><code>signup</code> or <code>first_deposit</code></td></tr><tr><td>customer_id</td><td>integer</td><td><span class="optional">Optional</span></td><td>The referrer</td></tr></table></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
-<pre>{"success": true, "data": {"summary": {"by_milestone": {"signup": {"bonuses": 9, "amount": 90.00}, "first_deposit": {"bonuses": 6, "amount": 60.00}}, "total": 150.00}, "items": [{"id": 31, "paid_at": "...", "referral_id": 7, "customer_id": 42, "referrer_name": "Jane Doe", "referred_id": 97, "referred_name": "New Player", "milestone": "signup", "amount": 10.00, "ledger_entry_id": "uuid"}], "pagination": {...}}}</pre></div>
+<pre>{"success": true, "data": {"summary": {"by_milestone": {"signup": {"bonuses": 9, "amount": 90.00}, "first_deposit": {"bonuses": 6, "amount": 60.00}}, "total": 150.00}, "items": [{"id": 31, "paid_at": "...", "referral_id": 7, "customer_id": 42, "referrer_name": "Jane Doe", "referred_id": 97, "referred_name": "New Player", "milestone": "signup", "amount": 10.00, "ledger_entry_id": "uuid"}], "pagination": {"page": 1, "per_page": 50, "total": 15, "last_page": 1}}}</pre></div>
 </div></div>
 <div class="endpoint">
 <div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/referrals/withdrawals</span><span class="endpoint-desc">Referral withdrawals to M-Pesa</span><span class="chevron">&#9654;</span></div>
@@ -5717,7 +5951,81 @@ Accept: application/json</pre></div>
 <div class="endpoint-section"><h4>Query Parameters</h4>
 <table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr><tr><td>status</td><td>string</td><td><span class="optional">Optional</span></td><td><code>pending</code>, <code>processing</code>, <code>completed</code> or <code>failed</code></td></tr><tr><td>customer_id</td><td>integer</td><td><span class="optional">Optional</span></td><td>The customer</td></tr></table></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
-<pre>{"success": true, "data": {"summary": {"by_status": {"completed": {"withdrawals": 4, "amount": 400.00}, ...}}, "items": [{"id": 5, "requested_at": "...", "customer_id": 42, "customer_name": "Jane Doe", "phone_no": "2547****5678", "amount": 100.00, "status": "completed", "mpesa_receipt": "RKA1B2C3D4", "result_code": "0", "result_desc": "...", "completed_at": "...", "failed_at": null}], "pagination": {...}}}</pre></div>
+<pre>{"success": true, "data": {"summary": {"by_status": {"completed": {"withdrawals": 4, "amount": 400.00}, ...}}, "items": [{"id": 5, "requested_at": "...", "customer_id": 42, "customer_name": "Jane Doe", "phone_no": "2547****5678", "amount": 100.00, "status": "completed", "mpesa_receipt": "RKA1B2C3D4", "result_code": "0", "result_desc": "...", "completed_at": "...", "failed_at": null}], "pagination": {"page": 1, "per_page": 50, "total": 4, "last_page": 1}}}</pre></div>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)">
+<span class="method method-get">GET</span>
+<span class="endpoint-path">/api/v1/finance/promotions</span>
+<span class="endpoint-desc">Promotion credits (signup bonuses) paid, and the budget used</span>
+<span class="chevron">&#9654;</span>
+</div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="response-list" style="margin-top:10px"><span class="status-code status-200">200 OK</span></div>
+<p class="endpoint-note">Bonuses granted in the range, newest first. The house wallet paid <code>gross_amount</code>; <code>excise_amount</code> is owed to KRA (it is also in <a href="#" data-section="finance-excise" style="color:var(--accent-blue)">excise duty charges</a> with <code>source: promotion</code>) and the customer kept <code>net_amount</code>. <code>signup_bonus_spent</code> is the all-time gross total, to compare with <code>budget_cap</code> (<code>null</code> when there is no cap). The same gross appears as <code>promotions</code> in the income statement. Follows <code>exclude_test</code>.</p>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table">
+<tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>from, to, exclude_test</td><td></td><td><span class="optional">Optional</span></td><td>See common parameters</td></tr>
+<tr><td>type</td><td>string</td><td><span class="optional">Optional</span></td><td>The promotion, e.g. <code>signup_bonus</code></td></tr>
+<tr><td>kind</td><td>string</td><td><span class="optional">Optional</span></td><td>Only bonuses paid through this promo code (any case)</td></tr>
+<tr><td>customer_id</td><td>integer</td><td><span class="optional">Optional</span></td><td>Only this customer</td></tr>
+<tr><td>page, per_page</td><td>integer</td><td><span class="optional">Optional</span></td><td>Paging</td></tr>
+</table></div>
+<div class="endpoint-section"><h4>Example Request</h4>
+<pre>GET /api/v1/finance/promotions?from=2026-10-01&amp;to=2026-10-31&amp;kind=LAUNCH-OCT HTTP/1.1
+Host: api.kadi-kings.co.ke
+X-API-KEY: your-api-key-here
+Accept: application/json</pre></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "generated_at": "2026-10-31T12:00:00+03:00",
+    "meta": {},
+    "summary": {
+      "credits": 96,
+      "gross_amount": 2020.8,
+      "excise_amount": 100.8,
+      "net_amount": 1920.0,
+      "by_promotion": {
+        "signup_bonus": {
+          "credits": 96,
+          "gross_amount": 2020.8,
+          "excise_amount": 100.8,
+          "net_amount": 1920.0
+        }
+      },
+      "budget_cap": 10525.0,
+      "signup_bonus_spent": 2020.8
+    },
+    "items": [
+      {
+        "id": 7,
+        "granted_at": "2026-10-02T10:15:00+03:00",
+        "customer_id": 42,
+        "customer_name": "Jane Wanjiru",
+        "promotion": "signup_bonus",
+        "promo_code": "LAUNCH-OCT",
+        "gross_amount": 21.05,
+        "rate": 0.05,
+        "excise_amount": 1.05,
+        "net_amount": 20.0,
+        "status": "granted",
+        "ledger_entry_id": "9b2f1c3e-6d4a-4b8e-9f10-2a3b4c5d6e7f"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "per_page": 50,
+      "total": 96,
+      "last_page": 2
+    }
+  }
+}</pre></div>
+<p class="endpoint-note">Also returns 401 (API key), 429 (rate limit): see <a href="#" data-section="errors" style="color:var(--accent-blue)">Error Responses</a>.</p>
 </div></div>
 
 <div class="endpoint">
@@ -5919,6 +6227,7 @@ X-API-KEY: your-api-key-here</pre></div>
 <div class="endpoint">
 <div class="endpoint-header" onclick="toggle(this)"><span class="method method-get">GET</span><span class="endpoint-path">/api/v1/finance/excise-duty/charges</span><span class="endpoint-desc">Excise duty per deposit</span><span class="chevron">&#9654;</span></div>
 <div class="endpoint-body">
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">A charge comes from a deposit (<code>source: deposit</code>) or from a <a href="#" data-section="promotions" style="color:var(--accent-blue)">signup bonus</a> (<code>source: promotion</code>, with <code>promotion_credit_id</code>; <code>deposit_id</code>, <code>trans_id</code> and <code>msisdn</code> are then <code>null</code>). Both count towards what is owed to KRA.</p>
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
 <div class="endpoint-section"><h4>Query Parameters</h4>
 <table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
@@ -5938,7 +6247,7 @@ X-API-KEY: your-api-key-here</pre></div>
       "unremitted": {"charges": 1, "excise": 5.00}
     },
     "items": [
-      {"id": 12, "charged_at": "2026-09-20T10:00:00+03:00", "deposit_id": 71, "trans_id": "SIA12345", "customer_id": 900, "customer_name": "Alice Wanjiru", "msisdn": "2547****5678", "gross_amount": 100.00, "rate": 0.05, "excise_amount": 5.00, "net_amount": 95.00, "status": "charged", "remittance_id": null, "kra_reference": null}
+      {"id": 12, "charged_at": "2026-09-20T10:00:00+03:00", "source": "deposit", "deposit_id": 71, "promotion_credit_id": null, "trans_id": "SIA12345", "customer_id": 900, "customer_name": "Alice Wanjiru", "msisdn": "2547****5678", "gross_amount": 100.00, "rate": 0.05, "excise_amount": 5.00, "net_amount": 95.00, "status": "charged", "remittance_id": null, "kra_reference": null}
     ],
     "pagination": {"page": 1, "per_page": 50, "total": 1, "last_page": 1}
   }
@@ -6095,13 +6404,14 @@ Idempotency-Key: excise-2026-08
 <tr><td>expenses</td><td>/finance/expenses</td><td>One per expense</td></tr>
 <tr><td>taxes</td><td>/finance/taxes</td><td>One per tax</td></tr>
 <tr><td>excise-duty</td><td>/finance/excise-duty</td><td>One per period</td></tr>
-<tr><td>excise-duty-charges</td><td>/finance/excise-duty/charges</td><td>One per charged deposit</td></tr>
+<tr><td>excise-duty-charges</td><td>/finance/excise-duty/charges</td><td>One per charge (deposit or signup bonus)</td></tr>
 <tr><td>excise-duty-returns</td><td>/finance/excise-duty/returns</td><td>One per month</td></tr>
 <tr><td>excise-duty-remittances</td><td>/finance/excise-duty/remittances</td><td>One per KRA payment</td></tr>
 <tr><td>disputes</td><td>/finance/disputes</td><td>One per complaint</td></tr>
 <tr><td>referral-bonuses</td><td>/finance/referrals/bonuses</td><td>One per bonus</td></tr>
-<tr><td>referral-withdrawals</td><td>/finance/referrals/withdrawals</td><td>One per referral withdrawal</td></tr></table>
-<p style="color:var(--text-secondary);font-size:13px;margin-top:8px;">The <code>cash-flow</code> export has <code>excise_withheld</code> and <code>excise_remitted</code> columns before <code>net_cash</code>, and <code>referral_paid</code>, <code>referral_pending</code>, <code>referral_failed</code> and <code>deposit_refunded</code> after it. The <code>income-statement</code> export has <code>referral_payouts</code> as its last column.</p>
+<tr><td>referral-withdrawals</td><td>/finance/referrals/withdrawals</td><td>One per referral withdrawal</td></tr>
+<tr><td>promotions</td><td>/finance/promotions</td><td>One per signup bonus</td></tr></table>
+<p style="color:var(--text-secondary);font-size:13px;margin-top:8px;">The <code>cash-flow</code> export has <code>excise_withheld</code> and <code>excise_remitted</code> columns before <code>net_cash</code>, and <code>referral_paid</code>, <code>referral_pending</code>, <code>referral_failed</code> and <code>deposit_refunded</code> after it. The <code>income-statement</code> export has <code>referral_payouts</code> and <code>promotions</code> as its last columns.</p>
 <p style="color:var(--text-secondary);font-size:13px;margin-top:8px;">The customer statement cannot be exported yet.</p></div>
 <div class="endpoint-section"><h4>Request</h4>
 <pre>GET /api/v1/finance/export/deposits?from=2026-09-01&amp;to=2026-09-20&amp;status=2 HTTP/1.1
@@ -6252,10 +6562,10 @@ var sectionTitles = {
     'complaints': { title: 'Complaints', desc: 'Disputed results: holding winnings in escrow, resolving, rejecting and cancelling' },
     'referrals': { title: 'Referrals', desc: 'Referral codes, bonuses, referral wallets and referral withdrawals' },
     'financial': { title: 'Financial Operations', desc: 'STK Push for coin loads, gifts and emoji; stored B2C balance' },
-    'stats': { title: 'Statistics', desc: 'Customer, income, purchase, and gameplay statistics' },
+    'stats': { title: 'Statistics', desc: 'Signups, games played, retention and today\'s house income' },
     'finance-overview': { title: 'Finance Overview', desc: 'Common parameters, response format, dates, test customers, caching, privacy and the fee schedule' },
     'finance-statements': { title: 'Financial Statements', desc: 'Summary, income statement, cash flow, balance sheet, trial balance, reconciliation and taxes' },
-    'finance-reports': { title: 'Finance Drill-downs', desc: 'Deposits, withdrawals, purchases, games, competitions, ledger, adjustments and customer reports' },
+    'finance-reports': { title: 'Finance Drill-downs', desc: 'Deposits, withdrawals, purchases, games, competitions, ledger, adjustments, disputes, referrals, promotions and customer reports' },
     'finance-expenses': { title: 'Expenses', desc: 'Record, void and list operating expenses' },
     'finance-excise': { title: 'Excise Duty', desc: 'Excise duty taken from deposits, monthly returns and payments to KRA' },
     'finance-export': { title: 'CSV Export', desc: 'Download any finance report as a CSV file' },
