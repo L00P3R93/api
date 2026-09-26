@@ -31,7 +31,11 @@ class CoinBuyController extends Controller
                 'message' => $result['message'],
                 'wallet_balance' => $result['wallet_balance'] ?? null,
                 'coins' => $result['coins'] ?? null,
-            ], $statusCode);
+            ] + array_filter([
+                'code' => $result['code'] ?? null,
+                'locked_amount' => $result['locked_amount'] ?? null,
+                'available' => $result['available'] ?? null,
+            ], fn ($value) => $value !== null), $statusCode);
         } catch (\Exception $e) {
             Log::error('Coin Purchase Error: '.$e->getMessage());
 

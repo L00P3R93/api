@@ -14,7 +14,8 @@ class WithdrawalService
 {
     public function __construct(
         private LedgerService $ledgerService,
-        private MpesaService $mpesaService
+        private MpesaService $mpesaService,
+        private SignupBonusService $signupBonus,
     ) {}
 
     public function initiateWithdrawal(string $identifier, float $amount): array
@@ -45,6 +46,10 @@ class WithdrawalService
                 return null;
             }
 
+            if ($this->signupBonus->wouldSpendLockedBonus($lockedWallet, (float) $amount)) {
+                return $this->signupBonus->lockedRefusal($lockedWallet);
+            }
+
             $transaction = $lockedWallet->transactions()->create([
                 'payment_id' => null,
                 'payment_ref' => null,
@@ -72,6 +77,10 @@ class WithdrawalService
 
         if ($reserved === null) {
             return ['success' => false, 'message' => 'Insufficient wallet balance for withdrawal', 'status_code' => 400];
+        }
+
+        if (isset($reserved['success'])) {
+            return $reserved;
         }
 
         [$transaction, $withdraw, $ledgerEntry] = $reserved;

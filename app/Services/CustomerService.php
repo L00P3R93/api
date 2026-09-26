@@ -10,6 +10,7 @@ use App\Models\GameTransaction;
 use App\Models\GameWallet;
 use App\Models\Wallet;
 use App\Models\Withdraw;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +21,7 @@ class CustomerService
     public function __construct(
         private LedgerService $ledgerService,
         private ReferralService $referralService,
+        private PromoCodeService $promoCodes,
     ) {}
 
     public function listActiveCustomers(): Collection
@@ -60,15 +62,17 @@ class CustomerService
 
     /**
      * Create the customer and their wallet. A `referral_code` that belongs to another customer makes
-     * this customer that customer's referral.
+     * this customer that customer's referral. A usable `promo_code` is recorded for the signup bonus;
+     * an unknown or expired one is ignored.
      */
     public function createCustomer(array $data): Customer
     {
         return DB::transaction(function () use ($data) {
-            $customer = Customer::create($data);
+            $customer = Customer::create(Arr::except($data, ['promo_code']));
             Wallet::create(['customer_id' => $customer->id, 'balance' => 0]);
 
             $this->referralService->attachAtSignup($customer, $data['referral_code'] ?? null);
+            $this->promoCodes->attachAtSignup($customer, $data['promo_code'] ?? null);
 
             return $customer;
         });

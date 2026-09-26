@@ -59,6 +59,7 @@ class FinanceReconciliationService
             $this->stuckReferralWithdrawals(),
             $this->failedReferralWithdrawalsNotReversed(),
             $this->referralBonusesWithoutVerification(),
+            $this->promotionCreditsLedger($range),
             $this->houseCutRates($range),
             $this->mpesaBalanceFreshness(),
             $this->cashCoverage(),
@@ -619,6 +620,41 @@ class FinanceReconciliationService
             (clone $rows)->count(),
             (float) (clone $rows)->sum('b.amount'),
             (clone $rows)->limit(self::SAMPLE_SIZE)->get(['b.id', 'b.referral_id', 'b.customer_id', 'b.milestone', 'b.amount'])->map(fn ($row) => (array) $row)->all()
+        );
+    }
+
+    /**
+     * Each promotion credit has its customer credit and house debit in the ledger for the gross amount, and
+     * an excise duty charge when duty was taken.
+     *
+     * @return array<string, mixed>
+     */
+    private function promotionCreditsLedger(FinanceDateRange $range): array
+    {
+        $tolerance = $this->tolerance();
+
+        $mismatched = DB::table('promotion_credits as p')
+            ->leftJoin('ledger_entries as c', 'c.id', '=', 'p.ledger_entry_id')
+            ->leftJoin('ledger_entries as h', 'h.id', '=', 'p.house_ledger_entry_id')
+            ->leftJoin('excise_duty_charges as x', 'x.promotion_credit_id', '=', 'p.id')
+            ->whereBetween('p.created_at', [$range->from, $range->to])
+            ->where(fn ($query) => $query
+                ->whereNull('c.id')
+                ->orWhereNull('h.id')
+                ->orWhere('c.entry_type', '!=', 'promo_credit')
+                ->orWhere('h.entry_type', '!=', 'promo_credit')
+                ->orWhereRaw('ABS(c.credit - p.gross_amount) > ?', [$tolerance])
+                ->orWhereRaw('ABS(h.debit - p.gross_amount) > ?', [$tolerance])
+                ->orWhereRaw('(p.excise_amount > 0 AND x.id IS NULL)')
+                ->orWhereRaw('ABS(p.gross_amount - p.excise_amount - p.net_amount) > ?', [$tolerance]));
+
+        return $this->result(
+            'promotion_credits_ledger',
+            'Promotion credits match the ledger',
+            'fail',
+            (clone $mismatched)->count(),
+            (float) (clone $mismatched)->sum('p.gross_amount'),
+            (clone $mismatched)->limit(self::SAMPLE_SIZE)->get(['p.id', 'p.customer_id', 'p.gross_amount', 'p.excise_amount', 'p.net_amount', 'c.id as ledger_entry_id', 'h.id as house_ledger_entry_id', 'x.id as excise_charge_id'])->map(fn ($row) => (array) $row)->all()
         );
     }
 

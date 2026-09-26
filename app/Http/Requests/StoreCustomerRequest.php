@@ -25,6 +25,7 @@ class StoreCustomerRequest extends FormRequest
             'google_id' => 'string|unique:customers,google_id',
             'account_no' => 'required|string|unique:customers,account_no',
             'referral_code' => 'string',
+            'promo_code' => 'nullable|string|max:30',
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:customers,email',
             'id_no' => 'string|unique:customers,id_no',

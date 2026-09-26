@@ -11,7 +11,10 @@ class WalletService
 {
     public const DEFAULT_ADJUSTMENT_REASON = 'unspecified';
 
-    public function __construct(private LedgerService $ledgerService) {}
+    public function __construct(
+        private LedgerService $ledgerService,
+        private SignupBonusService $signupBonus,
+    ) {}
 
     public function listWallets(): Collection
     {
@@ -130,6 +133,10 @@ class WalletService
 
         if ($wallet->balance < $amount) {
             return ['success' => false, 'message' => 'Insufficient balance', 'status_code' => 400];
+        }
+
+        if ($this->signupBonus->wouldSpendLockedBonus($wallet, (float) $amount)) {
+            return $this->signupBonus->lockedRefusal($wallet);
         }
 
         $receiverWallet = Wallet::lockForUpdate()->find($receiverWalletId);

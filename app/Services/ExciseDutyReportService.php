@@ -10,7 +10,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Excise duty taken from deposits, what has been paid to KRA and what is still owed.
+ * Excise duty taken from deposits and promotion credits, what has been paid to KRA and what is still owed.
  *
  * The summary and the charges list follow exclude_test like every other report. The payable
  * amount, the monthly returns and remittances always cover every charge, because that is what
@@ -96,12 +96,13 @@ class ExciseDutyReportService
                 'excise_charged is every charge made in the period; excise_reversed is the part later given back; excise_net is what is owed for the period.',
                 'excise_remitted is what was paid to KRA in the period, by payment date, whatever period the payment covered.',
                 'payable.outstanding is every charge not yet in a remittance, from all time and all customers.',
+                'Charges include duty on promotion credits (the signup bonus), which the house pays; deposits and gross_deposits count those credits too.',
             ],
         ];
     }
 
     /**
-     * Excise duty per deposit.
+     * Excise duty per charge. `source` is `deposit` or `promotion`; a promotion charge has no deposit.
      *
      * Filters: status (charged, reversed, remitted, unremitted), customer_id.
      *
@@ -149,7 +150,9 @@ class ExciseDutyReportService
             fn (object $row) => [
                 'id' => (int) $row->id,
                 'charged_at' => $this->moment($row->charged_at),
-                'deposit_id' => (int) $row->deposit_id,
+                'source' => $row->promotion_credit_id === null ? 'deposit' : 'promotion',
+                'deposit_id' => $row->deposit_id === null ? null : (int) $row->deposit_id,
+                'promotion_credit_id' => $row->promotion_credit_id === null ? null : (int) $row->promotion_credit_id,
                 'trans_id' => $row->trans_id,
                 'customer_id' => (int) $row->customer_id,
                 'customer_name' => $row->customer_name,
@@ -163,7 +166,7 @@ class ExciseDutyReportService
                 'kra_reference' => $row->kra_reference,
             ],
             $summary,
-            ['id', 'charged_at', 'deposit_id', 'trans_id', 'customer_id', 'customer_name', 'msisdn', 'gross_amount', 'rate', 'excise_amount', 'net_amount', 'status', 'remittance_id', 'kra_reference'],
+            ['id', 'charged_at', 'source', 'deposit_id', 'promotion_credit_id', 'trans_id', 'customer_id', 'customer_name', 'msisdn', 'gross_amount', 'rate', 'excise_amount', 'net_amount', 'status', 'remittance_id', 'kra_reference'],
         );
     }
 

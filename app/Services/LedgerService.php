@@ -11,6 +11,7 @@ use App\Models\DisputedTransaction;
 use App\Models\GameWallet;
 use App\Models\LedgerEntry;
 use App\Models\PendingBalance;
+use App\Models\PromotionCredit;
 use App\Models\Referral;
 use App\Models\ReferralWallet;
 use App\Models\ReferralWithdrawal;
@@ -61,6 +62,73 @@ class LedgerService
             balanceBefore: $balanceBefore,
             balanceAfter: $wallet->balance,
             metadata: ['deposit_id' => $deposit->id, 'rate' => $rate, 'gross_amount' => (float) $deposit->trans_amount]
+        );
+    }
+
+    /**
+     * Move a promotion's gross amount from the house wallet to the customer's wallet. Paired, so it nets to
+     * zero in the trial balance; the cost shows as the house wallet going down.
+     *
+     * @return array{0: LedgerEntry, 1: LedgerEntry} [house entry, customer entry]
+     */
+    public function recordPromotionCredit(PromotionCredit $credit, Wallet $houseWallet, Wallet $customerWallet, float $amount): array
+    {
+        $metadata = ['promotion' => $credit->promotion, 'promotion_credit_id' => $credit->id];
+
+        $houseBefore = $houseWallet->balance;
+        $houseWallet->balance -= $amount;
+        $houseWallet->save();
+
+        $houseEntry = $this->createEntry(
+            entryType: 'promo_credit',
+            referenceable: $credit,
+            wallet: $houseWallet,
+            customerId: $houseWallet->customer_id,
+            debit: $amount,
+            credit: 0,
+            balanceBefore: $houseBefore,
+            balanceAfter: $houseWallet->balance,
+            metadata: $metadata
+        );
+
+        $customerBefore = $customerWallet->balance;
+        $customerWallet->balance += $amount;
+        $customerWallet->save();
+
+        $customerEntry = $this->createEntry(
+            entryType: 'promo_credit',
+            referenceable: $credit,
+            wallet: $customerWallet,
+            customerId: $customerWallet->customer_id,
+            debit: 0,
+            credit: $amount,
+            balanceBefore: $customerBefore,
+            balanceAfter: $customerWallet->balance,
+            metadata: $metadata
+        );
+
+        return [$houseEntry, $customerEntry];
+    }
+
+    /**
+     * Take excise duty from a wallet that was just credited with a promotion.
+     */
+    public function recordPromotionExciseDuty(PromotionCredit $credit, Wallet $wallet, float $amount, float $rate): LedgerEntry
+    {
+        $balanceBefore = $wallet->balance;
+        $wallet->balance -= $amount;
+        $wallet->save();
+
+        return $this->createEntry(
+            entryType: 'excise_duty',
+            referenceable: $credit,
+            wallet: $wallet,
+            customerId: $wallet->customer_id,
+            debit: $amount,
+            credit: 0,
+            balanceBefore: $balanceBefore,
+            balanceAfter: $wallet->balance,
+            metadata: ['promotion_credit_id' => $credit->id, 'rate' => $rate, 'gross_amount' => (float) $credit->gross_amount]
         );
     }
 

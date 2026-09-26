@@ -236,7 +236,11 @@ return [
     |
     | Categories: cash_in, cash_out, stake, payout, house_revenue, refund,
     | adjustment, transfer, escrow_movement, coin, tax_withheld,
-    | referral_bonus, referral_payout.
+    | referral_bonus, referral_payout, promotion.
+    |
+    | promotion entries (promo_credit) move a promotion's gross amount from the
+    | house wallet to a customer wallet. They are paired and net to zero; the
+    | cost is reported as the promotions expense in the income statement.
     |
     | referral_wallets hold referral bonuses that cannot be spent yet. They are
     | a contingent amount, not a liability: a bonus becomes an expense only
@@ -276,6 +280,7 @@ return [
         'coin_transfer' => 'coin',
         'referral_bonus' => 'referral_bonus',
         'referral_withdrawal' => 'referral_payout',
+        'promo_credit' => 'promotion',
     ],
 
 ];

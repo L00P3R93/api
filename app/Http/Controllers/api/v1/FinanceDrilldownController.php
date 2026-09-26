@@ -13,6 +13,7 @@ use App\Services\FinanceGameReportService;
 use App\Services\FinanceLedgerReportService;
 use App\Services\FinanceListing;
 use App\Services\FinancePaymentReportService;
+use App\Services\FinancePromotionReportService;
 use App\Services\FinanceReferralReportService;
 use App\Services\FinanceReportService;
 use Illuminate\Http\JsonResponse;
@@ -31,6 +32,7 @@ class FinanceDrilldownController extends Controller
         private FinanceExpenseService $expenses,
         private FinanceDisputeReportService $disputes,
         private FinanceReferralReportService $referrals,
+        private FinancePromotionReportService $promotions,
     ) {}
 
     public function deposits(FinanceDepositListRequest $request): JsonResponse
@@ -96,6 +98,14 @@ class FinanceDrilldownController extends Controller
     public function referralWithdrawals(FinanceListRequest $request): JsonResponse
     {
         return $this->paged($request, $this->referrals->withdrawals($request->dateRange(), $request->filters()));
+    }
+
+    /**
+     * Promotion credits granted in the range (the signup bonus), with totals and the budget used.
+     */
+    public function promotions(FinanceListRequest $request): JsonResponse
+    {
+        return $this->paged($request, $this->promotions->credits($request->dateRange(), $request->filters()));
     }
 
     public function topCustomers(FinanceListRequest $request): JsonResponse

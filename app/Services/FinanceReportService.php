@@ -26,6 +26,7 @@ class FinanceReportService
         private FinanceExpenseService $expenses,
         private ExciseDutyReportService $exciseDuty,
         private FinanceReferralReportService $referrals,
+        private FinancePromotionReportService $promotions,
     ) {}
 
     /**
@@ -103,6 +104,7 @@ class FinanceReportService
                 ],
                 'expenses' => $statement['expenses']['total'],
                 'referral_payouts' => $statement['referral_payouts'],
+                'promotions' => $statement['promotions'],
                 'net_income' => $statement['net_income'],
                 'stakes' => $flows['stakes'],
                 'payouts' => $flows['payouts'],
@@ -288,6 +290,12 @@ class FinanceReportService
             }
         }
 
+        $promotionCosts = [];
+        foreach ($this->promotions->costRows($range) as $row) {
+            $bucket = $this->bucket($range, $row->day);
+            $promotionCosts[$bucket] = ($promotionCosts[$bucket] ?? 0.0) + (float) $row->amount;
+        }
+
         $referralBonuses = ['signup' => 0.0, 'first_deposit' => 0.0, 'total' => 0.0];
         foreach ($this->referrals->bonusRows($range) as $row) {
             $referralBonuses[$row->milestone] = ($referralBonuses[$row->milestone] ?? 0.0) + (float) $row->amount;
@@ -298,10 +306,11 @@ class FinanceReportService
         foreach ($series as $bucket => $figures) {
             $series[$bucket]['expenses'] = $expenses['by_bucket'][$bucket] ?? 0.0;
             $series[$bucket]['referral_payouts'] = $referralPayouts[$bucket] ?? 0.0;
-            $series[$bucket]['net_income'] = $figures['total'] - $series[$bucket]['expenses'] - $series[$bucket]['referral_payouts'];
+            $series[$bucket]['promotions'] = $promotionCosts[$bucket] ?? 0.0;
+            $series[$bucket]['net_income'] = $figures['total'] - $series[$bucket]['expenses'] - $series[$bucket]['referral_payouts'] - $series[$bucket]['promotions'];
         }
 
-        $totals = $template() + ['expenses' => 0.0, 'referral_payouts' => 0.0, 'net_income' => 0.0];
+        $totals = $template() + ['expenses' => 0.0, 'referral_payouts' => 0.0, 'promotions' => 0.0, 'net_income' => 0.0];
         $list = [];
         foreach ($series as $bucket => $figures) {
             foreach ($figures as $key => $value) {
@@ -328,6 +337,7 @@ class FinanceReportService
             ],
             'expenses' => ['tracked' => true, 'total' => $totals['expenses'], 'by_category' => $expenses['by_category']],
             'referral_payouts' => $totals['referral_payouts'],
+            'promotions' => $totals['promotions'],
             'net_income' => $totals['net_income'],
             'memo' => [
                 'load_margin' => $load,
@@ -338,7 +348,9 @@ class FinanceReportService
                 'competitions_unattributed are competition cuts booked before they were linked to their transaction, so tournament and jackpot cannot be told apart.',
                 'load_margin is cash received for wallet loads minus the wallet credit given. It is shown for information and is not part of revenue.',
                 'Expenses are the entries recorded through /finance/expenses (voided ones excluded), dated by expense_date. net_income is before tax; see /finance/taxes.',
-                'referral_payouts are referral withdrawals completed in the period (the referral programme expense), dated by completion. net_income is revenue minus expenses minus referral_payouts.',
+                'referral_payouts are referral withdrawals completed in the period (the referral programme expense), dated by completion.',
+                'promotions is the gross cost of promotion credits granted in the period (the signup bonus): what the house wallet paid, including the excise duty owed on it.',
+                'net_income is revenue minus expenses, referral_payouts and promotions.',
                 'referral_bonuses_earned is shown for information: bonuses credited to referral wallets are only an expense once they are paid out.',
                 'house cuts cannot always be tied to a player, so exclude_test only removes cuts that are linked to a test customer or game.',
             ],
@@ -480,7 +492,7 @@ class FinanceReportService
                 'imbalance_by_category' => array_filter($internalByCategory, fn (float $net) => abs($net) > $tolerance),
             ],
             'notes' => [
-                'Deposits, withdrawals, adjustments, excise duty, referral bonuses and referral payouts are single-sided in the ledger (the cash side is M-Pesa, excise duty is owed to KRA, and referral bonuses cost the house nothing until they are paid out from the referral shortcode). All other entries are paired and must net to zero, which is what check.imbalance measures.',
+                'Deposits, withdrawals, adjustments, excise duty, referral bonuses and referral payouts are single-sided in the ledger (the cash side is M-Pesa, excise duty is owed to KRA, and referral bonuses cost the house nothing until they are paid out from the referral shortcode). All other entries are paired and must net to zero, which is what check.imbalance measures. Promotion credits (promo_credit) are paired: the house wallet pays what the customer wallet receives.',
                 'Coin entries are in coins, not KES, and are left out of the totals and the check.',
                 'exclude_test does not apply here: the check only holds over the whole ledger.',
             ],

@@ -6,6 +6,7 @@ use App\Util\Badge;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -35,6 +36,24 @@ class Customer extends Model
     protected $hidden = [
         'phone_hash',
     ];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'phone_no_verified_at' => 'datetime',
+        ];
+    }
+
+    /**
+     * The promo code the customer signed up with, if it was valid then.
+     */
+    public function promoCode(): BelongsTo
+    {
+        return $this->belongsTo(PromoCode::class);
+    }
 
     protected static function boot(){
         parent::boot();

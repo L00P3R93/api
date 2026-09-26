@@ -30,7 +30,11 @@ class WithdrawalController extends Controller
             return response()->json([
                 'status' => $result['success'] ? 'success' : $result['message'],
                 'ledger_entry_id' => $result['ledger_entry_id'] ?? null,
-            ], $statusCode);
+            ] + array_filter([
+                'code' => $result['code'] ?? null,
+                'locked_amount' => $result['locked_amount'] ?? null,
+                'available' => $result['available'] ?? null,
+            ], fn ($value) => $value !== null), $statusCode);
         } catch (ValidationException $e) {
             return response()->json([
                 'status' => $e->errors(),
