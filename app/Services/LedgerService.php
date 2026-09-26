@@ -66,6 +66,56 @@ class LedgerService
     }
 
     /**
+     * Credit owner money paid into the paybill to the house wallet as capital. Single-sided like a deposit
+     * (the cash side is M-Pesa), but never a customer deposit: no excise duty, no referral hook.
+     */
+    public function recordHouseFunding(Deposit $deposit, Wallet $houseWallet, float $amount): LedgerEntry
+    {
+        $balanceBefore = $houseWallet->balance;
+        $houseWallet->balance += $amount;
+        $houseWallet->save();
+
+        return $this->createEntry(
+            entryType: 'house_funding',
+            referenceable: $deposit,
+            wallet: $houseWallet,
+            customerId: $houseWallet->customer_id,
+            debit: 0,
+            credit: $amount,
+            balanceBefore: $balanceBefore,
+            balanceAfter: $houseWallet->balance,
+            metadata: ['deposit_id' => $deposit->id, 'trans_id' => $deposit->trans_id]
+        );
+    }
+
+    /**
+     * Take a voided house funding back out of the house wallet.
+     */
+    public function reverseHouseFunding(LedgerEntry $funding, Wallet $houseWallet, string $reason): LedgerEntry
+    {
+        $amount = (float) $funding->credit;
+
+        $balanceBefore = $houseWallet->balance;
+        $houseWallet->balance -= $amount;
+        $houseWallet->save();
+
+        $funding->status = 'reversed';
+        $funding->save();
+
+        return $this->createEntry(
+            entryType: 'house_funding_reversal',
+            referenceable: $funding->referenceable,
+            wallet: $houseWallet,
+            customerId: $houseWallet->customer_id,
+            debit: $amount,
+            credit: 0,
+            balanceBefore: $balanceBefore,
+            balanceAfter: $houseWallet->balance,
+            metadata: ($funding->metadata ?? []) + ['original_entry_id' => $funding->entry_id, 'reason' => $reason]
+        );
+    }
+
+    /**
      * Move a promotion's gross amount from the house wallet to the customer's wallet. Paired, so it nets to
      * zero in the trial balance; the cost shows as the house wallet going down.
      *
@@ -865,7 +915,7 @@ class LedgerService
 
         return match ($entry->entry_type) {
             'deposit', 'excise_duty', 'withdrawal', 'wallet_transfer', 'refund', 'house_cut',
-            'game_payout', 'competition_payout', 'adjustment' => LedgerEntry::WALLET_TYPE_WALLET,
+            'game_payout', 'competition_payout', 'adjustment', 'house_funding' => LedgerEntry::WALLET_TYPE_WALLET,
             'game_bet' => match (true) {
                 isset($metadata['customer_wallet_id']) => LedgerEntry::WALLET_TYPE_GAME,
                 isset($metadata['game_wallet_id']) => LedgerEntry::WALLET_TYPE_WALLET,

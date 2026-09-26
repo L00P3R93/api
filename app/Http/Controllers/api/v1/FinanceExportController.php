@@ -16,6 +16,7 @@ use App\Services\FinancePromotionReportService;
 use App\Services\FinanceReferralReportService;
 use App\Services\FinanceReportService;
 use App\Services\FinanceTaxService;
+use App\Services\HouseFundingService;
 use Generator;
 use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -26,7 +27,7 @@ class FinanceExportController extends Controller
         'ledger', 'deposits', 'withdrawals', 'purchases', 'adjustments', 'games', 'competitions',
         'customers-top', 'cash-flow', 'income-statement', 'trial-balance', 'expenses', 'taxes',
         'excise-duty', 'excise-duty-charges', 'excise-duty-returns', 'excise-duty-remittances', 'disputes',
-        'referral-bonuses', 'referral-withdrawals', 'promotions',
+        'referral-bonuses', 'referral-withdrawals', 'promotions', 'house-funding',
     ];
 
     /** Days the top customers report covers when no range is given. */
@@ -43,6 +44,7 @@ class FinanceExportController extends Controller
         private FinanceDisputeReportService $disputes,
         private FinanceReferralReportService $referrals,
         private FinancePromotionReportService $promotions,
+        private HouseFundingService $houseFunding,
     ) {}
 
     /**
@@ -80,6 +82,7 @@ class FinanceExportController extends Controller
             'referral-bonuses' => $this->fromListing($this->referrals->bonuses($range, $filters)),
             'referral-withdrawals' => $this->fromListing($this->referrals->withdrawals($range, $filters)),
             'promotions' => $this->fromListing($this->promotions->credits($range, $filters)),
+            'house-funding' => $this->fromListing($this->houseFunding->listing($range, $filters)),
         };
 
         $filename = "finance-{$report}-{$range->from->toDateString()}-{$range->to->toDateString()}.csv";
@@ -110,7 +113,7 @@ class FinanceExportController extends Controller
      */
     private function cashFlowRows(FinanceDateRange $range): array
     {
-        $columns = ['period', 'wallet_deposit', 'load', 'gift', 'emoji', 'unmatched', 'other', 'cash_in_total', 'paid', 'pending', 'failed', 'excise_withheld', 'excise_remitted', 'net_cash', 'referral_paid', 'referral_pending', 'referral_failed', 'deposit_refunded'];
+        $columns = ['period', 'wallet_deposit', 'load', 'gift', 'emoji', 'unmatched', 'house_funding', 'other', 'cash_in_total', 'paid', 'pending', 'failed', 'excise_withheld', 'excise_remitted', 'net_cash', 'referral_paid', 'referral_pending', 'referral_failed', 'deposit_refunded'];
 
         $rows = (function () use ($range) {
             foreach ($this->reports->cashFlow($range)['series'] as $row) {

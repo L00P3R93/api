@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\DB;
 
 class FinanceReportService
 {
-    private const CASH_IN_KINDS = ['wallet_deposit', 'load', 'gift', 'emoji', 'unmatched', 'other'];
+    private const CASH_IN_KINDS = ['wallet_deposit', 'load', 'gift', 'emoji', 'unmatched', 'house_funding', 'other'];
 
     private const REVENUE_LINES = ['games', 'tournaments', 'jackpots', 'competitions_unattributed', 'gift_emoji_sales', 'other'];
 
@@ -127,6 +127,7 @@ class FinanceReportService
      * Excise duty withheld from deposits is shown apart; only what was paid to KRA leaves net cash.
      * Referral payouts leave from the referral shortcode and are shown apart from main withdrawals.
      * deposit_refunds are unmatched deposits sent back to the payer, by the day the refund was recorded.
+     * house_funding is owner money paid into the paybill and credited to the house wallet (capital).
      *
      * @return array{totals: array<string, mixed>, series: list<array<string, mixed>>}
      */
@@ -474,7 +475,7 @@ class FinanceReportService
             $totalDebit += (float) $row->debit;
             $totalCredit += (float) $row->credit;
 
-            if (! in_array($category, ['cash_in', 'cash_out', 'adjustment', 'tax_withheld', 'referral_bonus', 'referral_payout'], true)) {
+            if (! in_array($category, ['cash_in', 'cash_out', 'adjustment', 'tax_withheld', 'referral_bonus', 'referral_payout', 'capital'], true)) {
                 $net = (float) $row->credit - (float) $row->debit;
                 $internalNet += $net;
                 $internalByCategory[$category] = ($internalByCategory[$category] ?? 0.0) + $net;
@@ -492,7 +493,7 @@ class FinanceReportService
                 'imbalance_by_category' => array_filter($internalByCategory, fn (float $net) => abs($net) > $tolerance),
             ],
             'notes' => [
-                'Deposits, withdrawals, adjustments, excise duty, referral bonuses and referral payouts are single-sided in the ledger (the cash side is M-Pesa, excise duty is owed to KRA, and referral bonuses cost the house nothing until they are paid out from the referral shortcode). All other entries are paired and must net to zero, which is what check.imbalance measures. Promotion credits (promo_credit) are paired: the house wallet pays what the customer wallet receives.',
+                'Deposits, withdrawals, adjustments, excise duty, referral bonuses, referral payouts and house funding (capital) are single-sided in the ledger (the cash side is M-Pesa, excise duty is owed to KRA, and referral bonuses cost the house nothing until they are paid out from the referral shortcode). All other entries are paired and must net to zero, which is what check.imbalance measures. Promotion credits (promo_credit) are paired: the house wallet pays what the customer wallet receives.',
                 'Coin entries are in coins, not KES, and are left out of the totals and the check.',
                 'exclude_test does not apply here: the check only holds over the whole ledger.',
             ],
@@ -551,12 +552,13 @@ class FinanceReportService
                     ->where('l.referenceable_type', Deposit::class)
                     ->where('l.entry_type', 'deposit');
             })
+            ->leftJoin('house_fundings as h', fn ($join) => $join->on('h.deposit_id', '=', 'i.id')->whereNull('h.voided_at'))
             ->whereBetween('i.created_at', [$range->from, $range->to])
             ->when($excluded !== [], fn (Builder $query) => $query->whereRaw(
                 "({$customer} IS NULL OR {$customer} NOT IN (".$this->placeholders($excluded).'))',
                 $excluded
             ))
-            ->selectRaw("DATE(i.created_at) as day, CASE WHEN i.status IN (0, 4) THEN 'unmatched' WHEN p.purchase_type IS NOT NULL THEN p.purchase_type ELSE 'wallet_deposit' END as kind, SUM(i.trans_amount) as amount")
+            ->selectRaw("DATE(i.created_at) as day, CASE WHEN h.id IS NOT NULL THEN 'house_funding' WHEN i.status IN (0, 4) THEN 'unmatched' WHEN p.purchase_type IS NOT NULL THEN p.purchase_type ELSE 'wallet_deposit' END as kind, SUM(i.trans_amount) as amount")
             ->groupBy('day', 'kind')
             ->get();
     }

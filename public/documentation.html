@@ -2104,7 +2104,7 @@ Accept: application/json</pre></div>
 
 <div class="doc-section" data-section="deposits">
 
-<div class="callback-note">Deposits are M-Pesa payments into the paybill. Safaricom confirms each one to KadiApi, which credits the customer whose <strong>account number</strong> matches the bill ref (typing slips in <code>KK-</code> numbers are corrected). For a plain wallet deposit, 5% excise duty is taken when excise duty is on, so the wallet keeps 95% (<code>excise_amount</code>, <code>net_amount</code>); see <a href="#" data-section="finance-excise" style="color:var(--accent-blue)">Excise Duty</a>. A payment whose bill ref matches no account is kept as an <strong>unmatched deposit</strong> (status 0) for finance to assign to a customer or refund. Deposit <code>status</code>: 0 unmatched, 1 pending, 2 completed, 4 refunded. <code>msisdn</code> is the payer's phone number as M-Pesa sends it (usually a SHA-256 hash).</div>
+<div class="callback-note">Deposits are M-Pesa payments into the paybill. Safaricom confirms each one to KadiApi, which credits the customer whose <strong>account number</strong> matches the bill ref (typing slips in <code>KK-</code> numbers are corrected). For a plain wallet deposit, 5% excise duty is taken when excise duty is on, so the wallet keeps 95% (<code>excise_amount</code>, <code>net_amount</code>); see <a href="#" data-section="finance-excise" style="color:var(--accent-blue)">Excise Duty</a>. A payment whose bill ref matches no account is kept as an <strong>unmatched deposit</strong> (status 0) for finance to assign to a customer, refund, or record as <strong>house funding</strong> (owner money for the house wallet). A payment to the house account number is also kept unmatched for that. Deposit <code>status</code>: 0 unmatched, 1 pending, 2 completed, 4 refunded. <code>msisdn</code> is the payer's phone number as M-Pesa sends it (usually a SHA-256 hash).</div>
 
 <button class="expand-all" onclick="toggleAll('deposits')">Expand / Collapse All</button>
 
@@ -2158,7 +2158,7 @@ Accept: application/json</pre></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span></div>
 <div class="response-list" style="margin-top:10px"><span class="status-code status-200">200 OK</span> <span class="status-code status-404">404 Not Found</span></div>
-<p class="endpoint-note"><code>resolution</code> is set when an unmatched deposit was assigned or refunded, otherwise <code>null</code>.</p>
+<p class="endpoint-note"><code>resolution</code> is set when an unmatched deposit was assigned, refunded or recorded as house funding, otherwise <code>null</code>.</p>
 <div class="endpoint-section"><h4>Path Parameters</h4>
 <table class="params-table">
 <tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
@@ -2350,11 +2350,11 @@ Content-Type: application/json
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span></div>
 <div class="response-list" style="margin-top:10px"><span class="status-code status-200">200 OK</span> <span class="status-code status-422">422 Unprocessable</span></div>
-<p class="endpoint-note">Deposits whose bill ref matched no account, oldest first, each with suggested customers (strongest match first): <code>account_no</code> (the bill ref is an account number), <code>payer_phone</code> (the paying number is a customer's phone) and <code>bill_ref_phone</code> (the bill ref, read as a phone number, is a customer's phone). <code>ambiguous</code> is true when that phone belongs to more than one customer. Suggestions are hints; a person decides. <code>msisdn</code> is masked when it is a phone number. Pass <code>status=assigned</code> or <code>refunded</code> to list resolved ones (newest first, no suggestions). <code>summary</code> always counts every deposit still unmatched, whatever the filters. <code>bill_ref_no</code> is not masked here.</p>
+<p class="endpoint-note">Deposits whose bill ref matched no account, oldest first, each with suggested customers (strongest match first): <code>account_no</code> (the bill ref is an account number), <code>payer_phone</code> (the paying number is a customer's phone) and <code>bill_ref_phone</code> (the bill ref, read as a phone number, is a customer's phone). <code>ambiguous</code> is true when that phone belongs to more than one customer. Suggestions are hints; a person decides. <code>msisdn</code> is masked when it is a phone number. Pass <code>status=assigned</code>, <code>refunded</code> or <code>house_funded</code> to list resolved ones (newest first, no suggestions). <code>summary</code> always counts every deposit still unmatched, whatever the filters. <code>bill_ref_no</code> is not masked here.</p>
 <div class="endpoint-section"><h4>Query Parameters</h4>
 <table class="params-table">
 <tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
-<tr><td>status</td><td>string</td><td><span class="optional">Optional</span></td><td><code>unmatched</code> (default), <code>assigned</code> or <code>refunded</code></td></tr>
+<tr><td>status</td><td>string</td><td><span class="optional">Optional</span></td><td><code>unmatched</code> (default), <code>assigned</code>, <code>refunded</code> or <code>house_funded</code></td></tr>
 <tr><td>from</td><td>string</td><td><span class="optional">Optional</span></td><td><code>Y-m-d</code>, received on or after</td></tr>
 <tr><td>to</td><td>string</td><td><span class="optional">Optional</span></td><td><code>Y-m-d</code>, on or before; not before <code>from</code></td></tr>
 <tr><td>per_page</td><td>integer</td><td><span class="optional">Optional</span></td><td>1 to 200, default 50</td></tr>
@@ -2430,7 +2430,7 @@ Accept: application/json</pre></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">30/min</span></div>
 <div class="response-list" style="margin-top:10px"><span class="status-code status-200">200 OK</span></div>
-<p class="endpoint-note">For payers who paid before registering or whose account number was corrected. Matches on account number only, never on phone numbers. With <code>dry_run</code> (the default) nothing changes and <code>items</code> lists what would be assigned. Each assignment is credited like a deposit (excise duty, referral bonus) and records the calling API key in <code>resolved_by</code>. The same matcher runs as <code>php artisan deposits:match-unmatched</code>.</p>
+<p class="endpoint-note">For payers who paid before registering or whose account number was corrected. Matches on account number only, never on phone numbers, and never the house account (record that as house funding). With <code>dry_run</code> (the default) nothing changes and <code>items</code> lists what would be assigned. Each assignment is credited like a deposit (excise duty, referral bonus) and records the calling API key in <code>resolved_by</code>. The same matcher runs as <code>php artisan deposits:match-unmatched</code>.</p>
 <div class="endpoint-section"><h4>Request Body</h4>
 <table class="params-table">
 <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
@@ -2662,6 +2662,92 @@ Content-Type: application/json
   }
 }</pre></div>
 <p class="endpoint-note">Tell the two 409s apart by <code>code</code>: <code>already_resolved</code> or <code>reference_used</code>. Do not rely on the message wording.</p>
+<p class="endpoint-note">Also returns 401 (API key), 400 (invalid identifier), 409 (Idempotency-Key reused), 429 (rate limit): see <a href="#" data-section="errors" style="color:var(--accent-blue)">Error Responses</a>.</p>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)">
+<span class="method method-post">POST</span>
+<span class="endpoint-path">/api/v1/deposits/{encryptedIdentifier}/house-funding</span>
+<span class="endpoint-desc">Credit an unmatched deposit to the house wallet (owner funding)</span>
+<span class="chevron">&#9654;</span>
+</div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">30/min</span></div>
+<div class="response-list" style="margin-top:10px"><span class="status-code status-200">200 OK</span> <span class="status-code status-404">404 Not Found</span> <span class="status-code status-409">409 Conflict</span> <span class="status-code status-422">422 Unprocessable</span></div>
+<p class="endpoint-note">How the owner tops up the house wallet, which pays <a href="#" data-section="promotions" style="color:var(--accent-blue)">signup bonuses</a>: pay the paybill with bill ref <code>HOUSE</code> (anything that matches no account works). The payment arrives as an unmatched deposit; record it here. The full amount is credited to the house wallet as <code>house_funding</code> (ledger category <code>capital</code>): no excise duty, no referral bonus, and it is not counted as a customer deposit. Cash flow shows it as <code>cash_in.house_funding</code>. A payment made with the house customer's own account number is also left unmatched for this, never credited as a deposit, and it cannot be assigned to the house customer (422, <code>code: house_customer</code>). Undo a mistake with <a href="#" data-section="finance-reports" style="color:var(--accent-blue)">POST /finance/house-funding/{id}/void</a>.</p>
+<div class="endpoint-section"><h4>Path Parameters</h4>
+<table class="params-table">
+<tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>encryptedIdentifier</td><td>string</td><td><span class="required">Required</span></td><td>Encrypted deposit id</td></tr>
+</table></div>
+<div class="endpoint-section"><h4>Request Body</h4>
+<table class="params-table">
+<tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>note</td><td>string</td><td><span class="required">Required</span></td><td>What the money is for, 3 to 255 characters</td></tr>
+</table></div>
+<div class="endpoint-section"><h4>Example Request</h4>
+<pre>POST /api/v1/deposits/{encryptedIdentifier}/house-funding HTTP/1.1
+Host: api.kadi-kings.co.ke
+X-API-KEY: your-api-key-here
+Accept: application/json
+Content-Type: application/json
+
+{
+  "note": "Owner top-up for October signup bonuses"
+}</pre></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "message": "Deposit credited to the house wallet",
+  "data": {
+    "house_funding": {
+      "id": 3,
+      "deposit_id": 140,
+      "trans_id": "UJ5HSE0001",
+      "trans_time": "2026-09-26 10:02:11",
+      "bill_ref_no": "HOUSE",
+      "amount": 50000.0,
+      "note": "Owner top-up for October signup bonuses",
+      "status": "active",
+      "recorded_by": "api_key:2",
+      "created_at": "2026-09-26T10:05:00+03:00",
+      "voided_at": null,
+      "voided_by": null,
+      "void_reason": null
+    },
+    "deposit": {
+      "id": 140,
+      "trans_id": "UJ5HSE0001",
+      "amount": 50000.0,
+      "bill_ref_no": "HOUSE",
+      "status": 2,
+      "resolution": {
+        "action": "house_funded",
+        "customer_id": 1,
+        "customer_name": "House",
+        "account_no_used": null,
+        "ledger_entry_id": "4f7e2a1c-0b9d-4c3e-8a6f-1d2e3f4a5b6c",
+        "mpesa_reference": null,
+        "note": "Owner top-up for October signup bonuses",
+        "resolved_by": "api_key:2",
+        "resolved_at": "2026-09-26T10:05:00+03:00"
+      }
+    }
+  }
+}</pre></div>
+<div class="endpoint-section"><h4>Response (409: already assigned, refunded or funded)</h4>
+<pre>{
+  "success": false,
+  "code": "already_resolved",
+  "message": "Only unmatched deposits can be recorded as house funding",
+  "data": {
+    "deposit": {
+      "id": 140,
+      "status": 2
+    }
+  }
+}</pre></div>
 <p class="endpoint-note">Also returns 401 (API key), 400 (invalid identifier), 409 (Idempotency-Key reused), 429 (rate limit): see <a href="#" data-section="errors" style="color:var(--accent-blue)">Error Responses</a>.</p>
 </div></div>
 
@@ -5489,7 +5575,7 @@ Accept: application/json</pre></div>
 <div class="endpoint-body">
 <div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
 <div class="endpoint-section"><h4>Description</h4>
-<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Cash in is what customers actually paid (incoming payments), split into <code>wallet_deposit</code>, <code>load</code>, <code>gift</code>, <code>emoji</code> and <code>unmatched</code> (money received from an unknown customer and not credited to anyone; it is included in the total). Cash out is outgoing payments by status: <code>paid</code>, <code>pending</code>, <code>failed</code>. <code>excise_duty.withheld</code> is the excise duty charged in the period: taken from deposits (already inside cash in) and owed on signup bonuses and <code>excise_duty.remitted</code> is what was paid to KRA in the period, by payment date. <code>referral_payouts</code> are <a href="#" data-section="referrals" style="color:var(--accent-blue)">referral withdrawals</a> from the referral shortcode: <code>paid</code> by completion date, <code>failed</code> by failure date, <code>pending</code> (still open) by request date. <code>deposit_refunds.refunded</code> is unmatched deposits recorded as sent back to the payer, by the day the refund was recorded (the deposit stays in cash in as <code>unmatched</code>, the day it arrived). <code>net_cash</code> is cash in minus paid withdrawals minus excise duty remitted minus paid referral payouts minus deposit refunds. Works for dates before the ledger began.</p></div>
+<p style="color:var(--text-secondary);font-size:13px;margin-bottom:10px;">Cash in is what customers actually paid (incoming payments), split into <code>wallet_deposit</code>, <code>load</code>, <code>gift</code>, <code>emoji</code>, <code>unmatched</code> (money received from an unknown customer and not credited to anyone; it is included in the total) and <code>house_funding</code> (owner money credited to the house wallet: capital, not customer deposits). Cash out is outgoing payments by status: <code>paid</code>, <code>pending</code>, <code>failed</code>. <code>excise_duty.withheld</code> is the excise duty charged in the period: taken from deposits (already inside cash in) and owed on signup bonuses and <code>excise_duty.remitted</code> is what was paid to KRA in the period, by payment date. <code>referral_payouts</code> are <a href="#" data-section="referrals" style="color:var(--accent-blue)">referral withdrawals</a> from the referral shortcode: <code>paid</code> by completion date, <code>failed</code> by failure date, <code>pending</code> (still open) by request date. <code>deposit_refunds.refunded</code> is unmatched deposits recorded as sent back to the payer, by the day the refund was recorded (the deposit stays in cash in as <code>unmatched</code>, the day it arrived). <code>net_cash</code> is cash in minus paid withdrawals minus excise duty remitted minus paid referral payouts minus deposit refunds. Works for dates before the ledger began.</p></div>
 <div class="endpoint-section"><h4>Query Parameters</h4>
 <table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
 <tr><td>from, to, group_by, exclude_test</td><td>&nbsp;</td><td><span class="optional">Optional</span></td><td>See common parameters</td></tr></table></div>
@@ -5500,7 +5586,7 @@ Accept: application/json</pre></div>
     "generated_at": "2026-09-20T12:00:00+03:00",
     "meta": {},
     "totals": {
-      "cash_in": {"wallet_deposit": 500.00, "load": 300.00, "gift": 100.00, "emoji": 0.00, "unmatched": 200.00, "other": 0.00, "total": 1100.00},
+      "cash_in": {"wallet_deposit": 500.00, "load": 300.00, "gift": 100.00, "emoji": 0.00, "unmatched": 200.00, "house_funding": 0.00, "other": 0.00, "total": 1100.00},
       "cash_out": {"paid": 150.00, "pending": 40.00, "failed": 60.00},
       "excise_duty": {"withheld": 25.00, "remitted": 0.00},
       "referral_payouts": {"paid": 0.00, "pending": 0.00, "failed": 0.00},
@@ -5508,7 +5594,7 @@ Accept: application/json</pre></div>
       "net_cash": 950.00
     },
     "series": [
-      {"period": "2026-09-20", "cash_in": {"wallet_deposit": 500.00, "load": 300.00, "gift": 100.00, "emoji": 0.00, "unmatched": 200.00, "other": 0.00, "total": 1100.00}, "cash_out": {"paid": 150.00, "pending": 40.00, "failed": 60.00}, "excise_duty": {"withheld": 25.00, "remitted": 0.00}, "referral_payouts": {"paid": 0.00, "pending": 0.00, "failed": 0.00}, "deposit_refunds": {"refunded": 0.00}, "net_cash": 950.00}
+      {"period": "2026-09-20", "cash_in": {"wallet_deposit": 500.00, "load": 300.00, "gift": 100.00, "emoji": 0.00, "unmatched": 200.00, "house_funding": 0.00, "other": 0.00, "total": 1100.00}, "cash_out": {"paid": 150.00, "pending": 40.00, "failed": 60.00}, "excise_duty": {"withheld": 25.00, "remitted": 0.00}, "referral_payouts": {"paid": 0.00, "pending": 0.00, "failed": 0.00}, "deposit_refunds": {"refunded": 0.00}, "net_cash": 950.00}
     ]
   }
 }</pre></div>
@@ -5600,7 +5686,7 @@ Accept: application/json</pre></div>
 <tr><td>ledger_balance</td><td>fail</td><td>Paired ledger entries net to zero (see trial balance)</td></tr>
 <tr><td>unclassified_entries</td><td>warn</td><td>Ledger entries that have no wallet type</td></tr>
 <tr><td>unmatched_deposits</td><td>warn</td><td>Money received from unknown customers and not credited (resolve with <a href="#" data-section="deposits" style="color:var(--accent-blue)">assign or refund</a>)</td></tr>
-<tr><td>deposit_resolutions</td><td>fail</td><td>Resolved unmatched deposits agree with their records: assigned ones are completed with a ledger credit, refunded ones have status 4 and a refund record</td></tr>
+<tr><td>deposit_resolutions</td><td>fail</td><td>Resolved unmatched deposits agree with their records: assigned ones are completed with a ledger credit, house-funded ones with a <code>house_funding</code> credit, refunded ones have status 4 and a refund record</td></tr>
 <tr><td>deposits_without_ledger</td><td>fail</td><td>Processed deposits that never reached the ledger (gift and emoji purchases are not expected to)</td></tr>
 <tr><td>deposits_without_excise_duty</td><td>fail</td><td>Plain wallet deposits credited in full while excise duty was on (from its start date). Passes with a note when excise duty is off</td></tr>
 <tr><td>excise_duty_amounts</td><td>fail</td><td>Each charge is 5% of the gross rounded to the cent, and gross = excise + net</td></tr>
@@ -5616,6 +5702,7 @@ Accept: application/json</pre></div>
 <tr><td>stuck_referral_withdrawals</td><td>warn</td><td>Referral withdrawals still pending or processing after 24 hours. Check the payout on the referral shortcode before doing anything: a missing result does not mean it was not paid</td></tr>
 <tr><td>failed_referral_withdrawals_not_reversed</td><td>fail</td><td>A referral payout failed but the referral wallet was not credited back</td></tr>
 <tr><td>referral_bonuses_unverified</td><td>fail</td><td>Referral bonuses paid for referrals that are not verified</td></tr>
+<tr><td>house_funding_ledger</td><td>fail</td><td>Each house funding has its credit to the house wallet for the full deposit and its deposit completed, and each voided one has its reversal</td></tr>
 <tr><td>promotion_credits_ledger</td><td>fail</td><td>Each signup bonus has its customer credit and house debit in the ledger for the gross amount, and its excise duty charge when duty was taken</td></tr>
 <tr><td>house_cut_rates</td><td>warn</td><td>House cuts that differ from the fee schedule (only cuts linked to their transaction can be checked)</td></tr>
 <tr><td>mpesa_balance_freshness</td><td>warn</td><td>M-Pesa balances fetched in the last 3 hours</td></tr>
@@ -5686,7 +5773,7 @@ Accept: application/json</pre></div>
 <div class="endpoint-section"><h4>Query Parameters</h4>
 <table class="params-table"><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
 <tr><td>status</td><td>integer</td><td><span class="optional">Optional</span></td><td><code>0</code> unmatched, <code>1</code> pending, <code>2</code> processed, <code>4</code> refunded. Anything else (for example <code>refunded</code>) returns <code>422</code></td></tr>
-<tr><td>kind</td><td>string</td><td><span class="optional">Optional</span></td><td><code>wallet_deposit</code>, <code>load</code>, <code>gift</code>, <code>emoji</code>, <code>unmatched</code></td></tr>
+<tr><td>kind</td><td>string</td><td><span class="optional">Optional</span></td><td><code>wallet_deposit</code>, <code>load</code>, <code>gift</code>, <code>emoji</code>, <code>unmatched</code>, <code>house_funding</code></td></tr>
 <tr><td>customer_id</td><td>integer</td><td><span class="optional">Optional</span></td><td>Only this customer's payments</td></tr></table></div>
 <div class="endpoint-section"><h4>Response (200)</h4>
 <pre>{
@@ -6026,6 +6113,124 @@ Accept: application/json</pre></div>
   }
 }</pre></div>
 <p class="endpoint-note">Also returns 401 (API key), 429 (rate limit): see <a href="#" data-section="errors" style="color:var(--accent-blue)">Error Responses</a>.</p>
+</div></div>
+
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)">
+<span class="method method-get">GET</span>
+<span class="endpoint-path">/api/v1/finance/house-funding</span>
+<span class="endpoint-desc">Owner money credited to the house wallet</span>
+<span class="chevron">&#9654;</span>
+</div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-rate">20/min</span></div>
+<div class="response-list" style="margin-top:10px"><span class="status-code status-200">200 OK</span></div>
+<p class="endpoint-note">House fundings recorded in the range (by the day they were recorded), newest first, each with its M-Pesa payment. Recorded with <a href="#" data-section="deposits" style="color:var(--accent-blue)">POST /deposits/{id}/house-funding</a>. <code>house_wallet_balance</code> is the house wallet now.</p>
+<div class="endpoint-section"><h4>Query Parameters</h4>
+<table class="params-table">
+<tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>from, to</td><td></td><td><span class="optional">Optional</span></td><td>See common parameters</td></tr>
+<tr><td>status</td><td>string</td><td><span class="optional">Optional</span></td><td><code>active</code> (default), <code>voided</code> or <code>all</code></td></tr>
+<tr><td>page, per_page</td><td>integer</td><td><span class="optional">Optional</span></td><td>Paging</td></tr>
+</table></div>
+<div class="endpoint-section"><h4>Example Request</h4>
+<pre>GET /api/v1/finance/house-funding?from=2026-09-01&amp;to=2026-09-30 HTTP/1.1
+Host: api.kadi-kings.co.ke
+X-API-KEY: your-api-key-here
+Accept: application/json</pre></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "data": {
+    "generated_at": "2026-09-30T12:00:00+03:00",
+    "meta": {},
+    "summary": {
+      "active": {"entries": 1, "amount": 50000.0},
+      "voided": {"entries": 0, "amount": 0.0},
+      "house_wallet_balance": 47895.0
+    },
+    "items": [
+      {
+        "id": 3,
+        "deposit_id": 140,
+        "trans_id": "UJ5HSE0001",
+        "trans_time": "2026-09-26 10:02:11",
+        "bill_ref_no": "HOUSE",
+        "amount": 50000.0,
+        "note": "Owner top-up for October signup bonuses",
+        "status": "active",
+        "recorded_by": "api_key:2",
+        "created_at": "2026-09-26T10:05:00+03:00",
+        "voided_at": null,
+        "voided_by": null,
+        "void_reason": null
+      }
+    ],
+    "pagination": {"page": 1, "per_page": 50, "total": 1, "last_page": 1}
+  }
+}</pre></div>
+<p class="endpoint-note">Also returns 401 (API key), 429 (rate limit): see <a href="#" data-section="errors" style="color:var(--accent-blue)">Error Responses</a>.</p>
+</div></div>
+
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)">
+<span class="method method-post">POST</span>
+<span class="endpoint-path">/api/v1/finance/house-funding/{encryptedIdentifier}/void</span>
+<span class="endpoint-desc">Void a house funding and reopen its deposit</span>
+<span class="chevron">&#9654;</span>
+</div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-encrypted">Encrypted ID</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">30/min</span></div>
+<div class="response-list" style="margin-top:10px"><span class="status-code status-200">200 OK</span> <span class="status-code status-404">404 Not Found</span> <span class="status-code status-409">409 Conflict</span> <span class="status-code status-422">422 Unprocessable</span></div>
+<p class="endpoint-note">For a payment recorded as house funding by mistake (e.g. a customer's). Takes the amount back out of the house wallet (<code>house_funding_reversal</code>) and puts the deposit back to unmatched (status 0), so it can be assigned or refunded. The funding is kept, marked voided. Refused while the house wallet holds less than the amount (it has been paid out as bonuses).</p>
+<div class="endpoint-section"><h4>Path Parameters</h4>
+<table class="params-table">
+<tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>encryptedIdentifier</td><td>string</td><td><span class="required">Required</span></td><td>Encrypted house funding id</td></tr>
+</table></div>
+<div class="endpoint-section"><h4>Request Body</h4>
+<table class="params-table">
+<tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>reason</td><td>string</td><td><span class="required">Required</span></td><td>Why, 3 to 255 characters</td></tr>
+</table></div>
+<div class="endpoint-section"><h4>Example Request</h4>
+<pre>POST /api/v1/finance/house-funding/{encryptedIdentifier}/void HTTP/1.1
+Host: api.kadi-kings.co.ke
+X-API-KEY: your-api-key-here
+Accept: application/json
+Content-Type: application/json
+
+{
+  "reason": "Customer payment, not owner money"
+}</pre></div>
+<div class="endpoint-section"><h4>Response (200)</h4>
+<pre>{
+  "success": true,
+  "message": "House funding voided; the deposit is unmatched again",
+  "data": {
+    "house_funding": {
+      "id": 3,
+      "deposit_id": 140,
+      "amount": 50000.0,
+      "status": "voided",
+      "voided_at": "2026-09-26T11:00:00+03:00",
+      "voided_by": "api_key:2",
+      "void_reason": "Customer payment, not owner money"
+    }
+  }
+}</pre></div>
+<div class="endpoint-section"><h4>Response (409: the house wallet has spent it)</h4>
+<pre>{
+  "success": false,
+  "code": "insufficient_house_balance",
+  "message": "The house wallet no longer holds this amount, so it cannot be reversed",
+  "data": {
+    "house_funding": {"id": 3, "status": "active"}
+  }
+}</pre></div>
+<p class="endpoint-note">A second void returns 409 with <code>code: already_resolved</code>.</p>
+<p class="endpoint-note">Also returns 401 (API key), 400 (invalid identifier), 409 (Idempotency-Key reused), 429 (rate limit): see <a href="#" data-section="errors" style="color:var(--accent-blue)">Error Responses</a>.</p>
 </div></div>
 
 <div class="endpoint">
@@ -6410,8 +6615,9 @@ Idempotency-Key: excise-2026-08
 <tr><td>disputes</td><td>/finance/disputes</td><td>One per complaint</td></tr>
 <tr><td>referral-bonuses</td><td>/finance/referrals/bonuses</td><td>One per bonus</td></tr>
 <tr><td>referral-withdrawals</td><td>/finance/referrals/withdrawals</td><td>One per referral withdrawal</td></tr>
-<tr><td>promotions</td><td>/finance/promotions</td><td>One per signup bonus</td></tr></table>
-<p style="color:var(--text-secondary);font-size:13px;margin-top:8px;">The <code>cash-flow</code> export has <code>excise_withheld</code> and <code>excise_remitted</code> columns before <code>net_cash</code>, and <code>referral_paid</code>, <code>referral_pending</code>, <code>referral_failed</code> and <code>deposit_refunded</code> after it. The <code>income-statement</code> export has <code>referral_payouts</code> and <code>promotions</code> as its last columns.</p>
+<tr><td>promotions</td><td>/finance/promotions</td><td>One per signup bonus</td></tr>
+<tr><td>house-funding</td><td>/finance/house-funding</td><td>One per house funding</td></tr></table>
+<p style="color:var(--text-secondary);font-size:13px;margin-top:8px;">The <code>cash-flow</code> export has a <code>house_funding</code> column after <code>unmatched</code>, <code>excise_withheld</code> and <code>excise_remitted</code> columns before <code>net_cash</code>, and <code>referral_paid</code>, <code>referral_pending</code>, <code>referral_failed</code> and <code>deposit_refunded</code> after it. The <code>income-statement</code> export has <code>referral_payouts</code> and <code>promotions</code> as its last columns.</p>
 <p style="color:var(--text-secondary);font-size:13px;margin-top:8px;">The customer statement cannot be exported yet.</p></div>
 <div class="endpoint-section"><h4>Request</h4>
 <pre>GET /api/v1/finance/export/deposits?from=2026-09-01&amp;to=2026-09-20&amp;status=2 HTTP/1.1

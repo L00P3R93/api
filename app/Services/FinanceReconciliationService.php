@@ -60,6 +60,7 @@ class FinanceReconciliationService
             $this->failedReferralWithdrawalsNotReversed(),
             $this->referralBonusesWithoutVerification(),
             $this->promotionCreditsLedger($range),
+            $this->houseFundingLedger($range),
             $this->houseCutRates($range),
             $this->mpesaBalanceFreshness(),
             $this->cashCoverage(),
@@ -205,13 +206,20 @@ class FinanceReconciliationService
             ->where('i.status', '!=', Deposit::STATUS_REFUNDED)
             ->get(['i.id', 'i.trans_id', 'i.trans_amount', 'i.status', 'r.action']);
 
+        $houseFundedWrong = DB::table('deposit_resolutions as r')
+            ->join('incoming_payments as i', 'i.id', '=', 'r.deposit_id')
+            ->leftJoin('ledger_entries as l', 'l.id', '=', 'r.ledger_entry_id')
+            ->where('r.action', DepositResolution::ACTION_HOUSE_FUNDED)
+            ->where(fn ($query) => $query->where('i.status', '!=', Deposit::STATUS_COMPLETED)->orWhereNull('l.id')->orWhere('l.entry_type', '!=', 'house_funding'))
+            ->get(['i.id', 'i.trans_id', 'i.trans_amount', 'i.status', 'r.action']);
+
         $refundedWithoutRecord = DB::table('incoming_payments as i')
             ->leftJoin('deposit_resolutions as r', 'r.deposit_id', '=', 'i.id')
             ->where('i.status', Deposit::STATUS_REFUNDED)
             ->whereNull('r.id')
             ->get(['i.id', 'i.trans_id', 'i.trans_amount', 'i.status']);
 
-        $rows = $assignedWrong->concat($refundedWrong)->concat($refundedWithoutRecord);
+        $rows = $assignedWrong->concat($refundedWrong)->concat($houseFundedWrong)->concat($refundedWithoutRecord);
 
         return $this->result(
             'deposit_resolutions',
@@ -220,7 +228,7 @@ class FinanceReconciliationService
             $rows->count(),
             (float) $rows->sum('trans_amount'),
             $rows->take(self::SAMPLE_SIZE)->map(fn ($row) => (array) $row)->values()->all(),
-            'An assigned deposit must be completed with a ledger credit; a refunded deposit must have status 4 and a refund record.'
+            'An assigned deposit must be completed with a ledger credit; a house-funded deposit must be completed with a house_funding credit; a refunded deposit must have status 4 and a refund record.'
         );
     }
 
@@ -255,7 +263,7 @@ class FinanceReconciliationService
             ->leftJoin('ledger_entries as l', function ($join) {
                 $join->on('l.referenceable_id', '=', 'i.id')
                     ->where('l.referenceable_type', Deposit::class)
-                    ->where('l.entry_type', 'deposit');
+                    ->whereIn('l.entry_type', ['deposit', 'house_funding']);
             })
             ->leftJoin('purchases as p', 'p.deposit_id', '=', 'i.id')
             ->where('i.status', 2)
@@ -655,6 +663,40 @@ class FinanceReconciliationService
             (clone $mismatched)->count(),
             (float) (clone $mismatched)->sum('p.gross_amount'),
             (clone $mismatched)->limit(self::SAMPLE_SIZE)->get(['p.id', 'p.customer_id', 'p.gross_amount', 'p.excise_amount', 'p.net_amount', 'c.id as ledger_entry_id', 'h.id as house_ledger_entry_id', 'x.id as excise_charge_id'])->map(fn ($row) => (array) $row)->all()
+        );
+    }
+
+    /**
+     * Each house funding has its credit to the house wallet for the full deposit, and each voided one has its
+     * reversal.
+     *
+     * @return array<string, mixed>
+     */
+    private function houseFundingLedger(FinanceDateRange $range): array
+    {
+        $tolerance = $this->tolerance();
+
+        $mismatched = DB::table('house_fundings as h')
+            ->join('incoming_payments as i', 'i.id', '=', 'h.deposit_id')
+            ->leftJoin('ledger_entries as l', 'l.id', '=', 'h.ledger_entry_id')
+            ->leftJoin('ledger_entries as v', 'v.id', '=', 'h.void_ledger_entry_id')
+            ->whereBetween('h.created_at', [$range->from, $range->to])
+            ->where(fn ($query) => $query
+                ->whereNull('l.id')
+                ->orWhere('l.entry_type', '!=', 'house_funding')
+                ->orWhere('l.wallet_id', '!=', (int) config('wallets.house_wallet_id', 1))
+                ->orWhereRaw('ABS(l.credit - h.amount) > ?', [$tolerance])
+                ->orWhereRaw('ABS(h.amount - i.trans_amount) > ?', [$tolerance])
+                ->orWhereRaw('(h.voided_at IS NULL AND i.status <> ?)', [Deposit::STATUS_COMPLETED])
+                ->orWhereRaw("(h.voided_at IS NOT NULL AND (v.id IS NULL OR v.entry_type <> 'house_funding_reversal' OR ABS(v.debit - h.amount) > ?))", [$tolerance]));
+
+        return $this->result(
+            'house_funding_ledger',
+            'House funding matches the ledger',
+            'fail',
+            (clone $mismatched)->count(),
+            (float) (clone $mismatched)->sum('h.amount'),
+            (clone $mismatched)->limit(self::SAMPLE_SIZE)->get(['h.id', 'h.deposit_id', 'i.trans_id', 'h.amount', 'h.voided_at', 'l.id as ledger_entry_id', 'v.id as void_ledger_entry_id'])->map(fn ($row) => (array) $row)->all()
         );
     }
 
