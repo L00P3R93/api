@@ -48,7 +48,6 @@ use App\Http\Controllers\api\v1\StatsController;
 use App\Http\Controllers\api\v1\StkCallbackController;
 use App\Http\Controllers\api\v1\StkDepositController;
 use App\Http\Controllers\api\v1\StkLoadController;
-use App\Http\Controllers\api\v1\TestController;
 use App\Http\Controllers\api\v1\TransactionController;
 use App\Http\Controllers\api\v1\UnmatchedDepositController;
 use App\Http\Controllers\api\v1\ValidationController;
@@ -326,8 +325,6 @@ Route::prefix('/v1')->group(function () {
         // Register C2B Callback URLs
         Route::get('/c2b/register', RegisterC2BUrlsController::class);
 
-        // Testing MPESA API
-        Route::get('/test', TestController::class);
         /*Route::middleware('decryptIdentifier')->get('/test/{encryptedIdentifier}', function ($decryptedIdentifier) {
             return response()->json(['decrypted' => $decryptedIdentifier]);
         });*/
@@ -338,7 +335,6 @@ Route::prefix('/v1')->group(function () {
         })->middleware('auth:sanctum');
     });
 
-    // Route::get('/test', [TestController::class, 'index']);
 
     // Callback URLS
     Route::middleware('throttle:callback')->group(function () {
