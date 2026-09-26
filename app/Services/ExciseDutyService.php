@@ -4,14 +4,15 @@ namespace App\Services;
 
 use App\Models\Deposit;
 use App\Models\ExciseDutyCharge;
+use App\Models\PromotionCredit;
 use App\Models\Wallet;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
 /**
- * Excise duty on M-Pesa wallet deposits, using the rules in config/finance.php. The wallet is
- * credited with the gross deposit first, then this takes the duty off with its own ledger entry.
+ * Excise duty on M-Pesa wallet deposits and on promotion credits, using the rules in config/finance.php.
+ * The wallet is credited with the gross amount first, then this takes the duty off with its own ledger entry.
  */
 class ExciseDutyService
 {
@@ -71,6 +72,74 @@ class ExciseDutyService
             'excise' => $excise,
             'net' => round($gross - $excise, 2),
         ];
+    }
+
+    /**
+     * Whether duty is charged on something credited now: the feature is on and today is on or after
+     * `effective_from`. Used for promotion credits, which have no deposit kind.
+     */
+    public function appliesNow(): bool
+    {
+        $effectiveFrom = config('finance.excise_duty.effective_from');
+
+        return $this->isEnabled()
+            && (blank($effectiveFrom) || now()->gte(Carbon::parse($effectiveFrom, config('app.timezone'))->startOfDay()));
+    }
+
+    /**
+     * The gross amount that leaves exactly $net after duty, split like calculate(). With duty off the gross
+     * is the net. The first guess is net / (1 - rate); rounding can leave it a cent out, so it is nudged.
+     *
+     * @return array{gross: float, rate: float, excise: float, net: float}
+     */
+    public function grossUpForNet(float $net, ?float $rate = null): array
+    {
+        $rate ??= $this->appliesNow() ? $this->rate() : 0.0;
+
+        if ($rate <= 0) {
+            return $this->calculate($net, 0.0);
+        }
+
+        $gross = round($net / (1 - $rate), 2);
+
+        for ($attempt = 0; $attempt < 10; $attempt++) {
+            $amounts = $this->calculate($gross, $rate);
+
+            if (abs($amounts['net'] - $net) < 0.001) {
+                return $amounts;
+            }
+
+            $gross = round($gross + ($amounts['net'] < $net ? 0.01 : -0.01), 2);
+        }
+
+        return $this->calculate($gross, $rate);
+    }
+
+    /**
+     * Charge duty on a promotion credit already credited to the wallet. Call inside the caller's
+     * transaction, with the wallet row locked.
+     */
+    public function chargePromotion(PromotionCredit $credit, Wallet $wallet): ?ExciseDutyCharge
+    {
+        if ((float) $credit->excise_amount <= 0) {
+            return null;
+        }
+
+        $entry = $this->ledgerService->recordPromotionExciseDuty($credit, $wallet, (float) $credit->excise_amount, (float) $credit->rate);
+
+        return ExciseDutyCharge::create([
+            'deposit_id' => null,
+            'promotion_credit_id' => $credit->id,
+            'customer_id' => $wallet->customer_id,
+            'wallet_id' => $wallet->id,
+            'ledger_entry_id' => $entry->id,
+            'gross_amount' => $credit->gross_amount,
+            'rate' => $credit->rate,
+            'excise_amount' => $credit->excise_amount,
+            'net_amount' => $credit->net_amount,
+            'status' => ExciseDutyCharge::STATUS_CHARGED,
+            'charged_at' => now(),
+        ]);
     }
 
     /**

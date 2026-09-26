@@ -47,7 +47,11 @@ class CustomerController extends Controller
         try {
             $customer = $this->customerService->createCustomer($request->validated());
 
-            return response()->json(['status' => 'Success', 'customer_id' => $customer->id], 201);
+            return response()->json([
+                'status' => 'Success',
+                'customer_id' => $customer->id,
+                'promo_code_applied' => $customer->promo_code_id !== null,
+            ], 201);
         } catch (\Exception $e) {
             Log::error('Create Customer Error: ', ['error' => $e->getMessage()]);
 

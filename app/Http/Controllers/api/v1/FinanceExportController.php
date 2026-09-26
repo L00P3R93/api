@@ -12,6 +12,7 @@ use App\Services\FinanceGameReportService;
 use App\Services\FinanceLedgerReportService;
 use App\Services\FinanceListing;
 use App\Services\FinancePaymentReportService;
+use App\Services\FinancePromotionReportService;
 use App\Services\FinanceReferralReportService;
 use App\Services\FinanceReportService;
 use App\Services\FinanceTaxService;
@@ -25,7 +26,7 @@ class FinanceExportController extends Controller
         'ledger', 'deposits', 'withdrawals', 'purchases', 'adjustments', 'games', 'competitions',
         'customers-top', 'cash-flow', 'income-statement', 'trial-balance', 'expenses', 'taxes',
         'excise-duty', 'excise-duty-charges', 'excise-duty-returns', 'excise-duty-remittances', 'disputes',
-        'referral-bonuses', 'referral-withdrawals',
+        'referral-bonuses', 'referral-withdrawals', 'promotions',
     ];
 
     /** Days the top customers report covers when no range is given. */
@@ -41,6 +42,7 @@ class FinanceExportController extends Controller
         private ExciseDutyReportService $exciseDuty,
         private FinanceDisputeReportService $disputes,
         private FinanceReferralReportService $referrals,
+        private FinancePromotionReportService $promotions,
     ) {}
 
     /**
@@ -77,6 +79,7 @@ class FinanceExportController extends Controller
             'disputes' => $this->fromListing($this->disputes->listing($range, $filters)),
             'referral-bonuses' => $this->fromListing($this->referrals->bonuses($range, $filters)),
             'referral-withdrawals' => $this->fromListing($this->referrals->withdrawals($range, $filters)),
+            'promotions' => $this->fromListing($this->promotions->credits($range, $filters)),
         };
 
         $filename = "finance-{$report}-{$range->from->toDateString()}-{$range->to->toDateString()}.csv";
@@ -130,7 +133,7 @@ class FinanceExportController extends Controller
      */
     private function incomeStatementRows(FinanceDateRange $range): array
     {
-        $columns = ['period', 'games', 'tournaments', 'jackpots', 'competitions_unattributed', 'gift_emoji_sales', 'other', 'total', 'expenses', 'net_income', 'referral_payouts'];
+        $columns = ['period', 'games', 'tournaments', 'jackpots', 'competitions_unattributed', 'gift_emoji_sales', 'other', 'total', 'expenses', 'net_income', 'referral_payouts', 'promotions'];
 
         $rows = (function () use ($range) {
             yield from $this->reports->incomeStatement($range)['series'];

@@ -9,7 +9,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Excise duty taken from one M-Pesa wallet deposit. Held as a liability until it is paid to KRA.
+ * Excise duty taken from one M-Pesa wallet deposit, or from one promotion credit (deposit_id is then null).
+ * Held as a liability until it is paid to KRA.
  */
 class ExciseDutyCharge extends Model
 {
@@ -22,6 +23,7 @@ class ExciseDutyCharge extends Model
 
     protected $fillable = [
         'deposit_id',
+        'promotion_credit_id',
         'customer_id',
         'wallet_id',
         'ledger_entry_id',
@@ -67,6 +69,11 @@ class ExciseDutyCharge extends Model
     public function deposit(): BelongsTo
     {
         return $this->belongsTo(Deposit::class);
+    }
+
+    public function promotionCredit(): BelongsTo
+    {
+        return $this->belongsTo(PromotionCredit::class);
     }
 
     public function customer(): BelongsTo

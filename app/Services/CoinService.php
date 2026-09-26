@@ -8,7 +8,10 @@ use Illuminate\Support\Facades\DB;
 
 class CoinService
 {
-    public function __construct(private LedgerService $ledgerService) {}
+    public function __construct(
+        private LedgerService $ledgerService,
+        private SignupBonusService $signupBonus,
+    ) {}
 
     public function buyCoins(int $customerId, float $amount): array
     {
@@ -24,6 +27,10 @@ class CoinService
 
         if ($wallet->balance < $amount) {
             return ['success' => false, 'message' => 'Insufficient balance in Wallet', 'status_code' => 400];
+        }
+
+        if ($this->signupBonus->wouldSpendLockedBonus($wallet, (float) $amount)) {
+            return $this->signupBonus->lockedRefusal($wallet);
         }
 
         $exchangeRate = config('finance.coin_rate');

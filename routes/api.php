@@ -18,6 +18,7 @@ use App\Http\Controllers\api\v1\CompetitionWalletWithdrawController;
 use App\Http\Controllers\api\v1\ComplaintController;
 use App\Http\Controllers\api\v1\ConfirmationController;
 use App\Http\Controllers\api\v1\CustomerController;
+use App\Http\Controllers\api\v1\CustomerPromotionController;
 use App\Http\Controllers\api\v1\DecryptIdentifierController;
 use App\Http\Controllers\api\v1\DepositController;
 use App\Http\Controllers\api\v1\DropConnectionController;
@@ -34,6 +35,7 @@ use App\Http\Controllers\api\v1\GameTransactionController;
 use App\Http\Controllers\api\v1\GameWalletController;
 use App\Http\Controllers\api\v1\GameWalletWithdrawController;
 use App\Http\Controllers\api\v1\PlaygroundController;
+use App\Http\Controllers\api\v1\PromoCodeController;
 use App\Http\Controllers\api\v1\PurchaseController;
 use App\Http\Controllers\api\v1\ReferralB2CBalanceController;
 use App\Http\Controllers\api\v1\ReferralB2CBalanceTimeoutController;
@@ -112,6 +114,11 @@ Route::prefix('/v1')->group(function () {
         Route::get('/referrals/lookup', [ReferralController::class, 'lookup']);
         Route::get('/referral-withdrawals', [ReferralWithdrawalController::class, 'index']);
 
+        // Promo codes for the signup bonus (GMS) and the signup screen lookup
+        Route::get('/promo-codes', [PromoCodeController::class, 'index']);
+        Route::post('/promo-codes', [PromoCodeController::class, 'store'])->middleware(['idempotency', 'throttle:write']);
+        Route::get('/promo-codes/lookup', [PromoCodeController::class, 'lookup']);
+
         // Complaints and disputed transactions
         Route::get('/complaints', [ComplaintController::class, 'index']);
         Route::post('/complaints', [ComplaintController::class, 'store'])->middleware(['idempotency', 'throttle:write']);
@@ -161,6 +168,7 @@ Route::prefix('/v1')->group(function () {
                 Route::get('/referrals', [FinanceDrilldownController::class, 'referrals']);
                 Route::get('/referrals/bonuses', [FinanceDrilldownController::class, 'referralBonuses']);
                 Route::get('/referrals/withdrawals', [FinanceDrilldownController::class, 'referralWithdrawals']);
+                Route::get('/promotions', [FinanceDrilldownController::class, 'promotions']);
                 Route::get('/customers/top', [FinanceDrilldownController::class, 'topCustomers']);
                 Route::get('/export/{report}', FinanceExportController::class);
             });
@@ -191,6 +199,10 @@ Route::prefix('/v1')->group(function () {
             Route::get('/customers/{encryptedIdentifier}/referral-code', [ReferralController::class, 'showCode']);
             Route::put('/customers/{encryptedIdentifier}/referral-code', [ReferralController::class, 'saveCode'])->middleware('throttle:write');
             Route::post('/customers/{encryptedIdentifier}/referral/verified', [ReferralController::class, 'verified'])->middleware('throttle:write');
+            // Customer verification (every player) and promotions
+            Route::post('/customers/{encryptedIdentifier}/verified', [CustomerPromotionController::class, 'verified'])->middleware('throttle:write');
+            Route::get('/customers/{encryptedIdentifier}/promotions', [CustomerPromotionController::class, 'index']);
+            Route::post('/promo-codes/{encryptedIdentifier}/deactivate', [PromoCodeController::class, 'deactivate'])->middleware(['idempotency', 'throttle:write']);
             Route::get('/customers/{encryptedIdentifier}/referrals', [ReferralController::class, 'customerReferrals']);
             Route::get('/customers/{encryptedIdentifier}/referrals/stats', [ReferralController::class, 'customerStats']);
             Route::get('/customers/{encryptedIdentifier}/referral-wallet', [ReferralController::class, 'wallet']);

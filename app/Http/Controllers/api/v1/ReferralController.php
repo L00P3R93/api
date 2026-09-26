@@ -11,7 +11,9 @@ use App\Http\Resources\ReferralResource;
 use App\Models\Customer;
 use App\Models\Referral;
 use App\Models\ReferralBonus;
+use App\Services\CustomerVerificationService;
 use App\Services\ReferralService;
+use App\Services\SignupBonusService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
@@ -107,9 +109,10 @@ class ReferralController extends Controller
     }
 
     /**
-     * The client has verified the customer's email and phone. Pays the referrer any bonus now due.
+     * The client has verified the customer's email and phone. Pays the referrer any bonus now due and grants
+     * the signup bonus when the customer qualifies (same as POST /customers/{id}/verified).
      */
-    public function verified(string $encryptedIdentifier): JsonResponse
+    public function verified(CustomerVerificationService $verification, SignupBonusService $signupBonus, string $encryptedIdentifier): JsonResponse
     {
         $customer = $this->customer($encryptedIdentifier);
 
@@ -117,12 +120,14 @@ class ReferralController extends Controller
             return $this->customerNotFound();
         }
 
-        $referral = $this->referrals->markVerified($customer);
+        $result = $verification->markVerified($customer);
+        $referral = $result['referral'];
 
         return response()->json([
             'success' => true,
             'referred' => $referral !== null,
             'data' => $referral ? ReferralResource::make($referral->load('referred:id,name,phone_no')) : null,
+            'signup_bonus' => $result['signup_bonus'] ? $signupBonus->present($result['signup_bonus']) : null,
         ]);
     }
 

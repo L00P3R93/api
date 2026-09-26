@@ -33,7 +33,11 @@ class WalletTransferController extends Controller
             if (! $result['success']) {
                 $statusCode = $result['status_code'] ?? 500;
 
-                return response()->json(['status' => 'error', 'message' => $result['message']], $statusCode);
+                return response()->json(['status' => 'error', 'message' => $result['message']] + array_filter([
+                    'code' => $result['code'] ?? null,
+                    'locked_amount' => $result['locked_amount'] ?? null,
+                    'available' => $result['available'] ?? null,
+                ], fn ($value) => $value !== null), $statusCode);
             }
 
             return response()->json(['status' => 'success'], 200);
