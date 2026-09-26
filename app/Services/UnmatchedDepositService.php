@@ -25,12 +25,17 @@ class UnmatchedDepositService
 
     public const CODE_REFERENCE_USED = 'reference_used';
 
+    public const CODE_HOUSE_CUSTOMER = 'house_customer';
+
     private const REFERENCE_USED_MESSAGE = 'That M-Pesa reference is already on another refund';
 
     /** Suggestion kinds, strongest first. */
     public const MATCH_KINDS = ['account_no', 'payer_phone', 'bill_ref_phone'];
 
-    public function __construct(private WalletDepositService $walletDeposits) {}
+    public function __construct(
+        private WalletDepositService $walletDeposits,
+        private HouseFundingService $houseFunding,
+    ) {}
 
     /**
      * Customers an unmatched deposit probably belongs to, strongest match first:
@@ -114,6 +119,10 @@ class UnmatchedDepositService
                 return $this->refused('Customer not found', 404);
             }
 
+            if ((int) $customer->id === $this->houseFunding->houseCustomerId()) {
+                return $this->refused('The house wallet is funded with the house-funding action, not assigned as a deposit', 422, $deposit, self::CODE_HOUSE_CUSTOMER);
+            }
+
             $ledgerEntry = $this->walletDeposits->credit($deposit, $customer);
 
             $deposit->update(['status' => Deposit::STATUS_COMPLETED]);
@@ -189,22 +198,24 @@ class UnmatchedDepositService
     /**
      * Assign every unmatched deposit whose bill ref now matches a customer's account number exactly (the C2B
      * rule), for payers who paid before registering or whose account number was corrected. Never matches on
-     * phone numbers. With $dryRun nothing is changed. $actor is recorded as resolved_by.
+     * phone numbers, and never the house account (that money is recorded as house funding). With $dryRun
+     * nothing is changed. $actor is recorded as resolved_by.
      *
      * @return Collection<int, array{deposit_id: int, trans_id: ?string, amount: float, bill_ref_no: ?string, customer_id: int, account_no: string, assigned: bool, message: string}>
      */
     public function matchByAccountNumber(bool $dryRun, ?string $actor = self::COMMAND_ACTOR): Collection
     {
         $results = collect();
+        $houseCustomerId = $this->houseFunding->houseCustomerId();
 
         Deposit::where('status', Deposit::STATUS_UNMATCHED)
             ->orderBy('id')
-            ->chunkById(200, function ($deposits) use ($dryRun, $actor, $results) {
+            ->chunkById(200, function ($deposits) use ($dryRun, $actor, $results, $houseCustomerId) {
                 foreach ($deposits as $deposit) {
                     $accountNo = $this->walletDeposits->accountNoFromBillRef($deposit->bill_ref_no);
                     $customer = $accountNo === '' ? null : Customer::where('account_no', $accountNo)->first();
 
-                    if (! $customer) {
+                    if (! $customer || (int) $customer->id === $houseCustomerId) {
                         continue;
                     }
 

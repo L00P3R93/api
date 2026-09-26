@@ -236,7 +236,11 @@ return [
     |
     | Categories: cash_in, cash_out, stake, payout, house_revenue, refund,
     | adjustment, transfer, escrow_movement, coin, tax_withheld,
-    | referral_bonus, referral_payout, promotion.
+    | referral_bonus, referral_payout, promotion, capital.
+    |
+    | capital entries (house_funding) are owner money paid into the paybill and
+    | credited to the house wallet. Single-sided like deposits (the cash side
+    | is M-Pesa), but not customer deposits: no excise duty, not revenue.
     |
     | promotion entries (promo_credit) move a promotion's gross amount from the
     | house wallet to a customer wallet. They are paired and net to zero; the
@@ -281,6 +285,7 @@ return [
         'referral_bonus' => 'referral_bonus',
         'referral_withdrawal' => 'referral_payout',
         'promo_credit' => 'promotion',
+        'house_funding' => 'capital',
     ],
 
 ];

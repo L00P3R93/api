@@ -17,12 +17,12 @@ class UnmatchedDepositController extends Controller
 
     /**
      * Deposits whose account number matched no customer (status 0), oldest first, each with suggested
-     * customers. Pass `status=refunded` or `status=assigned` to see resolved ones instead.
+     * customers. Pass `status=refunded`, `status=assigned` or `status=house_funded` to see resolved ones instead.
      */
     public function index(Request $request): JsonResponse
     {
         $filters = $request->validate([
-            'status' => ['nullable', 'in:unmatched,assigned,refunded'],
+            'status' => ['nullable', 'in:unmatched,assigned,refunded,house_funded'],
             'from' => ['nullable', 'date_format:Y-m-d'],
             'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:200'],

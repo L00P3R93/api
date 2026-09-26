@@ -9,6 +9,7 @@ use App\Models\Customer;
 use App\Models\Deposit;
 use App\Models\Wallet;
 use App\Services\ExciseDutyService;
+use App\Services\HouseFundingService;
 use App\Services\LedgerService;
 use App\Services\ReferralService;
 use Illuminate\Http\JsonResponse;
@@ -20,6 +21,7 @@ class DepositController extends Controller
         private LedgerService $ledgerService,
         private ExciseDutyService $exciseDutyService,
         private ReferralService $referralService,
+        private HouseFundingService $houseFunding,
     ) {}
 
     /**
@@ -73,6 +75,16 @@ class DepositController extends Controller
                 'message' => 'Customer not found. Deposit moved to suspense.',
                 'deposit' => $deposit,
             ], 404);
+        }
+
+        // Money paid to the house account is owner funding, not a deposit: finance records it as house funding.
+        if ((int) $customer->id === $this->houseFunding->houseCustomerId()) {
+            $deposit->update(['status' => Deposit::STATUS_UNMATCHED]);
+
+            return response()->json([
+                'message' => 'Payment to the house account left unmatched. Record it as house funding.',
+                'deposit' => $deposit,
+            ], 202);
         }
 
         // Credit, excise duty and transaction row are written together or not at all.

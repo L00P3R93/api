@@ -15,6 +15,9 @@ class DepositResolution extends Model
 
     public const ACTION_REFUNDED = 'refunded';
 
+    /** Owner money credited to the house wallet (HouseFunding). Removed if the funding is voided. */
+    public const ACTION_HOUSE_FUNDED = 'house_funded';
+
     protected $fillable = [
         'deposit_id',
         'action',

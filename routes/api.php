@@ -34,6 +34,7 @@ use App\Http\Controllers\api\v1\GameRefundController;
 use App\Http\Controllers\api\v1\GameTransactionController;
 use App\Http\Controllers\api\v1\GameWalletController;
 use App\Http\Controllers\api\v1\GameWalletWithdrawController;
+use App\Http\Controllers\api\v1\HouseFundingController;
 use App\Http\Controllers\api\v1\PlaygroundController;
 use App\Http\Controllers\api\v1\PromoCodeController;
 use App\Http\Controllers\api\v1\PurchaseController;
@@ -168,6 +169,7 @@ Route::prefix('/v1')->group(function () {
                 Route::get('/referrals/bonuses', [FinanceDrilldownController::class, 'referralBonuses']);
                 Route::get('/referrals/withdrawals', [FinanceDrilldownController::class, 'referralWithdrawals']);
                 Route::get('/promotions', [FinanceDrilldownController::class, 'promotions']);
+                Route::get('/house-funding', [FinanceDrilldownController::class, 'houseFunding']);
                 Route::get('/customers/top', [FinanceDrilldownController::class, 'topCustomers']);
                 Route::get('/export/{report}', FinanceExportController::class);
             });
@@ -245,6 +247,9 @@ Route::prefix('/v1')->group(function () {
             Route::get('/deposits/{encryptedIdentifier}', [DepositController::class, 'show']);
             Route::post('/deposits/{encryptedIdentifier}/assign', [UnmatchedDepositController::class, 'assign'])->middleware(['idempotency', 'throttle:write']);
             Route::post('/deposits/{encryptedIdentifier}/refund', [UnmatchedDepositController::class, 'refund'])->middleware(['idempotency', 'throttle:write']);
+            // Owner money paid to the paybill: credit it to the house wallet, or void that
+            Route::post('/deposits/{encryptedIdentifier}/house-funding', [HouseFundingController::class, 'store'])->middleware(['idempotency', 'throttle:write']);
+            Route::post('/finance/house-funding/{encryptedIdentifier}/void', [HouseFundingController::class, 'void'])->middleware(['idempotency', 'throttle:write']);
 
             // Wallet Transfer Routes
             Route::post('/wallets/transfer/{encryptedIdentifier}', WalletTransferController::class)->middleware(['idempotency', 'throttle:write']);
@@ -334,7 +339,6 @@ Route::prefix('/v1')->group(function () {
             return $request->user();
         })->middleware('auth:sanctum');
     });
-
 
     // Callback URLS
     Route::middleware('throttle:callback')->group(function () {

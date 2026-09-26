@@ -16,6 +16,7 @@ use App\Services\FinancePaymentReportService;
 use App\Services\FinancePromotionReportService;
 use App\Services\FinanceReferralReportService;
 use App\Services\FinanceReportService;
+use App\Services\HouseFundingService;
 use Illuminate\Http\JsonResponse;
 
 class FinanceDrilldownController extends Controller
@@ -33,6 +34,7 @@ class FinanceDrilldownController extends Controller
         private FinanceDisputeReportService $disputes,
         private FinanceReferralReportService $referrals,
         private FinancePromotionReportService $promotions,
+        private HouseFundingService $houseFunding,
     ) {}
 
     public function deposits(FinanceDepositListRequest $request): JsonResponse
@@ -73,6 +75,14 @@ class FinanceDrilldownController extends Controller
     public function expenses(FinanceListRequest $request): JsonResponse
     {
         return $this->paged($request, $this->expenses->listing($request->dateRange(), $request->filters()));
+    }
+
+    /**
+     * Owner money credited to the house wallet (house funding), by the day it was recorded.
+     */
+    public function houseFunding(FinanceListRequest $request): JsonResponse
+    {
+        return $this->paged($request, $this->houseFunding->listing($request->dateRange(), $request->filters()));
     }
 
     public function disputes(FinanceListRequest $request): JsonResponse

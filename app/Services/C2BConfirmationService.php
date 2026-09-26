@@ -13,6 +13,7 @@ class C2BConfirmationService
     public function __construct(
         private LedgerService $ledgerService,
         private WalletDepositService $walletDepositService,
+        private HouseFundingService $houseFunding,
     ) {}
 
     public function processCallback(array $depositData): array
@@ -52,6 +53,18 @@ class C2BConfirmationService
                     'ResultCode' => 'C2B00016',
                     'ResultDesc' => 'Invalid customer',
                     'status' => 500,
+                ];
+            }
+
+            // Money paid to the house account is owner funding, not a deposit: finance records it as house funding.
+            if ((int) $customer->id === $this->houseFunding->houseCustomerId()) {
+                $deposit->update(['status' => Deposit::STATUS_UNMATCHED]);
+                Log::channel('mpesa')->warning('MPESA Confirmation to the house account left unmatched for house funding', ['trans_id' => $deposit->trans_id]);
+
+                return [
+                    'ResultCode' => '0',
+                    'ResultDesc' => 'Accepted',
+                    'status' => 201,
                 ];
             }
 
