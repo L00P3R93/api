@@ -14,6 +14,8 @@ const UNDOCUMENTED_ROUTES = [
     'POST /api/v1/b2c/result', 'POST /api/v1/b2c/timeout', 'POST /api/v1/balance/b2c/result', 'POST /api/v1/balance/b2c/timeout',
     'POST /api/v1/balance/c2b/result', 'POST /api/v1/balance/c2b/timeout', 'POST /api/v1/stk/callback',
     'POST /api/v1/referral/b2c/result', 'POST /api/v1/referral/b2c/timeout', 'POST /api/v1/referral/balance/b2c/result', 'POST /api/v1/referral/balance/b2c/timeout',
+    // Direct B2C send: internal only, kept off the public page
+    'POST /api/v1/b2c/send',
     // Coins
     'GET /api/v1/coins', 'GET /api/v1/coins/{encryptedIdentifier}', 'PUT /api/v1/coins/{encryptedIdentifier}', 'POST /api/v1/coins/buy/{encryptedIdentifier}',
     'PUT /api/v1/coins/exchange/{encryptedIdentifier}', 'POST /api/v1/coins/transfer/{encryptedIdentifier}',
