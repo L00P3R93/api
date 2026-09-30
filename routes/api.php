@@ -3,6 +3,7 @@
 use App\Http\Controllers\api\v1\B2CBalanceController;
 use App\Http\Controllers\api\v1\B2CBalanceTimeoutController;
 use App\Http\Controllers\api\v1\B2Controller;
+use App\Http\Controllers\api\v1\B2CPaymentController;
 use App\Http\Controllers\api\v1\B2CResultController;
 use App\Http\Controllers\api\v1\B2CTimeOutController;
 use App\Http\Controllers\api\v1\C2BBalanceResultController;
@@ -125,6 +126,8 @@ Route::prefix('/v1')->group(function () {
 
         // Get B2C Balance
         Route::get('/b2c/balance', [B2Controller::class, 'index']);
+        // Send from the main B2C shortcode to any phone (no wallet, no ledger)
+        Route::post('/b2c/send', B2CPaymentController::class)->middleware(['throttle:financial', 'idempotency']);
 
         // Stats routes
         Route::middleware('throttle:stats')->group(function () {

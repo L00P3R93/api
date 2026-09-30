@@ -5093,6 +5093,64 @@ Accept: application/json</pre></div>
 <p class="endpoint-note">Also returns 401 (API key): see <a href="#" data-section="errors" style="color:var(--accent-blue)">Error Responses</a>.</p>
 </div></div>
 
+<div class="endpoint">
+<div class="endpoint-header" onclick="toggle(this)">
+<span class="method method-post">POST</span>
+<span class="endpoint-path">/api/v1/b2c/send</span>
+<span class="endpoint-desc">Send money from the main B2C shortcode to any phone</span>
+<span class="chevron">&#9654;</span>
+</div>
+<div class="endpoint-body">
+<div class="tags"><span class="tag tag-auth">API Key</span><span class="tag tag-idempotent">Idempotent</span><span class="tag tag-rate">5/min</span></div>
+<div class="response-list" style="margin-top:10px"><span class="status-code status-201">201 Created</span> <span class="status-code status-422">422 Unprocessable</span> <span class="status-code status-500">500 Server Error</span> <span class="status-code status-503">503 Unavailable</span></div>
+<p class="endpoint-note">Pays <code>amount</code> from the main B2C shortcode straight to <code>phone</code>. <strong>No wallet is debited and nothing is written to the ledger</strong>, so the payout does not appear in finance reports and shows as an unexplained drop in the B2C float on <a href="#" data-section="finance-statements" style="color:var(--accent-blue)">reconciliation</a>. <code>201</code> means M-Pesa accepted the request; the final result is logged when Safaricom calls back. <strong>Send an <code>Idempotency-Key</code></strong> so a retry does not pay twice (see <a href="#" data-section="auth" style="color:var(--accent-blue)">Idempotency</a>).</p>
+<div class="endpoint-section"><h4>Request Body</h4>
+<table class="params-table">
+<tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+<tr><td>phone</td><td>string</td><td><span class="required">Required</span></td><td>Kenyan mobile number: <code>0712345678</code>, <code>254712345678</code> or <code>+254712345678</code></td></tr>
+<tr><td>amount</td><td>integer</td><td><span class="required">Required</span></td><td>Whole KES, at least 10</td></tr>
+<tr><td>remarks</td><td>string</td><td>Optional</td><td>Up to 100 characters. Default <code>Business Payment</code></td></tr>
+</table></div>
+<div class="endpoint-section"><h4>Example Request</h4>
+<pre>POST /api/v1/b2c/send HTTP/1.1
+Host: api.kadi-kings.co.ke
+X-API-KEY: your-api-key-here
+Idempotency-Key: 3f2e1d0c-9b8a-4c7d-8e6f-5a4b3c2d1e0f
+Accept: application/json
+Content-Type: application/json
+
+{
+  "phone": "0712345678",
+  "amount": 500
+}</pre></div>
+<div class="endpoint-section"><h4>Response (201: sent to M-Pesa)</h4>
+<pre>{
+  "status": "success",
+  "phone": "254712345678",
+  "amount": 500,
+  "conversation_id": "AG_20260930_0000123456789abcdef",
+  "originator_conversation_id": "12345-67890123-1"
+}</pre></div>
+<div class="endpoint-section"><h4>Response (422: validation failed)</h4>
+<pre>{
+  "message": "The phone must be a Kenyan mobile number, e.g. 0712345678 or 254712345678.",
+  "errors": {
+    "phone": [
+      "The phone must be a Kenyan mobile number, e.g. 0712345678 or 254712345678."
+    ]
+  }
+}</pre></div>
+<div class="endpoint-section"><h4>Response (500: M-Pesa refused)</h4>
+<pre>{
+  "status": "M-Pesa API error: The initiator information is invalid."
+}</pre></div>
+<div class="endpoint-section"><h4>Response (503: shortcode not configured)</h4>
+<pre>{
+  "status": "B2C shortcode is not configured"
+}</pre></div>
+<p class="endpoint-note">Also returns 401 (API key), 409 (Idempotency-Key reused), 429 (rate limit): see <a href="#" data-section="errors" style="color:var(--accent-blue)">Error Responses</a>.</p>
+</div></div>
+
 </div>
 
 
